@@ -22,6 +22,12 @@
    "contributes": {
       "commands": [
          {
+            "command": "forester.scanMacros",
+            "title": "Scan Macros for Formatter",
+            "category": "Forester",
+            "icon": "$(search)"
+         },
+         {
             "command": "forester.newTree",
             "title": "New Tree",
             "category": "Forester",
@@ -180,6 +186,19 @@
                   "Open the new tree as the active editor"
                ],
                "description": "Controls how newly created trees are opened in the editor."
+            },
+            "forester.formatter.ignoredCommands": {
+               "type": "array",
+               "items": {
+                  "type": "string"
+               },
+               "default": [],
+               "description": "List of commands whose content should not be reformatted. Content inside these blocks is preserved exactly as written. Use 'Forester: Scan Macros' command to auto-detect macros."
+            },
+            "forester.formatter.autoScanMacros": {
+               "type": "boolean",
+               "default": true,
+               "description": "Automatically scan workspace for macro definitions and add them to ignored commands."
             }
          }
       },
@@ -187,7 +206,9 @@
          "[forester]": {
             "editor.wordWrap": "on",
             "editor.tabSize": 2,
-            "editor.wordBasedSuggestions": "off"
+            "editor.wordBasedSuggestions": "off",
+            "editor.formatOnSave": false,
+            "editor.defaultFormatter": "JarredFilmer.topos-vscode-forester"
          }
       },
       "languages": [
@@ -248,7 +269,11 @@
       "compile": "tsc -p ./",
       "build": "tsc -p ./",
       "watch": "tsc -watch -p ./",
-      "lint": "eslint src --ext ts"
+      "lint": "eslint src --ext ts",
+      "test:formatter": "npx tsx src/formatter.test.ts",
+      "package": "vsce package",
+      "install-local": "npm run package && code --install-extension topos-vscode-forester-*.vsix",
+      "package-install": "npm run package && code --install-extension topos-vscode-forester-*.vsix"
    },
    "devDependencies": {
       "@types/node": "18.x",

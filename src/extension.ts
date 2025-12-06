@@ -5,6 +5,8 @@ import { getRoot, getAvailableTemplates } from "./utils";
 import { transcludeNewTree, renameTreeCommand, newTree } from "./edit-forest";
 import { ForesterWebviewProvider } from "./forestStructureView";
 import { TranscludeDecorationProvider } from "./transclude-decorations";
+import { ForesterDocumentFormattingEditProvider, ForesterDocumentRangeFormattingEditProvider } from "./formatter";
+import { initFormatterConfig, scanMacrosCommand, refreshIgnoredCommandsCache, clearIgnoredCommandsCache } from "./formatter-config";
 
 function suggest(trees: Forest, range: vscode.Range) {
    var results: vscode.CompletionItem[] = [];
@@ -54,8 +56,29 @@ export async function activate(context: vscode.ExtensionContext) {
    // Track pinned state for context
    vscode.commands.executeCommand('setContext', 'foresterTreeViewPinned', false);
 
+   // Initialize formatter config and scan for macros
+   await initFormatterConfig();
+   await refreshIgnoredCommandsCache();
+
+   // Watch for configuration changes to refresh the ignored commands cache
+   context.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration(e => {
+         if (e.affectsConfiguration("forester.formatter")) {
+            clearIgnoredCommandsCache();
+            refreshIgnoredCommandsCache();
+         }
+      })
+   );
+
    // Register tree commands
    context.subscriptions.push(
+      vscode.commands.registerCommand(
+         "forester.scanMacros",
+         async () => {
+            await scanMacrosCommand();
+            await refreshIgnoredCommandsCache();
+         }
+      ),
       vscode.commands.registerCommand(
          "forester.newTree",
          (folder?: vscode.Uri) => newTree(folder, false)
@@ -203,6 +226,22 @@ export async function activate(context: vscode.ExtensionContext) {
    // Initialize transclude decorations
    const transcludeDecorations = new TranscludeDecorationProvider();
    transcludeDecorations.activate(context);
+
+   // Register document formatter
+   context.subscriptions.push(
+      vscode.languages.registerDocumentFormattingEditProvider(
+         { scheme: "file", language: "forester" },
+         new ForesterDocumentFormattingEditProvider()
+      )
+   );
+
+   // Register range formatter
+   context.subscriptions.push(
+      vscode.languages.registerDocumentRangeFormattingEditProvider(
+         { scheme: "file", language: "forester" },
+         new ForesterDocumentRangeFormattingEditProvider()
+      )
+   );
 
    // Register definition provider for navigation
    const definitionProvider = vscode.languages.registerDefinitionProvider(

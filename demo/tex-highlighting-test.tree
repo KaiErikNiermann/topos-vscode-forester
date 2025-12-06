@@ -1,0 +1,38 @@
+\title{LaTeX Highlighting Test}
+
+\p{This tests the LaTeX syntax highlighting in \code{\\tex} blocks.}
+
+% Example 1: Both args should have LaTeX highlighting (no verbatim)
+\tex{
+  \usepackage{amsmath}
+  \usepackage{tikz-cd}
+}{
+  \begin{tikzcd}
+    A \arrow[r] & B \arrow[d] \\
+    C \arrow[u] & D \arrow[l]
+  \end{tikzcd}
+}
+
+% Example 2: First arg LaTeX, second arg verbatim (no highlighting)
+\tex{
+  \usepackage{eulervm}
+  \usepackage{amsmath}
+}{
+  \startverb
+  \begin{align*}
+    \forall a, i, v.\; [a \langle i \triangleleft v \rangle][i] &= v \quad \tag{Read-Over-Write 1} \\
+    \forall a, b.\; (\forall i.\; a[i] = b[i]) &\implies a = b \quad \tag{Extensionality}
+  \end{align*}
+  \stopverb
+}
+
+% Example 3: Simple inline tex
+\tex{\usepackage{mathrsfs}}{\mathscr{C}}
+
+% Normal forester content
+\p{Regular paragraph with #{inline math} and some text.}
+
+\ul{
+  \li{List item 1}
+  \li{List item 2}
+}

@@ -6,6 +6,7 @@
   "repository": {
     "body": {
       "patterns": [
+        { "include": "#tex-command" },
         { "include": "#tex" },
         { "include": "#verbatim" },
         { "include": "#link" },
@@ -81,6 +82,7 @@
       ]
     },
     "tex": {
+      "comment": "\\startverb%tex block with LaTeX highlighting",
       "begin": "(\\\\startverb)(%)(tex).*",
       "end": "\\\\stopverb",
       "patterns": [
@@ -95,6 +97,78 @@
         "0": { "name": "constant.language.forester" }
       },
       "contentName": "embedded.latex"
+    },
+    "tex-command": {
+      "comment": "\\tex{preamble}{content} - handles both arguments",
+      "begin": "(\\\\tex)\\s*(\\{)",
+      "end": "(\\})",
+      "beginCaptures": {
+        "1": { "name": "constant.language.forester" },
+        "2": { "name": "punctuation.definition.group.begin.forester" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.group.end.forester" }
+      },
+      "patterns": [
+        { "include": "#tex-preamble-content" }
+      ]
+    },
+    "tex-preamble-content": {
+      "comment": "Content inside \\tex first arg (preamble) with LaTeX highlighting",
+      "patterns": [
+        { "include": "#tex-nested-brace-latex" },
+        { "include": "text.tex.latex" },
+        { "include": "#tex-second-arg" }
+      ]
+    },
+    "tex-second-arg": {
+      "comment": "Second argument of \\tex - content with possible verbatim",
+      "begin": "(\\})\\s*(\\{)",
+      "end": "(\\})",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.group.end.forester" },
+        "2": { "name": "punctuation.definition.group.begin.forester" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.group.end.forester" }
+      },
+      "patterns": [
+        { "include": "#tex-verbatim-block" },
+        { "include": "#tex-nested-brace-content" },
+        { "include": "text.tex.latex" }
+      ],
+      "contentName": "meta.embedded.block.latex"
+    },
+    "tex-nested-brace-latex": {
+      "comment": "Nested braces in LaTeX preamble",
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        { "include": "#tex-nested-brace-latex" },
+        { "include": "text.tex.latex" }
+      ]
+    },
+    "tex-verbatim-block": {
+      "comment": "Verbatim block inside \\tex content - no LaTeX highlighting",
+      "begin": "\\\\startverb",
+      "end": "\\\\stopverb",
+      "contentName": "markup.raw.forester",
+      "beginCaptures": {
+        "0": { "name": "constant.language.forester" }
+      },
+      "endCaptures": {
+        "0": { "name": "constant.language.forester" }
+      }
+    },
+    "tex-nested-brace-content": {
+      "comment": "Nested braces in tex content that may contain verbatim",
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        { "include": "#tex-verbatim-block" },
+        { "include": "#tex-nested-brace-content" },
+        { "include": "text.tex.latex" }
+      ]
     },
     "verbatim": {
       "begin": "\\\\startverb",

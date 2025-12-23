@@ -1,0 +1,12 @@
+\subtree{
+  \title{Test}
+  \p{Some text}
+  
+  \codeblock{lean}{
+    inductive Nat where
+    | zero : Nat
+    | succ (n : Nat) : Nat
+}
+  
+  \p{More text}
+}

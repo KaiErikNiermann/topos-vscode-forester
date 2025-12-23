@@ -1,12 +1,17 @@
 import * as vscode from "vscode";
+import { TextDecoder } from "util";
 
 import { Forest, cleanupServer, getForest, onForestChange, initForestMonitoring, getTree, initStatusBar, getForestStatus } from "./get-forest";
 import { getRoot, getAvailableTemplates } from "./utils";
 import { transcludeNewTree, renameTreeCommand, newTree } from "./edit-forest";
 import { ForesterWebviewProvider } from "./forestStructureView";
 import { TranscludeDecorationProvider } from "./transclude-decorations";
-import { ForesterDocumentFormattingEditProvider, ForesterDocumentRangeFormattingEditProvider } from "./formatter";
+import { ForesterDocumentFormattingEditProvider, ForesterDocumentRangeFormattingEditProvider, formatAllTreeFiles } from "./formatter";
 import { initFormatterConfig, scanMacrosCommand, refreshIgnoredCommandsCache, clearIgnoredCommandsCache } from "./formatter-config";
+import { initLanguageToolBridge, checkAllTreeFilesCommand } from "./languageToolIntegration";
+import { registerSpeedFixCommand } from "./speedfix";
+
+const textDecoder = new TextDecoder("utf-8");
 
 function suggest(trees: Forest, range: vscode.Range) {
    var results: vscode.CompletionItem[] = [];
@@ -29,6 +34,118 @@ function suggest(trees: Forest, range: vscode.Range) {
       results.push(item);
    }
    return results;
+}
+
+function getMacroNameAtPosition(line: string, position: vscode.Position): string | undefined {
+   const match = getMacroMatchAtPosition(line, position);
+   return match?.name;
+}
+
+interface MacroMatch {
+   name: string;
+   start: number;
+   end: number;
+}
+
+function getMacroMatchAtPosition(line: string, position: vscode.Position): MacroMatch | undefined {
+   const macroPattern = /\\([A-Za-z][A-Za-z0-9\-]*)/g;
+   let match: RegExpExecArray | null;
+   while ((match = macroPattern.exec(line)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (position.character >= start && position.character <= end) {
+         return { name: match[1], start, end };
+      }
+   }
+   return undefined;
+}
+
+interface MacroDefinitionInfo {
+   uri: vscode.Uri;
+   definitionRange: vscode.Range;  // Full range of the definition (for highlighting in peek)
+   targetRange: vscode.Range;      // Where to position cursor
+}
+
+async function findMacroDefinitionLocations(macroName: string, originRange?: vscode.Range): Promise<vscode.LocationLink[]> {
+   const workspaceFolders = vscode.workspace.workspaceFolders;
+   if (!workspaceFolders || workspaceFolders.length === 0) {
+      return [];
+   }
+
+   // Match \def\macroName or \alloc\macroName patterns
+   const defRegex = new RegExp(`\\\\(def|alloc)\\\\${macroName}(?![A-Za-z0-9-])`, 'g');
+   const treeFiles = await vscode.workspace.findFiles("**/*.tree", "**/node_modules/**");
+   const locationLinks: vscode.LocationLink[] = [];
+
+   for (const file of treeFiles) {
+      try {
+         const raw = await vscode.workspace.fs.readFile(file);
+         const content = textDecoder.decode(raw);
+         const lines = content.split(/\r?\n/);
+         
+         for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            let match;
+            defRegex.lastIndex = 0;
+            
+            while ((match = defRegex.exec(line)) !== null) {
+               const matchStart = match.index;
+               const matchEnd = matchStart + match[0].length;
+               
+               // Find the extent of the full definition (scan for matching braces)
+               const definitionEndLine = findDefinitionEnd(lines, i, matchEnd);
+               
+               const targetRange = new vscode.Range(
+                  new vscode.Position(i, matchStart),
+                  new vscode.Position(i, matchEnd)
+               );
+               
+               const definitionRange = new vscode.Range(
+                  new vscode.Position(i, matchStart),
+                  new vscode.Position(definitionEndLine.line, definitionEndLine.char)
+               );
+               
+               locationLinks.push({
+                  originSelectionRange: originRange,
+                  targetUri: file,
+                  targetRange: definitionRange,      // This is what gets shown in peek
+                  targetSelectionRange: targetRange  // This is what gets highlighted
+               });
+            }
+         }
+      } catch (error) {
+         console.error(`Failed to read ${file.fsPath}:`, error);
+      }
+   }
+
+   return locationLinks;
+}
+
+// Find the end of a macro definition by tracking brace depth
+function findDefinitionEnd(lines: string[], startLine: number, startChar: number): { line: number; char: number } {
+   let depth = 0;
+   let inDefinition = false;
+   
+   for (let lineNum = startLine; lineNum < lines.length && lineNum < startLine + 100; lineNum++) {
+      const line = lines[lineNum];
+      const startCol = lineNum === startLine ? startChar : 0;
+      
+      for (let col = startCol; col < line.length; col++) {
+         const char = line[col];
+         if (char === '{') {
+            depth++;
+            inDefinition = true;
+         } else if (char === '}') {
+            depth--;
+            if (inDefinition && depth === 0) {
+               return { line: lineNum, char: col + 1 };
+            }
+         }
+      }
+   }
+   
+   // Fallback: return end of start line if we can't find matching braces
+   return { line: startLine, char: lines[startLine].length };
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -59,6 +176,7 @@ export async function activate(context: vscode.ExtensionContext) {
    // Initialize formatter config and scan for macros
    await initFormatterConfig();
    await refreshIgnoredCommandsCache();
+   await initLanguageToolBridge(context);
 
    // Watch for configuration changes to refresh the ignored commands cache
    context.subscriptions.push(
@@ -78,6 +196,15 @@ export async function activate(context: vscode.ExtensionContext) {
             await scanMacrosCommand();
             await refreshIgnoredCommandsCache();
          }
+      ),
+      vscode.commands.registerCommand(
+         "forester.checkAllTreeFiles",
+         checkAllTreeFilesCommand
+      ),
+      ...registerSpeedFixCommand(context),
+      vscode.commands.registerCommand(
+         "forester.formatAllTrees",
+         formatAllTreeFiles
       ),
       vscode.commands.registerCommand(
          "forester.newTree",
@@ -250,6 +377,19 @@ export async function activate(context: vscode.ExtensionContext) {
          async provideDefinition(document, position) {
             // Get the line text
             const line = document.lineAt(position.line).text;
+
+            // Macro definition lookup
+            const macroMatch = getMacroMatchAtPosition(line, position);
+            if (macroMatch) {
+               const originRange = new vscode.Range(
+                  new vscode.Position(position.line, macroMatch.start),
+                  new vscode.Position(position.line, macroMatch.end)
+               );
+               const macroDefs = await findMacroDefinitionLocations(macroMatch.name, originRange);
+               if (macroDefs.length > 0) {
+                  return macroDefs;
+               }
+            }
 
             // Check for link patterns that contain the cursor position
             // We need to check for patterns that might span around the cursor

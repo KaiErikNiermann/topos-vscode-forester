@@ -2,647 +2,20 @@
  * Tests for the Forester formatter
  * 
  * Run with: npx ts-node src/formatter.test.ts
- * Or add to package.json scripts and run with npm test
  */
 
-// Re-implement the core formatting logic for testing (without vscode dependency)
-
-// Top-level metadata commands that should be on their own line
-const TOP_LEVEL_COMMANDS = [
-   "title", "taxon", "author", "contributor", "date", "parent", "tag", "meta", "number",
-   "import", "export", "namespace", "def", "let", "alloc", "open", "solution"
-];
-
-// Block-level commands that typically contain multi-line content
-const BLOCK_COMMANDS = [
-   "p", "ul", "ol", "li", "blockquote", "pre", "subtree", "query", "solution",
-   "texfig", "ltexfig", "scope", "figure"
-];
-
-// Commands whose content should be preserved exactly (like \tex{preamble}{content})
-const TEX_CONTENT_COMMANDS = [
-   "tex"
-];
-
-interface Token {
-   type: "command" | "text" | "brace_open" | "brace_close" | "bracket_open" | "bracket_close" |
-   "paren_open" | "paren_close" | "comment" | "whitespace" | "newline" | "math_inline" |
-   "math_display" | "verbatim_start" | "verbatim_end" | "verbatim_content" | "ignored_block";
-   value: string;
-   commandName?: string;
-}
-
-/**
- * Check if a command should have its content ignored/preserved
- */
-function isIgnoredCommand(commandName: string, ignoredCommands: Set<string>): boolean {
-   return ignoredCommands.has(commandName);
-}
-
-/**
- * Extract the full block content for an ignored command, including all its arguments.
- */
-function extractIgnoredBlockContent(text: string, startPos: number): { content: string; endPos: number } {
-   let i = startPos;
-   let content = "";
-   
-   let consumedBrace = false;
-   
-   while (i < text.length) {
-      while (i < text.length && /[ \t]/.test(text[i])) {
-         content += text[i];
-         i++;
-      }
-      
-      if (i >= text.length) break;
-      
-      if (text[i] === "[") {
-         let depth = 1;
-         content += text[i];
-         i++;
-         while (i < text.length && depth > 0) {
-            if (text[i] === "[") depth++;
-            else if (text[i] === "]") depth--;
-            content += text[i];
-            i++;
-         }
-      } else if (text[i] === "{") {
-         let depth = 1;
-         content += text[i];
-         i++;
-         while (i < text.length && depth > 0) {
-            if (text[i] === "{") depth++;
-            else if (text[i] === "}") depth--;
-            content += text[i];
-            i++;
-         }
-         consumedBrace = true;
-         continue;
-      } else if (text[i] === "\\" && !consumedBrace) {
-         // For \def\macroName style, consume the following command name
-         content += text[i];
-         i++;
-         while (i < text.length && /[A-Za-z0-9\-]/.test(text[i])) {
-            content += text[i];
-            i++;
-         }
-      } else {
-         break;
-      }
-   }
-   
-   return { content, endPos: i };
-}
-
-/**
- * Normalize indentation in multi-line math blocks.
- */
-function normalizeMultilineMath(mathBlock: string, baseIndent: string, indentUnit: string): string {
-   const isDisplay = mathBlock.startsWith("##{");
-   const prefix = isDisplay ? "##{" : "#{";
-   const content = mathBlock.slice(prefix.length, -1);
-   
-   if (!content.includes("\n")) {
-      return mathBlock;
-   }
-   
-   const lines = content.split("\n");
-   
-   let minIndent = Infinity;
-   for (let i = 1; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.trim().length > 0) {
-         const leadingSpaces = line.match(/^[ \t]*/)?.[0]?.length || 0;
-         minIndent = Math.min(minIndent, leadingSpaces);
-      }
-   }
-   
-   if (minIndent === Infinity) {
-      minIndent = 0;
-   }
-   
-   const contentIndent = baseIndent + indentUnit;
-   
-   const normalizedLines: string[] = [];
-   for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (i === 0) {
-         if (line.trim().length === 0) {
-            normalizedLines.push("");
-         } else {
-            normalizedLines.push(line.trim());
-         }
-      } else {
-         if (line.trim().length === 0) {
-            normalizedLines.push("");
-         } else {
-            const stripped = line.slice(minIndent);
-            normalizedLines.push(contentIndent + stripped.trim());
-         }
-      }
-   }
-   
-   const lastLine = normalizedLines[normalizedLines.length - 1];
-   if (lastLine.trim().length === 0) {
-      normalizedLines[normalizedLines.length - 1] = baseIndent;
-   }
-   
-   return prefix + normalizedLines.join("\n") + "}";
-}
-
-function tokenize(text: string, ignoredCommands: Set<string> = new Set()): Token[] {
-   const tokens: Token[] = [];
-   let i = 0;
-
-   while (i < text.length) {
-      // Check for verbatim blocks first
-      if (text.slice(i).startsWith("\\startverb")) {
-         const endIndex = text.indexOf("\\stopverb", i);
-         if (endIndex !== -1) {
-            let startEnd = i + 10;
-            while (startEnd < text.length && text[startEnd] !== '\n') {
-               startEnd++;
-            }
-            tokens.push({ type: "verbatim_start", value: text.slice(i, startEnd + 1) });
-            const contentStart = startEnd + 1;
-            const content = text.slice(contentStart, endIndex);
-            if (content.length > 0) {
-               tokens.push({ type: "verbatim_content", value: content });
-            }
-            tokens.push({ type: "verbatim_end", value: "\\stopverb" });
-            i = endIndex + 9;
-            continue;
-         }
-      }
-
-      // Check for comments (% to end of line)
-      if (text[i] === "%" && (i === 0 || text[i - 1] !== "\\")) {
-         let j = i;
-         while (j < text.length && text[j] !== "\n") {
-            j++;
-         }
-         tokens.push({ type: "comment", value: text.slice(i, j) });
-         i = j;
-         continue;
-      }
-
-      // Check for display math ##{...}
-      if (text.slice(i, i + 3) === "##{") {
-         let depth = 1;
-         let j = i + 3;
-         while (j < text.length && depth > 0) {
-            if (text[j] === "{") depth++;
-            else if (text[j] === "}") depth--;
-            j++;
-         }
-         tokens.push({ type: "math_display", value: text.slice(i, j) });
-         i = j;
-         continue;
-      }
-
-      // Check for inline math #{...}
-      if (text.slice(i, i + 2) === "#{") {
-         let depth = 1;
-         let j = i + 2;
-         while (j < text.length && depth > 0) {
-            if (text[j] === "{") depth++;
-            else if (text[j] === "}") depth--;
-            j++;
-         }
-         tokens.push({ type: "math_inline", value: text.slice(i, j) });
-         i = j;
-         continue;
-      }
-
-      // Check for commands (\word or \<xml>)
-      if (text[i] === "\\") {
-         if (i + 1 < text.length && (text[i + 1] === "%" || text[i + 1] === "\\")) {
-            tokens.push({ type: "text", value: text.slice(i, i + 2) });
-            i += 2;
-            continue;
-         }
-
-         if (text[i + 1] === "<") {
-            let j = i + 2;
-            while (j < text.length && text[j] !== ">") {
-               j++;
-            }
-            const commandName = text.slice(i + 2, j);
-            tokens.push({ type: "command", value: text.slice(i, j + 1), commandName });
-            i = j + 1;
-            continue;
-         }
-
-         let j = i + 1;
-         while (j < text.length && /[A-Za-z0-9\-\/#]/.test(text[j])) {
-            j++;
-         }
-         if (j > i + 1) {
-            const commandName = text.slice(i + 1, j);
-            
-            // Check if this is an ignored command - if so, extract entire block as-is
-            if (isIgnoredCommand(commandName, ignoredCommands)) {
-               const commandValue = text.slice(i, j);
-               const { content, endPos } = extractIgnoredBlockContent(text, j);
-               tokens.push({ 
-                  type: "ignored_block", 
-                  value: commandValue + content, 
-                  commandName 
-               });
-               i = endPos;
-               continue;
-            }
-            
-            // Check if this is a \tex command - preserve its content exactly
-            if (TEX_CONTENT_COMMANDS.includes(commandName)) {
-               const commandValue = text.slice(i, j);
-               const { content, endPos } = extractIgnoredBlockContent(text, j);
-               tokens.push({ 
-                  type: "ignored_block", 
-                  value: commandValue + content, 
-                  commandName 
-               });
-               i = endPos;
-               continue;
-            }
-            
-            tokens.push({ type: "command", value: text.slice(i, j), commandName });
-            i = j;
-            continue;
-         } else {
-            tokens.push({ type: "text", value: "\\" });
-            i++;
-            continue;
-         }
-      }
-
-      if (text[i] === "{") {
-         tokens.push({ type: "brace_open", value: "{" });
-         i++;
-         continue;
-      }
-      if (text[i] === "}") {
-         tokens.push({ type: "brace_close", value: "}" });
-         i++;
-         continue;
-      }
-      if (text[i] === "[") {
-         tokens.push({ type: "bracket_open", value: "[" });
-         i++;
-         continue;
-      }
-      if (text[i] === "]") {
-         tokens.push({ type: "bracket_close", value: "]" });
-         i++;
-         continue;
-      }
-      if (text[i] === "(") {
-         tokens.push({ type: "paren_open", value: "(" });
-         i++;
-         continue;
-      }
-      if (text[i] === ")") {
-         tokens.push({ type: "paren_close", value: ")" });
-         i++;
-         continue;
-      }
-      if (text[i] === "\n") {
-         tokens.push({ type: "newline", value: "\n" });
-         i++;
-         continue;
-      }
-      if (/[ \t\r]/.test(text[i])) {
-         let j = i;
-         while (j < text.length && /[ \t\r]/.test(text[j])) {
-            j++;
-         }
-         tokens.push({ type: "whitespace", value: text.slice(i, j) });
-         i = j;
-         continue;
-      }
-
-      let j = i;
-      while (j < text.length && !/[\\{}\[\]()%\n\r\t #]/.test(text[j])) {
-         j++;
-      }
-      while (j < text.length && text[j] === "#" && text[j + 1] !== "{" && text[j + 1] !== "#") {
-         j++;
-         while (j < text.length && !/[\\{}\[\]()%\n\r\t #]/.test(text[j])) {
-            j++;
-         }
-      }
-      if (j > i) {
-         tokens.push({ type: "text", value: text.slice(i, j) });
-         i = j;
-      } else {
-         tokens.push({ type: "text", value: text[i] });
-         i++;
-      }
-   }
-
-   return tokens;
-}
-
-interface FormatOptions {
-   tabSize: number;
-   insertSpaces: boolean;
-   ignoredCommands?: Set<string>;
-}
-
-function format(text: string, options: FormatOptions): string {
-   const ignoredCommands = options.ignoredCommands || new Set<string>();
-   const tokens = tokenize(text, ignoredCommands);
-   const indent = options.insertSpaces ? " ".repeat(options.tabSize) : "\t";
-
-   let result = "";
-   let depth = 0;
-   let lineStart = true;
-   let lastWasNewline = true;
-   let lastWasCommand = false;
-   let lastCommandName = "";
-   let consecutiveNewlines = 0;
-   let inVerbatim = false;
-
-   const contextStack: string[] = [];
-
-   function currentIndent(): string {
-      return indent.repeat(depth);
-   }
-
-   function pushContext(name: string) {
-      contextStack.push(name);
-   }
-
-   function popContext(): string | undefined {
-      return contextStack.pop();
-   }
-
-   function isTopLevelCommand(name: string): boolean {
-      return TOP_LEVEL_COMMANDS.includes(name);
-   }
-
-   function isBlockCommand(name: string): boolean {
-      return BLOCK_COMMANDS.includes(name);
-   }
-
-   for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-      const nextToken = tokens[i + 1];
-      const prevToken = tokens[i - 1];
-
-      if (token.type === "verbatim_start") {
-         inVerbatim = true;
-         if (!lineStart && !lastWasNewline) {
-            result += "\n";
-         }
-         result += currentIndent() + token.value;
-         lineStart = false;
-         lastWasNewline = false;
-         lastWasCommand = false;
-         consecutiveNewlines = 0;
-         continue;
-      }
-
-      if (token.type === "verbatim_content") {
-         result += token.value;
-         lineStart = false;
-         lastWasNewline = token.value.endsWith("\n");
-         continue;
-      }
-
-      if (token.type === "verbatim_end") {
-         inVerbatim = false;
-         result += token.value;
-         lineStart = false;
-         lastWasNewline = false;
-         lastWasCommand = false;
-         continue;
-      }
-
-      if (inVerbatim) {
-         result += token.value;
-         continue;
-      }
-
-      switch (token.type) {
-         case "ignored_block":
-            // Preserve ignored blocks exactly as-is, but with proper indentation on first line
-            if (lineStart) {
-               result += currentIndent();
-            }
-            result += token.value;
-            lineStart = false;
-            lastWasNewline = token.value.endsWith("\n");
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "comment":
-            if (!lineStart) {
-               if (!lastWasNewline && result.length > 0 && !result.endsWith(" ")) {
-                  result += " ";
-               }
-            } else {
-               result += currentIndent();
-            }
-            result += token.value;
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "newline":
-            consecutiveNewlines++;
-            if (consecutiveNewlines <= 2) {
-               result += "\n";
-            }
-            lineStart = true;
-            lastWasNewline = true;
-            lastWasCommand = false;
-            break;
-
-         case "whitespace":
-            if (!lineStart && !lastWasNewline) {
-               if (prevToken && (prevToken.type === "brace_open" || prevToken.type === "bracket_open" || prevToken.type === "paren_open")) {
-                  // Skip whitespace after opening delimiter
-               } else if (nextToken && (nextToken.type === "brace_close" || nextToken.type === "bracket_close" || nextToken.type === "paren_close")) {
-                  // Skip whitespace before closing delimiter
-               } else if (!result.endsWith(" ") && !result.endsWith("\n")) {
-                  result += " ";
-               }
-            }
-            break;
-
-         case "command":
-            const cmdName = token.commandName || "";
-
-            if (isTopLevelCommand(cmdName)) {
-               if (!lineStart && !lastWasNewline) {
-                  result += "\n";
-                  lineStart = true;
-               }
-            }
-
-            if (isBlockCommand(cmdName) && depth === 0 && !lineStart) {
-               result += "\n";
-               lineStart = true;
-            }
-
-            if (lineStart) {
-               result += currentIndent();
-            }
-
-            result += token.value;
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = true;
-            lastCommandName = cmdName;
-            consecutiveNewlines = 0;
-            break;
-
-         case "brace_open":
-            result += "{";
-            depth++;
-            pushContext(lastWasCommand ? lastCommandName : "brace");
-
-            // For block commands, add newline and indent (but don't add if next token is already newline)
-            if (lastWasCommand && isBlockCommand(lastCommandName)) {
-               // Only add newline if the next token isn't already a newline
-               if (nextToken && nextToken.type !== "newline") {
-                  result += "\n";
-                  lineStart = true;
-                  lastWasNewline = true;
-               } else {
-                  // Let the newline token handle it
-                  lineStart = false;
-                  lastWasNewline = false;
-               }
-            } else {
-               lineStart = false;
-               lastWasNewline = false;
-            }
-
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "brace_close":
-            depth = Math.max(0, depth - 1);
-            const ctx = popContext();
-
-            if (ctx && isBlockCommand(ctx)) {
-               // Remove trailing whitespace before adding newline
-               while (result.endsWith(" ") || result.endsWith("\t")) {
-                  result = result.slice(0, -1);
-               }
-               if (!result.endsWith("\n")) {
-                  result += "\n";
-               }
-               result += currentIndent() + "}";
-            } else {
-               if (result.endsWith(" ")) {
-                  result = result.slice(0, -1);
-               }
-               // If we're at the start of a line (after a newline), add proper indentation
-               if (lineStart || result.endsWith("\n")) {
-                  result += currentIndent() + "}";
-               } else {
-                  result += "}";
-               }
-            }
-
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "bracket_open":
-            result += "[";
-            depth++;
-            pushContext("bracket");
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "bracket_close":
-            depth = Math.max(0, depth - 1);
-            popContext();
-            if (result.endsWith(" ")) {
-               result = result.slice(0, -1);
-            }
-            result += "]";
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "paren_open":
-            result += "(";
-            depth++;
-            pushContext("paren");
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "paren_close":
-            depth = Math.max(0, depth - 1);
-            popContext();
-            if (result.endsWith(" ")) {
-               result = result.slice(0, -1);
-            }
-            result += ")";
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "math_inline":
-            if (lineStart) {
-               result += currentIndent();
-            }
-            result += token.value;
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "math_display":
-            if (lineStart) {
-               result += currentIndent();
-            }
-            result += normalizeMultilineMath(token.value, currentIndent(), indent);
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-
-         case "text":
-            if (lineStart) {
-               result += currentIndent();
-            }
-            result += token.value;
-            lineStart = false;
-            lastWasNewline = false;
-            lastWasCommand = false;
-            consecutiveNewlines = 0;
-            break;
-      }
-   }
-
-   result = result.trimEnd() + "\n";
-
-   return result;
-}
+import {
+   format,
+   tokenize,
+   checkContentPreservation,
+   FormatOptions,
+   Token,
+   TOP_LEVEL_COMMANDS,
+   BLOCK_COMMANDS,
+   TEX_CONTENT_COMMANDS,
+   CODE_CONTENT_COMMANDS,
+   normalizeCodeBlock
+} from "./formatter-core";
 
 // Test framework
 let testsPassed = 0;
@@ -719,6 +92,62 @@ test("Display math preservation", () => {
    assertContains(result, "U = \\{a, b, c\\}");
 });
 
+test("Display math formatting is preserved verbatim", () => {
+   const input = `##{
+  \\begin{align*}
+    p \\to q &\\equiv \\neg p \\lor q \\\\
+    p \\leftrightarrow q &\\equiv (p \\land q) \\lor (\\neg p \\land \\neg q)
+  \\end{align*}
+}`;
+
+   const expected = `${input}\n`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected);
+});
+
+test("Brace-delimited display math closing brace indentation in subtree", () => {
+   // The closing brace of ##{ } should be indented to match the opening
+   const input = `\\subtree{
+  \\p{Some text}
+  ##{
+    \\cf{sp}^\\# (s, a) = \\alpha (\\cf{sp}(s, \\gamma(a)))
+}
+}`;
+   const expected = `\\subtree{
+  \\p{
+    Some text
+  }
+  ##{
+    \\cf{sp}^\\# (s, a) = \\alpha (\\cf{sp}(s, \\gamma(a)))
+  }
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected);
+});
+
+test("Multiple brace-delimited math blocks indentation", () => {
+   const input = `\\subtree{
+  ##{
+    x = 1
+}
+  ##{
+    y = 2
+}
+}`;
+   const expected = `\\subtree{
+  ##{
+    x = 1
+  }
+  ##{
+    y = 2
+  }
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected);
+});
+
 test("Nested lists - basic", () => {
    const input = `\\ol{
 \\li{First item}
@@ -776,13 +205,77 @@ test("Solution block with nested content", () => {
         \\li{Yes, because #{f(a) = b}}
         \\li{Yes, because #{f(a) = b}}
       }
-    }
+   }
   }
 }`;
    const result = format(input, defaultOptions);
    assertContains(result, "\\solution{");
    assertContains(result, "\\ol{");
    assertContains(result, "\\li{");
+});
+
+test("Non-subtree macro remains ignored", () => {
+   const input = `\\def\\bold[body]{\\strong{   \\body  }}`;
+   const result = format(input, {
+      ...defaultOptions,
+      ignoredCommands: new Set(["bold"]),
+      subtreeMacros: new Set()
+   });
+
+   assertEqual(result, `\\def\\bold[body]{\\strong{   \\body  }}\n`);
+});
+
+test("Macro aliasing subtree is formatted like subtree", () => {
+   const input = `\\def\\solution[body]{ \\scope{
+   \\put\\transclude/toc{false}
+   \\put\\transclude/expanded{false}
+   \\subtree{
+     \\taxon{Solution}
+      \\body
+   }
+ }}`;
+
+   const expected = `\\def\\solution[body]{
+  \\scope{
+    \\put\\transclude/toc{false}
+    \\put\\transclude/expanded{false}
+    \\subtree{
+      \\taxon{Solution}
+      \\body
+    }
+  }
+}\n`;
+
+   const result = format(input, {
+      ...defaultOptions,
+      ignoredCommands: new Set(),
+      subtreeMacros: new Set(["solution"])
+   });
+
+   assertEqual(result, expected);
+});
+
+test("Macro subtree alias usage formats nested content", () => {
+   const input = `\\solution{\\ol{
+  \\li{Item}
+}}`;
+
+   const expected = `\\solution{
+  \\ol{
+    \\li{
+      Item
+    }
+  }
+}
+`;
+
+   const result = format(input, {
+      ...defaultOptions,
+      ignoredCommands: new Set(),
+      subtreeMacros: new Set(["solution"])
+   });
+
+   assertEqual(result, expected);
 });
 
 test("Preserve verbatim blocks exactly", () => {
@@ -834,6 +327,56 @@ test("Multiple blank lines should be collapsed to one", () => {
    const hasTripleNewline = result.includes("\n\n\n");
    if (hasTripleNewline) {
       throw new Error("Should not have more than 2 consecutive newlines");
+   }
+});
+
+test("Inline math at end of paragraph doesn't keep following blocks indented", () => {
+   const input = `\\date{2025-12-10}
+
+\\import{base-macros}
+
+\\taxon{Quiz}
+
+\\title{Finding inductive invariants}
+
+\\p{
+  Consider the following while loop #{W}:}
+  \\codeblock{lean}{
+    while i < n do
+      a[i] := 0;
+      i    := i + 1
+  }
+  \\p{
+    Consider the following pre-and-post condition:
+  }
+  ##{
+    \\{i = 0 \\land n > 0\\}\\ W\\ \\{\\forall j.\\ 0 \\leq j < n \\to a[j] = 0\\}
+}
+
+  \\solution{
+
+  }
+`;
+
+   const result = format(input, defaultOptions);
+
+   assertContains(result, "\\p{\n  Consider the following while loop #{W}:\n}", "Paragraph closing brace should be on its own line");
+
+   const lines = result.split("\n");
+   const codeblockLine = lines.find(l => l.includes("\\codeblock{lean}{"));
+   if (!codeblockLine) {
+      throw new Error("Formatted output should include the codeblock line");
+   }
+   if (codeblockLine.startsWith(" ") || codeblockLine.startsWith("\t")) {
+      throw new Error("Codeblock should not remain indented after the paragraph closes");
+   }
+
+   const solutionLine = lines.find(l => l.startsWith("\\solution{"));
+   if (!solutionLine) {
+      throw new Error("Formatted output should include the solution block");
+   }
+   if (solutionLine.startsWith(" ") || solutionLine.startsWith("\t")) {
+      throw new Error("Solution block should be at top-level indentation");
    }
 });
 
@@ -1406,6 +949,243 @@ test("Tex command idempotent", () => {
    const once = format(input, defaultOptions);
    const twice = format(once, defaultOptions);
    assertEqual(once, twice, "Tex command formatting should be idempotent");
+});
+
+test("Codeblock inside subtree - closing brace alignment", () => {
+   const input = `\\subtree{
+  \\title{Remarks}
+
+  \\codeblock{lean}{
+    some piece of code
+}
+}`;
+   const expected = `\\subtree{
+  \\title{Remarks}
+
+  \\codeblock{lean}{
+    some piece of code
+  }
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected, "Codeblock closing brace should align with opening");
+});
+
+test("Codeblock misaligned closing brace at column 0", () => {
+   const input = `\\subtree{
+  \\codeblock{lean}{
+    #check Nat
+}
+}`;
+   const expected = `\\subtree{
+  \\codeblock{lean}{
+    #check Nat
+  }
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected, "Codeblock closing brace at column 0 should be re-aligned");
+});
+
+test("Codeblock formatting is idempotent", () => {
+   const input = `\\subtree{
+  \\title{Remarks}
+
+  \\codeblock{lean}{
+    some piece of code
+}
+}`;
+   const once = format(input, defaultOptions);
+   const twice = format(once, defaultOptions);
+   assertEqual(once, twice, "Codeblock formatting should be idempotent");
+});
+
+test("Codeblock with closing brace inline with content", () => {
+   // This is a common pattern where the closing } is right after the last line of code
+   const input = `\\subtree{
+  \\codeblock{lean}{
+    def three : Nat := Nat.succ (Nat.succ (Nat.succ Nat.zero))
+  }
+}`;
+   const expected = `\\subtree{
+  \\codeblock{lean}{
+    def three : Nat := Nat.succ (Nat.succ (Nat.succ Nat.zero))
+  }
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected, "Codeblock with inline closing brace should format correctly");
+});
+
+test("Multiple codeblocks in sequence", () => {
+   const input = `\\subtree{
+  \\p{First paragraph}
+
+  \\codeblock{lean}{
+    code block 1
+}
+
+  \\p{Second paragraph}
+
+  \\codeblock{lean}{
+    code block 2
+}
+}`;
+   const expected = `\\subtree{
+  \\p{
+    First paragraph
+  }
+
+  \\codeblock{lean}{
+    code block 1
+  }
+
+  \\p{
+    Second paragraph
+  }
+
+  \\codeblock{lean}{
+    code block 2
+  }
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected, "Multiple codeblocks should all be formatted correctly");
+});
+
+test("Codeblock with multiline code content", () => {
+   const input = `\\subtree{
+  \\codeblock{lean}{
+    inductive Nat where
+    | zero : Nat
+    | succ (n : Nat) : Nat
+}
+}`;
+   const expected = `\\subtree{
+  \\codeblock{lean}{
+    inductive Nat where
+    | zero : Nat
+    | succ (n : Nat) : Nat
+  }
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected, "Codeblock with multiline content should preserve content and align braces");
+});
+
+test("Codeblock at top level (no nesting)", () => {
+   const input = `\\codeblock{lean}{
+  some code
+}`;
+   const expected = `\\codeblock{lean}{
+  some code
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected, "Top-level codeblock should format with no base indent");
+});
+
+test("Real world example - codeblock in nested li", () => {
+   const input = `\\ul{
+  \\li{
+    #{f : X \\to X} where #{f} maps each node to the next node along the arrow. That is
+    \\codeblock{lean}{
+      f(a) = b
+      f(b) = c
+      f(c) = d
+    }
+  }
+}`;
+   const expected = `\\ul{
+  \\li{
+    #{f : X \\to X} where #{f} maps each node to the next node along the arrow. That is
+    \\codeblock{lean}{
+      f(a) = b
+      f(b) = c
+      f(c) = d
+    }
+  }
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected, "Codeblock inside nested li should have correct indentation");
+});
+
+test("User's full document excerpt - codeblocks in subtree", () => {
+   const input = `\\subtree{
+  \\title{The recursor for natural numbers}
+  \\p{
+    Before we define recursors.
+  }
+
+  \\codeblock{lean}{
+    inductive Nat where
+    | zero : Nat
+    | succ (n : Nat) : Nat
+}
+
+  \\p{
+    The idea here.
+  }
+
+  \\codeblock{lean}{
+    def three : Nat := Nat.succ (Nat.succ (Nat.succ Nat.zero))
+  }
+}`;
+   const result = format(input, defaultOptions);
+   console.log("=== DEBUG: User's document formatted ===");
+   console.log(result);
+   console.log("=== END DEBUG ===");
+   
+   // Check that codeblock closing braces are properly indented
+   assertContains(result, "  \\codeblock{lean}{", "First codeblock opening should be at subtree indent");
+   assertContains(result, "  }", "Codeblock closing brace should be at subtree indent level");
+   
+   // Check idempotency
+   const twice = format(result, defaultOptions);
+   assertEqual(result, twice, "User document should be idempotent");
+});
+
+test("Exact user case - closing brace at column 0", () => {
+   // This is the exact pattern from the user's report
+   const input = `\\subtree{
+  \\title{The recursor for natural numbers}
+  \\p{
+    Before we define recursors, let's first introduce the idea of an inductive type. We'll do this by examining how lean defines natural numbers.
+  }
+
+  \\codeblock{lean}{
+    inductive Nat where
+    | zero : Nat
+    | succ (n : Nat) : Nat
+}
+}`;
+   
+   const result = format(input, defaultOptions);
+   
+   // The result should have the codeblock with proper formatting:
+   // \codeblock{lean}{
+   //   content
+   // }
+   // Where the { is on same line as \codeblock{lang} and } is at 2-space indent
+   
+   // Check that codeblock content block starts with { on same line
+   const hasProperCodeblockStart = result.includes("\\codeblock{lean}{");
+   // Check that there's a } at 2-space indent after the code content
+   const hasProperCodeblockEnd = result.includes("| succ (n : Nat) : Nat\n  }");
+   
+   console.log("Has proper codeblock start:", hasProperCodeblockStart);
+   console.log("Has proper codeblock end:", hasProperCodeblockEnd);
+   
+   if (!hasProperCodeblockStart || !hasProperCodeblockEnd) {
+      console.log("Formatted result:");
+      console.log(result);
+      throw new Error("Codeblock should have proper indentation structure");
+   }
+   
+   // Check idempotency
+   const twice = format(result, defaultOptions);
+   assertEqual(result, twice, "Should be idempotent");
 });
 
 // Summary

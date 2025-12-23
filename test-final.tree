@@ -1,0 +1,13 @@
+\subtree{
+  \title{The recursor for natural numbers}
+  \p{
+    Before we define recursors.
+  }
+
+  \codeblock{lean}
+{
+inductive Nat where
+| zero : Nat
+| succ (n : Nat) : Nat
+}
+}

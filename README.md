@@ -84,3 +84,48 @@ You need forester installed, see [here](https://www.jonmsterling.com/jms-005P.xm
 }
 ```
 
+## LanguageTool Integration
+
+This extension includes a LanguageTool integration that provides grammar and spell checking for `.tree` files with special filtering to avoid false positives on Forester syntax.
+
+### Setup
+
+1. **Install LanguageTool extension**: Install the base LanguageTool extension (`adamvoss.vscode-languagetool`) and a language pack (e.g., `adamvoss.vscode-languagetool-en` for English).
+
+2. **Disable the original LanguageTool extension**: After installing, **disable** the original LanguageTool extension. The Forester extension will use its language server but apply filtering to avoid false positives on Forester commands.
+
+3. **Configure settings** (optional):
+
+   ```json
+   {
+     "forester.languageTool.enable": true,
+     "languageTool.language": "en"
+   }
+   ```
+
+### What gets filtered
+
+The integration automatically filters:
+
+- **Forester commands**: `\title`, `\taxon`, `\author`, `\transclude`, `\import`, `\export`, `\li`, `\ul`, `\ol`, `\strong`, `\em`, `\code`, etc.
+- **Command arguments**: Text inside braces `{...}` that are arguments to commands
+- **Whitespace rules**: LanguageTool's whitespace/punctuation spacing complaints
+- **Parenthesis rules**: Opening/closing parenthesis spacing complaints
+- **Code blocks**: Content in `\startverb`/`\stopverb` blocks and `\verb|...|` inline code
+
+### Custom ignore patterns
+
+Create a `.foresterLangIgnore` file in your workspace root to add custom ignore patterns (one regex pattern per line):
+
+```text
+# Ignore specific terms
+LaTeX
+Forester
+topos
+
+# Ignore patterns
+^[A-Z]{2,}$  # Ignore all-caps abbreviations
+```
+
+Use the "Add to .foresterLangIgnore" code action (lightbulb menu) to quickly add patterns when hovering over a diagnostic.
+

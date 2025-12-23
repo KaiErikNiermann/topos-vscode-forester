@@ -1,0 +1,10 @@
+{
+  "iconDefinitions": {
+    "tree": {
+      "iconPath": "./tree-file2.svg"
+    }
+  },
+  "fileExtensions": {
+    "tree": "tree"
+  }
+}

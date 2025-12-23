@@ -28,6 +28,30 @@
             "icon": "$(search)"
          },
          {
+            "command": "forester.checkAllTreeFiles",
+            "title": "Check All Tree Files (Grammar)",
+            "category": "Forester",
+            "icon": "$(checklist)"
+         },
+         {
+            "command": "forester.speedFix",
+            "title": "SpeedFix - Rapid Spelling/Grammar Fixes",
+            "category": "Forester",
+            "icon": "$(zap)"
+         },
+         {
+            "command": "forester.autoHideSyntaxNoise",
+            "title": "Auto-Hide Forester Syntax Noise",
+            "category": "Forester",
+            "icon": "$(filter)"
+         },
+         {
+            "command": "forester.formatAllTrees",
+            "title": "Format All Tree Files",
+            "category": "Forester",
+            "icon": "$(file-code)"
+         },
+         {
             "command": "forester.newTree",
             "title": "New Tree",
             "category": "Forester",
@@ -107,6 +131,12 @@
             "key": "ctrl+r",
             "mac": "cmd+r",
             "when": "editorTextFocus && resourceExtname == .tree"
+         },
+         {
+            "command": "forester.speedFix",
+            "key": "ctrl+shift+.",
+            "mac": "cmd+shift+.",
+            "when": "workspaceHasForesterFiles"
          }
       ],
       "configuration": {
@@ -151,6 +181,21 @@
                "type": "boolean",
                "default": true,
                "description": "Show inline title hints next to transclude/import/export commands."
+            },
+            "forester.languageTool.enable": {
+               "type": "boolean",
+               "default": true,
+               "description": "Enable LanguageTool grammar checking for Forester (.tree) files when the LanguageTool extension is installed."
+            },
+            "forester.languageTool.javaOpts": {
+               "type": "string",
+               "default": "",
+               "description": "Extra JAVA_OPTS passed to the LanguageTool server (e.g. '--add-opens java.base/java.util=ALL-UNNAMED'). If left empty, safe defaults for Java 17+ are applied automatically."
+            },
+            "forester.languageTool.language": {
+               "type": "string",
+               "default": "en",
+               "description": "LanguageTool language code for Forester files. Use 'en' for English (recommended), or locale codes like 'en-US', 'en-GB', 'de', 'fr' if you have the corresponding language pack installed."
             },
             "forester.taxonCustomization": {
                "type": "object",
@@ -217,6 +262,10 @@
             "extensions": [
                ".tree"
             ],
+            "icon": {
+               "light": "./resources/icons/tree-file2.svg",
+               "dark": "./resources/icons/tree-file2.svg"
+            },
             "configuration": "./resources/language/language-configuration.json"
          }
       ],
@@ -271,6 +320,7 @@
       "watch": "tsc -watch -p ./",
       "lint": "eslint src --ext ts",
       "test:formatter": "npx tsx src/formatter.test.ts",
+      "test:language-server": "npm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
       "package": "vsce package",
       "install-local": "npm run package && code --install-extension topos-vscode-forester-*.vsix",
       "package-install": "npm run package && code --install-extension topos-vscode-forester-*.vsix"
@@ -281,10 +331,13 @@
       "@typescript-eslint/eslint-plugin": "^6.19.1",
       "@typescript-eslint/parser": "^6.19.1",
       "eslint": "^8.56.0",
+      "tsx": "^4.21.0",
       "typescript": "^5.3.3"
    },
    "dependencies": {
       "@vscode/codicons": "^0.0.41",
-      "smol-toml": "^1.5.2"
+      "smol-toml": "^1.5.2",
+      "ts-pattern": "^5.9.0",
+      "vscode-languageclient": "^9.0.1"
    }
 }

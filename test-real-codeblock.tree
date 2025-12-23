@@ -1,0 +1,32 @@
+\date{2025-11-23}
+
+\import{base-macros}
+
+\taxon{Blog}
+
+\title{Understanding recursors with Lean4}
+
+\subtree{
+  \title{The recursor for natural numbers}
+  \p{
+    Before we define recursors, let's first introduce the idea of an inductive type. We'll do this by examining how lean defines natural numbers.
+  }
+
+  \codeblock{lean}{
+    inductive Nat where
+    | zero : Nat
+    | succ (n : Nat) : Nat
+}
+
+  \p{
+    The idea here being that we can construct natural numbers by either using the constructor \code{zero} to get \code{0}, or by applying the constructor \code{succ} to an existing natural number to get its successor. For example, we can construct \code{3} as follows:
+  }
+
+  \codeblock{lean}{
+    def three : Nat := Nat.succ (Nat.succ (Nat.succ Nat.zero))
+  }
+
+  \p{
+    We can equivalently express this definition using the type formation and term introduction rules:
+  }
+}

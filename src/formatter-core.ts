@@ -901,6 +901,9 @@ export function format(text: string, options: FormatOptions = {}): string {
                 consecutiveNewlines = 0;
             })
             .with({ type: "bracket_open" }, () => {
+                if (lineStart) {
+                    result += currentIndent();
+                }
                 result += "[";
                 depth++;
                 pushContext("bracket");

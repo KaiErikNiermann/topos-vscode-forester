@@ -187,6 +187,11 @@
                "default": true,
                "description": "Enable LanguageTool grammar checking for Forester (.tree) files when the LanguageTool extension is installed."
             },
+            "forester.languageTool.autoPopulateLtexConfig": {
+               "type": "boolean",
+               "default": true,
+               "description": "Automatically add Forester syntax noise (e.g., macro names, short tokens) to LTeX's dictionary and disabled rules in workspace settings. This helps suppress false positives without manual configuration."
+            },
             "forester.languageTool.javaOpts": {
                "type": "string",
                "default": "",

@@ -523,6 +523,22 @@ test("Link syntax [text](url)", () => {
    assertContains(result, "[this link](https://example.com)");
 });
 
+test("Link at start of line in li block is indented", () => {
+   const input = `\\ul{
+  \\li{
+[Build and view your forest](https://example.com)
+  }
+}`;
+   const expected = `\\ul{
+  \\li{
+    [Build and view your forest](https://example.com)
+  }
+}
+`;
+   const result = format(input, defaultOptions);
+   assertEqual(result, expected);
+});
+
 test("Wiki-style link [[id]]", () => {
    const input = `\\p{See [[some-tree-id]] for details.}`;
    const result = format(input, defaultOptions);

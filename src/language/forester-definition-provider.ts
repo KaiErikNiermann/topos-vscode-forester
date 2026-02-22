@@ -20,9 +20,11 @@ import { LocationLink } from 'vscode-languageserver';
 import {
     isCommand,
     isBraceArg,
+    isBracketGroup,
     isDocument,
     isTextFragment,
     type Command,
+    type TextFragment,
 } from './generated/ast.js';
 
 // Commands whose first brace arg is a tree-id / URI to navigate to
@@ -75,6 +77,27 @@ export class ForesterDefinitionProvider implements DefinitionProvider {
         // Case 2: cursor on a Command name → find its \def or \let binding site
         if (isCommand(astNode)) {
             return this.resolveMacroDefinition(astNode.name, leafNode.range);
+        }
+
+        // Case 3a: cursor on the method name TextFragment following a '#'
+        //   e.g. \get\myObj#methodName — `methodName` is a TextFragment after '#'
+        if (isTextFragment(astNode) && astNode.value.trim().length > 0 && astNode.value !== '#') {
+            if (this.isPrecededByHash(astNode)) {
+                return this.resolveMethodName(astNode.value.trim(), leafNode.range);
+            }
+        }
+
+        // Case 3b: cursor on method name inside \call{expr}{methodName}
+        //   The method name is a TextFragment in the SECOND BraceArg of \call
+        if (isTextFragment(astNode) && isBraceArg(astNode.$container)) {
+            const braceArg = astNode.$container;
+            if (isCommand(braceArg.$container) && braceArg.$container.name === '\\call') {
+                const callCmd = braceArg.$container;
+                const braceArgs = callCmd.args.filter(isBraceArg);
+                if (braceArgs[1] === braceArg) {
+                    return this.resolveMethodName(astNode.value.trim(), leafNode.range);
+                }
+            }
         }
 
         return undefined;
@@ -204,5 +227,70 @@ export class ForesterDefinitionProvider implements DefinitionProvider {
         }
         const prev = siblings[idx - 1];
         return isCommand(prev) ? prev : undefined;
+    }
+
+    /**
+     * Return true when `node` is immediately preceded by a TextFragment with
+     * value '#' in the same parent container's nodes array.
+     *
+     * This detects the `#methodName` suffix in `\get\myObj#methodName`.
+     */
+    private isPrecededByHash(node: TextFragment): boolean {
+        const container = node.$container as AstNode & { nodes?: AstNode[] };
+        const siblings = container.nodes;
+        if (!siblings) {
+            return false;
+        }
+        const idx = siblings.indexOf(node);
+        if (idx <= 0) {
+            return false;
+        }
+        const prev = siblings[idx - 1];
+        return isTextFragment(prev) && prev.value === '#';
+    }
+
+    /**
+     * Search all loaded workspace documents for \object and \patch commands
+     * that define a method named `methodName`.
+     *
+     * Method definitions appear as [methodName]{body} inside the body BraceArg
+     * of \object or \patch; the BracketGroup [methodName] is the definition site.
+     */
+    private resolveMethodName(methodName: string, sourceRange: SimpleRange): LocationLink[] | undefined {
+        if (!methodName) return undefined;
+
+        const results: LocationLink[] = [];
+        const OBJECT_CMDS: ReadonlySet<string> = new Set(['\\object', '\\patch']);
+
+        for (const doc of this.documents.all) {
+            const root = doc.parseResult.value;
+            for (const node of AstUtils.streamAllContents(root)) {
+                if (!isCommand(node) || !OBJECT_CMDS.has(node.name)) continue;
+
+                // The body is the last BraceArg of \object or \patch
+                const bodyArg = [...node.args].reverse().find(isBraceArg);
+                if (!bodyArg) continue;
+
+                // Scan body nodes for BracketGroup nodes whose first TextFragment
+                // matches the method name
+                for (const bodyNode of bodyArg.nodes) {
+                    if (!isBracketGroup(bodyNode)) continue;
+                    const firstText = bodyNode.nodes.find(isTextFragment);
+                    if (!firstText || firstText.value.trim() !== methodName) continue;
+
+                    const cst = bodyNode.$cstNode;
+                    if (cst) {
+                        results.push(LocationLink.create(
+                            doc.uri.toString(),
+                            cst.range,
+                            cst.range,
+                            sourceRange,
+                        ));
+                    }
+                }
+            }
+        }
+
+        return results.length > 0 ? results : undefined;
     }
 }

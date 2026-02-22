@@ -1058,6 +1058,63 @@ await test('datalog: \\rel/has-taxon inside \\datalog{} is a Command with slash 
     }
 });
 
+// ── Definition provider: object method navigation prerequisites (Task 7 nav) ──
+// resolveMethodName scans \object/\patch body BraceArg for BracketGroup nodes.
+// These tests verify the AST structure is as expected.
+
+await test('object: \\object body BraceArg contains BracketGroup for each method', async () => {
+    const source = '\\object[self]{[method1]{body1}[method2]{body2}}';
+    const doc = await parseClean(source);
+
+    // Import isBracketGroup for this test
+    const { isBracketGroup } = await import('./language/generated/ast.js');
+
+    const objCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\object');
+    assertOk(objCmd, 'Expected \\object command at top level');
+    if (!isCommand(objCmd)) throw new Error('Not a Command');
+
+    // Last BraceArg is the body
+    const braceArgs = objCmd.args.filter(isBraceArg);
+    const bodyArg = braceArgs[braceArgs.length - 1];
+    assertOk(bodyArg, 'Expected body BraceArg on \\object');
+
+    // Body nodes should include BracketGroup nodes for method names
+    const bracketGroups = bodyArg.nodes.filter(isBracketGroup);
+    assertEqual(bracketGroups.length, 2, 'Expected 2 BracketGroups (one per method)');
+
+    // First BracketGroup should contain TextFragment 'method1'
+    const firstFrag = bracketGroups[0].nodes.find(isTextFragment);
+    assertOk(firstFrag, 'Expected TextFragment inside first BracketGroup');
+    assertEqual(firstFrag.value.trim(), 'method1', 'First method name should be "method1"');
+
+    // Second BracketGroup should contain TextFragment 'method2'
+    const secondFrag = bracketGroups[1].nodes.find(isTextFragment);
+    assertOk(secondFrag, 'Expected TextFragment inside second BracketGroup');
+    assertEqual(secondFrag.value.trim(), 'method2', 'Second method name should be "method2"');
+});
+
+await test('object: #method TextFragment is immediately preceded by # TextFragment', async () => {
+    // \get\myObj#methodName — in the doc, # and methodName are separate TextFragments
+    const source = '\\get\\myObj#methodName';
+    const doc = await parseClean(source);
+
+    // Find the 'methodName' TextFragment (not '#')
+    const methodFrag = doc.nodes.find(
+        n => isTextFragment(n) && n.value === 'methodName',
+    );
+    assertOk(methodFrag, 'Expected methodName TextFragment at document level');
+    if (!isTextFragment(methodFrag)) throw new Error('Not a TextFragment');
+
+    // The preceding sibling should be a TextFragment with value '#'
+    const idx = doc.nodes.indexOf(methodFrag);
+    if (idx <= 0) throw new Error('No preceding sibling');
+    const prev = doc.nodes[idx - 1];
+    if (!isTextFragment(prev)) {
+        throw new Error(`Expected TextFragment before methodName, got ${prev.$type}`);
+    }
+    assertEqual(prev.value, '#', 'Preceding node should be TextFragment("#")');
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

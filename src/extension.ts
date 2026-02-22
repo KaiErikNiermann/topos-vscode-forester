@@ -27,6 +27,7 @@ import {
 } from "./link-aliases-config";
 import { ForestGraphView } from "./forest-graph-view";
 import { TransclusionTreeProvider } from "./transclusion-tree-view";
+import { BacklinksTreeProvider } from "./backlinks-view";
 
 const textDecoder = new TextDecoder("utf-8");
 
@@ -217,6 +218,19 @@ export async function activate(context: vscode.ExtensionContext) {
    );
    // Populate immediately for the current editor
    void transclusionProvider.update(vscode.window.activeTextEditor?.document);
+
+   // ── Backlinks View (native VS Code TreeView) ──────────────────────────────
+   const backlinksProvider = new BacklinksTreeProvider();
+   context.subscriptions.push(
+      vscode.window.createTreeView('foresterBacklinksView', {
+         treeDataProvider: backlinksProvider,
+         showCollapseAll: true,
+      }),
+      vscode.window.onDidChangeActiveTextEditor(editor => {
+         void backlinksProvider.update(editor?.document);
+      }),
+   );
+   void backlinksProvider.update(vscode.window.activeTextEditor?.document);
 
    // Track pinned state for context
    vscode.commands.executeCommand('setContext', 'foresterTreeViewPinned', false);

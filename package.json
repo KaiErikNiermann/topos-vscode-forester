@@ -390,6 +390,7 @@
       "build": "npm run compile",
       "lint": "eslint src --ext ts",
       "test:formatter": "npx tsx src/formatter.test.ts",
+      "test:langium-formatter": "npx esbuild src/langium-formatter.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-formatter-test.mjs && node out/langium-formatter-test.mjs",
       "test:latex-hover": "npx tsx src/latex-hover-core.test.ts",
       "test:tag-closure-inlay": "npx tsx src/tag-closure-inlay-core.test.ts",
       "test:subtree-auto-id": "npx tsx src/subtree-auto-id.test.ts",

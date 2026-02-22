@@ -83,13 +83,15 @@ export class ForesterFormatter extends AbstractFormatter {
         // TextFragment, Escape, MathText, MathBraceGroup — no reformatting.
     }
 
-    // ── Document: top-level nodes inherit no extra indentation ─────────────
+    // ── Document: top-level nodes handled via per-command newLine() calls ──
 
-    private formatDocumentNode(node: Document): void {
-        if (node.nodes.length === 0) return;
-        const formatter = this.getNodeFormatter(node);
-        // All top-level nodes start at column 0 (no extra indentation).
-        formatter.nodes(...node.nodes).prepend(Formatting.noIndent());
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private formatDocumentNode(_node: Document): void {
+        // Top-level indentation is managed per-command in formatCommand().
+        // We intentionally do NOT call formatter.nodes().prepend(noIndent())
+        // here: that API internally uses createTabTextEdit which adds a
+        // minimum of one newline before every non-first node, causing
+        // \def\macroName pairs to split across lines and breaking idempotence.
     }
 
     // ── Task 16 & 17: Command formatting ───────────────────────────────────

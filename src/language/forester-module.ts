@@ -49,5 +49,7 @@ export function createForesterServices(context: DefaultSharedModuleContext): {
         ForesterModule,
     ) as ForesterServices;
 
+    shared.ServiceRegistry.register(Forester);
+
     return { shared, Forester };
 }

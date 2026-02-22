@@ -707,6 +707,39 @@ await test('display math with LaTeX commands: \\nexists, \\ldots, \\land', async
     assertOk(md, 'Expected MathDisplay');
 });
 
+// ── Validator: \startverb…\stopverb error suppression ──────────────────────
+
+await test('\\startverb…\\stopverb with mismatched delimiters: parser errors suppressed by validator', async () => {
+    // This mirrors the pattern from 005d.tree: LaTeX half-open intervals
+    // [a, +∞) inside \startverb…\stopverb which have mismatched [ and )
+    const source = `##{
+  \\startverb
+  [a, +\\infty)
+  \\stopverb
+}`;
+    const doc = await parse(source);
+    // The parser WILL produce errors (mismatched [ and ))
+    // But the validator should filter them out
+    const diagnostics = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const parsingDiags = diagnostics.filter(d => (d.data as { code?: string })?.code === 'parsing-error');
+    if (parsingDiags.length > 0) {
+        throw new Error(
+            `Expected 0 parsing diagnostics after validator filtering, got ${parsingDiags.length}: ${parsingDiags.map(d => `${d.message} at L${d.range.start.line}:${d.range.start.character}`).join('; ')}`,
+        );
+    }
+});
+
+await test('parse errors outside \\startverb…\\stopverb are NOT suppressed', async () => {
+    // A mismatched delimiter NOT inside \startverb should still produce errors
+    const source = '\\p{text [unclosed}';
+    const doc = await parse(source);
+    const diagnostics = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const parsingDiags = diagnostics.filter(d => (d.data as { code?: string })?.code === 'parsing-error');
+    if (parsingDiags.length === 0) {
+        throw new Error('Expected parsing diagnostics for mismatched delimiters outside \\startverb');
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

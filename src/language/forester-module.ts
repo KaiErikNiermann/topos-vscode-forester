@@ -12,6 +12,7 @@ import { inject } from 'langium';
 import type { DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, PartialLangiumServices } from 'langium/lsp';
 import { createDefaultModule, createDefaultSharedModule } from 'langium/lsp';
 import { ForesterGeneratedModule, ForesterGeneratedSharedModule } from './generated/module.js';
+import { ForesterDocumentValidator } from './forester-validator.js';
 
 /**
  * Forester-specific services added on top of the default Langium LSP services.
@@ -27,6 +28,9 @@ export type ForesterServices = LangiumServices & ForesterAddedServices;
  * Formatting is NOT registered here — handled by formatter-core.ts instead.
  */
 export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = {
+    validation: {
+        DocumentValidator: (services) => new ForesterDocumentValidator(services),
+    },
 };
 
 /**

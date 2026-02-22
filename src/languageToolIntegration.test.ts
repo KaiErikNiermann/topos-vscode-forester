@@ -65,16 +65,16 @@ function shouldIgnoreDiagnostic(
    diag: MockDiagnostic
 ): boolean {
    const text = content.slice(diag.startOffset, diag.endOffset);
-   if (!text.trim()) return true;
-   if (!/[A-Za-z]/.test(text)) return true; // skip non-words
+   if (!text.trim()) {return true;}
+   if (!/[A-Za-z]/.test(text)) {return true;} // skip non-words
 
    // Ignore obvious macro-ish tokens
-   if (/^\\/.test(text)) return true;
-   if (/[\\{}$#]/.test(text)) return true;
-   if (/^\\?[A-Za-z]{1,3}$/.test(text)) return true; // very short tokens likely macro names
-   if (/^\\?(ul|li|p|ol|em|strong|taxon)$/i.test(text)) return true;
-   if (/^\\?(ul|li|ol|p)[{\\]/i.test(text)) return true;
-   if (/^\\?(ul|li|ol|p)\b/i.test(text)) return true;
+   if (/^\\/.test(text)) {return true;}
+   if (/[\\{}$#]/.test(text)) {return true;}
+   if (/^\\?[A-Za-z]{1,3}$/.test(text)) {return true;} // very short tokens likely macro names
+   if (/^\\?(ul|li|p|ol|em|strong|taxon)$/i.test(text)) {return true;}
+   if (/^\\?(ul|li|ol|p)[{\\]/i.test(text)) {return true;}
+   if (/^\\?(ul|li|ol|p)\b/i.test(text)) {return true;}
 
    const startOffset = diag.startOffset;
    const endOffset = diag.endOffset;
@@ -88,18 +88,18 @@ function shouldIgnoreDiagnostic(
 
    // If immediately preceded by a backslash, it's likely a macro name.
    const prefix = content.slice(Math.max(0, startOffset - 1), startOffset);
-   if (prefix.includes("\\")) return true;
+   if (prefix.includes("\\")) {return true;}
 
    // If inside a command name - check if there's a backslash before us on the same "word"
    // Look back up to 20 characters for a backslash followed by only letters
    const lookback = content.slice(Math.max(0, startOffset - 20), startOffset);
-   if (/\\[A-Za-z]*$/.test(lookback)) return true;
+   if (/\\[A-Za-z]*$/.test(lookback)) {return true;}
 
    // Ignore LaTeX-ish command names without letters (e.g., \_, \%)
-   if (/^\\[^A-Za-z]*$/.test(text)) return true;
+   if (/^\\[^A-Za-z]*$/.test(text)) {return true;}
 
    // Ignore very short tokens that are often macro fragments.
-   if (text.length <= 2) return true;
+   if (text.length <= 2) {return true;}
 
    return false;
 }
@@ -126,7 +126,7 @@ function diagFromText(content: string, text: string, message: string, source?: s
    let index = -1;
    for (let i = 0; i <= occurrence; i++) {
       index = content.indexOf(text, index + 1);
-      if (index === -1) break;
+      if (index === -1) {break;}
    }
    if (index === -1) {
       throw new Error(`Text "${text}" not found in document (occurrence ${occurrence})`);

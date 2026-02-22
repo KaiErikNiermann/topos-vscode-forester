@@ -68,7 +68,7 @@ function innerText(text: string, openLen: number, cstStart: number, cstEnd: numb
 // ── Task 5: #{...} inline math ────────────────────────────────────────────────
 
 function asMathInline(text: string, node: AstNode): LangiumHoverSnippet | undefined {
-    if (!isMathInline(node) || !node.$cstNode) return undefined;
+    if (!isMathInline(node) || !node.$cstNode) {return undefined;}
     const { offset, end } = node.$cstNode;
     return {
         kind: 'math-inline',
@@ -81,7 +81,7 @@ function asMathInline(text: string, node: AstNode): LangiumHoverSnippet | undefi
 // ── Task 6: ##{...} display math ─────────────────────────────────────────────
 
 function asMathDisplay(text: string, node: AstNode): LangiumHoverSnippet | undefined {
-    if (!isMathDisplay(node) || !node.$cstNode) return undefined;
+    if (!isMathDisplay(node) || !node.$cstNode) {return undefined;}
     const { offset, end } = node.$cstNode;
     return {
         kind: 'math-display',
@@ -94,11 +94,11 @@ function asMathDisplay(text: string, node: AstNode): LangiumHoverSnippet | undef
 // ── Task 7: \tex{preamble}{body} ─────────────────────────────────────────────
 
 function asTexCommand(text: string, node: AstNode): LangiumHoverSnippet | undefined {
-    if (!isCommand(node) || node.name !== '\\tex' || !node.$cstNode) return undefined;
+    if (!isCommand(node) || node.name !== '\\tex' || !node.$cstNode) {return undefined;}
     const braceArgs = node.args.filter(isBraceArg);
-    if (braceArgs.length < 2) return undefined;
+    if (braceArgs.length < 2) {return undefined;}
     const [preambleArg, bodyArg] = braceArgs;
-    if (!preambleArg.$cstNode || !bodyArg.$cstNode) return undefined;
+    if (!preambleArg.$cstNode || !bodyArg.$cstNode) {return undefined;}
     return {
         kind: 'tex',
         start: node.$cstNode.offset,
@@ -117,7 +117,7 @@ function snippetFromAncestors(text: string, start: AstNode | undefined): Langium
             asMathInline(text, node) ??
             asMathDisplay(text, node) ??
             asTexCommand(text, node);
-        if (result) return result;
+        if (result) {return result;}
         node = node.$container;
     }
     return undefined;
@@ -138,10 +138,10 @@ export async function findHoverSnippetAtOffset(
     const parser = getParser();
     const parseResult: ParseResult<Document> = parser.parse(text);
     const rootCstNode = parseResult.value.$cstNode;
-    if (!rootCstNode) return undefined;
+    if (!rootCstNode) {return undefined;}
 
     const leafNode = CstUtils.findLeafNodeAtOffset(rootCstNode, offset);
-    if (!leafNode) return undefined;
+    if (!leafNode) {return undefined;}
 
     return snippetFromAncestors(text, leafNode.astNode);
 }

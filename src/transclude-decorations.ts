@@ -50,9 +50,9 @@ export class TranscludeDecorationProvider {
             );
 
             // Update all affected editors with debounce
-            affectedEditors.forEach(editor => {
+            for (const editor of affectedEditors) {
                setTimeout(() => this.updateDecorations(editor), 100);
-            });
+            }
          })
       );
 
@@ -82,9 +82,9 @@ export class TranscludeDecorationProvider {
    }
 
    private updateAllVisibleEditors() {
-      vscode.window.visibleTextEditors.forEach(editor => {
+      for (const editor of vscode.window.visibleTextEditors) {
          this.updateDecorations(editor);
-      });
+      }
    }
 
    private async updateDecorations(editor: vscode.TextEditor) {
@@ -146,7 +146,7 @@ export class TranscludeDecorationProvider {
    private async getTreeTitle(treeId: string): Promise<string | null> {
       try {
          const tree = await getTree(treeId);
-         if (!tree) return null;
+         if (!tree) {return null;}
 
          // Format like TOC: include taxon abbreviation if present
          if (tree.taxon) {
@@ -162,7 +162,7 @@ export class TranscludeDecorationProvider {
    }
 
    public dispose() {
-      this.disposables.forEach(d => d.dispose());
+      for (const d of this.disposables) {d.dispose();}
       this.decorationType.dispose();
    }
 }

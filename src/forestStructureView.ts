@@ -210,12 +210,12 @@ export class ForesterWebviewProvider implements vscode.WebviewViewProvider {
    }
 
    private nodeContainsChild(parentId: string, targetId: string, visited: Set<string>): boolean {
-      if (parentId === targetId) return true;
-      if (visited.has(parentId)) return false;
+      if (parentId === targetId) {return true;}
+      if (visited.has(parentId)) {return false;}
       visited.add(parentId);
 
       const parent = this.nodes.get(parentId);
-      if (!parent) return false;
+      if (!parent) {return false;}
 
       for (const childId of Array.from(parent.transcludes)) {
          if (this.nodeContainsChild(childId, targetId, visited)) {
@@ -233,14 +233,14 @@ export class ForesterWebviewProvider implements vscode.WebviewViewProvider {
 
       // Build resolution map
       for (const entry of forestData) {
-         if (!entry.uri) throw new Error('Unexpected lack of uri');
+         if (!entry.uri) {throw new Error('Unexpected lack of uri');}
 
          const taxonPrefix = getTaxonAbbreviation(entry.taxon);
          const separator = taxonPrefix ? ': ' : '';
 
 
 
-         const title = !entry.title || /(https?:\/\/)/.test(entry.title) ? entry.uri : entry.title
+         const title = !entry.title || /(https?:\/\/)/.test(entry.title) ? entry.uri : entry.title;
 
          const node = {
             ...entry,
@@ -295,9 +295,9 @@ export class ForesterWebviewProvider implements vscode.WebviewViewProvider {
          if (node && node.transcludedBy.size === 0 && !this.currentRootIds.includes(currentTreeId)) {
             this.currentRootIds.push(currentTreeId);
          } else {
-            const rootNode = this.findRoot(currentTreeId)
+            const rootNode = this.findRoot(currentTreeId);
             if (!this.currentRootIds.includes(rootNode)) {
-               this.currentRootIds.push(rootNode)
+               this.currentRootIds.push(rootNode);
             }
          }
       }
@@ -322,7 +322,7 @@ export class ForesterWebviewProvider implements vscode.WebviewViewProvider {
 
       const renderNode = (nodeId: string, depth: number = 0, visited: Set<string> = new Set()): string => {
          const node = this.nodes.get(nodeId);
-         if (!node) return '';
+         if (!node) {return '';}
 
          const isExpanded = this.expandedNodes.has(nodeId);
          const hasChildren = node.transcludes.size > 0;
@@ -412,10 +412,10 @@ export class ForesterWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       // Built-in mappings with updates
-      if (lowerTaxon.includes('author')) return '👤';
-      if (lowerTaxon.includes('person')) return '👤';
-      if (lowerTaxon === 'paper') return '🚩';
-      if (lowerTaxon === 'section') return '⚡️';
+      if (lowerTaxon.includes('author')) {return '👤';}
+      if (lowerTaxon.includes('person')) {return '👤';}
+      if (lowerTaxon === 'paper') {return '🚩';}
+      if (lowerTaxon === 'section') {return '⚡️';}
 
       // Use $default emoji if configured, otherwise use tree emoji
       return customConfig['$default']?.emoji as string || '🌲';
@@ -723,13 +723,13 @@ export class ForesterWebviewProvider implements vscode.WebviewViewProvider {
 
    private findRoot(treeId: string): string {
       const node = this.nodes.get(treeId);
-      if (!node || node.transcludedBy.size === 0) return treeId;
+      if (!node || node.transcludedBy.size === 0) {return treeId;}
 
       const visited = new Set<string>();
       let current = treeId;
 
       while (true) {
-         if (visited.has(current)) return treeId; // Cycle
+         if (visited.has(current)) {return treeId;} // Cycle
          visited.add(current);
 
          const currentNode = this.nodes.get(current);
@@ -767,7 +767,7 @@ export class ForesterWebviewProvider implements vscode.WebviewViewProvider {
 
    public dispose(): void {
       // Clean up all disposables
-      this.disposables.forEach(d => d.dispose());
+      for (const d of this.disposables) {d.dispose();}
       this.disposables = [];
 
       // Clear data structures

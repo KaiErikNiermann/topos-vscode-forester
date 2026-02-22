@@ -77,13 +77,13 @@ export class ForesterCodeLensProvider implements CodeLensProvider {
 
         // ── Run query / datalog rules for \datalog{…} blocks ─────────────────
         for (const node of AstUtils.streamAllContents(document.parseResult.value)) {
-            if (!isCommand(node) || node.name !== '\\datalog') continue;
+            if (!isCommand(node) || node.name !== '\\datalog') {continue;}
 
             const cst = node.$cstNode;
-            if (!cst) continue;
+            if (!cst) {continue;}
 
             const bodyArg = node.args.find(isBraceArg);
-            if (!bodyArg?.$cstNode) continue;
+            if (!bodyArg?.$cstNode) {continue;}
 
             // Extract text inside the braces (strip leading '{' and trailing '}')
             const rawText = document.textDocument.getText(bodyArg.$cstNode.range);

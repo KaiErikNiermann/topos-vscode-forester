@@ -445,7 +445,7 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand(
          "forester.restartLanguageServer",
          async () => {
-            if (!langiumClient) return;
+            if (!langiumClient) {return;}
             await vscode.window.withProgress(
                { location: vscode.ProgressLocation.Notification, title: 'Restarting Forester language server…', cancellable: false },
                async () => {
@@ -569,7 +569,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
             if (!treeId) {
                // Not inside a link
-               return undefined;
+               return;
             }
 
             // Get the forest
@@ -577,7 +577,7 @@ export async function activate(context: vscode.ExtensionContext) {
             if (!tree) {
                // Tree not found
                vscode.window.showInformationMessage(`Tree '${treeId}' not found`);
-               return undefined;
+               return;
             }
 
             // Find the actual file path
@@ -596,7 +596,7 @@ export async function activate(context: vscode.ExtensionContext) {
                   vscode.window.showInformationMessage(
                      `File for tree '${treeId}' not found`,
                   );
-                  return undefined;
+                  return;
                }
 
                treePath = files[0];
@@ -665,7 +665,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
             if (!targetTreeId) {
                // Not inside a link
-               return undefined;
+               return;
             }
 
             // Get the forest
@@ -673,7 +673,7 @@ export async function activate(context: vscode.ExtensionContext) {
             if (!tree) {
                // Tree not found
                vscode.window.showInformationMessage(`Tree '${targetTreeId}' not found`);
-               return undefined;
+               return;
             }
 
             // Create hover content with title and rename action

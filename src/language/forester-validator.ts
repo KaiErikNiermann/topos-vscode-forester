@@ -39,7 +39,7 @@ function findSuppressedRanges(text: string): SuppressedRange[] {
         // Find the next \stopverb after this \startverb
         stopPattern.lastIndex = svStart + match[0].length;
         const stopMatch = stopPattern.exec(text);
-        if (!stopMatch) continue;
+        if (!stopMatch) {continue;}
         const svEnd = stopMatch.index + stopMatch[0].length;
 
         // Expand outward to the enclosing brace block:
@@ -47,7 +47,7 @@ function findSuppressedRanges(text: string): SuppressedRange[] {
         let braceStart = svStart;
         let depth = 0;
         for (let i = svStart - 1; i >= 0; i--) {
-            if (text[i] === '}') depth++;
+            if (text[i] === '}') {depth++;}
             else if (text[i] === '{') {
                 if (depth === 0) {
                     braceStart = i;
@@ -61,7 +61,7 @@ function findSuppressedRanges(text: string): SuppressedRange[] {
         let braceEnd = svEnd;
         depth = 0;
         for (let i = svEnd; i < text.length; i++) {
-            if (text[i] === '{') depth++;
+            if (text[i] === '{') {depth++;}
             else if (text[i] === '}') {
                 if (depth === 0) {
                     braceEnd = i + 1;

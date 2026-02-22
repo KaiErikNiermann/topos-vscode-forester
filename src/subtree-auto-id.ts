@@ -136,7 +136,7 @@ export class SubtreeAutoIdFeature implements vscode.Disposable {
    }
 
    public dispose(): void {
-      this.disposables.forEach((disposable) => disposable.dispose());
+      for (const disposable of this.disposables) {disposable.dispose();}
    }
 
    private isEnabled(): boolean {

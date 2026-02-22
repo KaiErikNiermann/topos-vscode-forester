@@ -60,7 +60,7 @@ export class ForesterDocumentFormattingEditProvider implements vscode.DocumentFo
          const langiumFormat = await getLangiumFormat();
          const formatted = await langiumFormat(text, { ignoredCommands, subtreeMacros }, options.tabSize, options.insertSpaces);
 
-         if (text === formatted) return [];
+         if (text === formatted) {return [];}
 
          const fullRange = new vscode.Range(
             document.positionAt(0),
@@ -91,7 +91,7 @@ export class ForesterDocumentRangeFormattingEditProvider implements vscode.Docum
          const langiumFormat = await getLangiumFormat();
          const formatted = await langiumFormat(text, { ignoredCommands, subtreeMacros }, options.tabSize, options.insertSpaces);
 
-         if (text === formatted) return [];
+         if (text === formatted) {return [];}
 
          const fullRange = new vscode.Range(
             document.positionAt(0),

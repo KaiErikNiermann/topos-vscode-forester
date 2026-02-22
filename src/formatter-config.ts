@@ -151,12 +151,12 @@ async function addMacrosToLtexDictionary(macros: string[]): Promise<number> {
       if (fs.existsSync(dictionaryPath)) {
          existingContent = fs.readFileSync(dictionaryPath, "utf-8");
          // Parse existing words (skip comments and empty lines)
-         existingContent.split(/\r?\n/).forEach(line => {
+         for (const line of existingContent.split(/\r?\n/)) {
             const trimmed = line.trim();
             if (trimmed && !trimmed.startsWith("#")) {
                existingWords.add(trimmed.toLowerCase());
             }
-         });
+         }
       }
    } catch (error) {
       console.error("Failed to read LTeX dictionary:", error);
@@ -214,8 +214,8 @@ function extractMacroBody(content: string, startPos: number): { body: string; en
       let depth = 1;
       i++; // skip initial "["
       while (i < len && depth > 0) {
-         if (content[i] === "[") depth++;
-         else if (content[i] === "]") depth--;
+         if (content[i] === "[") {depth++;}
+         else if (content[i] === "]") {depth--;}
          i++;
       }
       // Skip whitespace between arguments
@@ -299,8 +299,8 @@ export async function scanWorkspaceForMacros(): Promise<MacroScanResult> {
       try {
          const content = fs.readFileSync(file.fsPath, "utf-8");
          const macros = extractMacrosFromContent(content);
-         macros.macros.forEach(m => allMacros.add(m));
-         macros.subtreeMacros.forEach(m => subtreeMacros.add(m));
+         for (const m of macros.macros) {allMacros.add(m);}
+         for (const m of macros.subtreeMacros) {subtreeMacros.add(m);}
       } catch (error) {
          console.error(`Failed to read ${file.fsPath}:`, error);
       }
@@ -336,12 +336,12 @@ async function getFormatterMacroConfig(): Promise<FormatterMacroConfig> {
    
    if (autoScan) {
       const cachedMacros = await readCachedMacros();
-      cachedMacros.subtreeMacros.forEach(m => subtreeMacros.add(m));
-      cachedMacros.macros.forEach(m => {
+      for (const m of cachedMacros.subtreeMacros) {subtreeMacros.add(m);}
+      for (const m of cachedMacros.macros) {
          if (!subtreeMacros.has(m)) {
             ignored.add(m);
          }
-      });
+      }
    }
    
    return { ignoredCommands: ignored, subtreeMacros };

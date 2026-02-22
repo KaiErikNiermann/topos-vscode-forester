@@ -672,10 +672,10 @@ await test('0007.tree full file parses without errors', async () => {
     // Verify we can find at least the top-level commands
     const cmds = doc.nodes.filter(isCommand);
     const cmdNames = cmds.map(c => (c as Command).name);
-    if (!cmdNames.includes('\\date')) throw new Error('Missing \\date');
-    if (!cmdNames.includes('\\import')) throw new Error('Missing \\import');
-    if (!cmdNames.includes('\\title')) throw new Error('Missing \\title');
-    if (!cmdNames.includes('\\infrule')) throw new Error('Missing \\infrule');
+    if (!cmdNames.includes('\\date')) {throw new Error('Missing \\date');}
+    if (!cmdNames.includes('\\import')) {throw new Error('Missing \\import');}
+    if (!cmdNames.includes('\\title')) {throw new Error('Missing \\title');}
+    if (!cmdNames.includes('\\infrule')) {throw new Error('Missing \\infrule');}
 });
 
 await test('001c.tree-like content: tikzcd with \\arrow[r, "0"] parses', async () => {
@@ -974,7 +974,7 @@ await test('namespace: \\namespace{prefix}{\\def\\foo{}} parses with two BraceAr
     const doc = await parseClean(source);
     const nsCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\namespace');
     assertOk(nsCmd, 'Expected \\namespace command at top level');
-    if (!isCommand(nsCmd)) throw new Error('Not a Command');
+    if (!isCommand(nsCmd)) {throw new Error('Not a Command');}
     const braceArgs = nsCmd.args.filter(isBraceArg);
     assertEqual(braceArgs.length, 2, 'Expected 2 BraceArgs on \\namespace');
 
@@ -1006,7 +1006,7 @@ await test('namespace: body without \\def has no binding pair', async () => {
     const doc = await parseClean(source);
     const nsCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\namespace');
     assertOk(nsCmd, 'Expected \\namespace command');
-    if (!isCommand(nsCmd)) throw new Error('Not a Command');
+    if (!isCommand(nsCmd)) {throw new Error('Not a Command');}
     const bodyArg = nsCmd.args.filter(isBraceArg)[1];
     assertOk(bodyArg, 'Expected body BraceArg');
 
@@ -1027,13 +1027,13 @@ await test('datalog: ?Var TextFragment inside \\datalog{} is a direct Document-l
     const doc = await parseClean(source);
     const datalогCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\datalog');
     assertOk(datalогCmd, 'Expected \\datalog command at document level');
-    if (!isCommand(datalогCmd)) throw new Error('Not a Command');
+    if (!isCommand(datalогCmd)) {throw new Error('Not a Command');}
 
     const bodyArg = datalогCmd.args.find(isBraceArg);
     assertOk(bodyArg, 'Expected BraceArg on \\datalog');
 
     // The BraceArg's $container is the \datalog Command
-    if (!isCommand(bodyArg.$container)) throw new Error('BraceArg.$container is not a Command');
+    if (!isCommand(bodyArg.$container)) {throw new Error('BraceArg.$container is not a Command');}
     assertEqual(bodyArg.$container.name, '\\datalog', 'BraceArg.$container should be \\datalog');
 
     // ?X is a TextFragment inside the body
@@ -1046,14 +1046,14 @@ await test('datalog: \\rel/has-taxon inside \\datalog{} is a Command with slash 
     const doc = await parseClean(source);
     const datalогCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\datalog');
     assertOk(datalогCmd, 'Expected \\datalog command');
-    if (!isCommand(datalогCmd)) throw new Error('Not a Command');
+    if (!isCommand(datalогCmd)) {throw new Error('Not a Command');}
 
     const bodyArg = datalогCmd.args.find(isBraceArg);
     assertOk(bodyArg, 'Expected BraceArg on \\datalog');
 
     const relCmd = bodyArg.nodes.find(n => isCommand(n) && (n as Command).name.includes('/'));
     assertOk(relCmd, 'Expected Command with "/" in name inside \\datalog body');
-    if (!isCommand(relCmd)) throw new Error('Not a Command');
+    if (!isCommand(relCmd)) {throw new Error('Not a Command');}
     if (!relCmd.name.startsWith('\\rel/')) {
         throw new Error(`Expected \\rel/... command, got: ${relCmd.name}`);
     }
@@ -1072,7 +1072,7 @@ await test('object: \\object body BraceArg contains BracketGroup for each method
 
     const objCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\object');
     assertOk(objCmd, 'Expected \\object command at top level');
-    if (!isCommand(objCmd)) throw new Error('Not a Command');
+    if (!isCommand(objCmd)) {throw new Error('Not a Command');}
 
     // Last BraceArg is the body
     const braceArgs = objCmd.args.filter(isBraceArg);
@@ -1104,11 +1104,11 @@ await test('object: #method TextFragment is immediately preceded by # TextFragme
         n => isTextFragment(n) && n.value === 'methodName',
     );
     assertOk(methodFrag, 'Expected methodName TextFragment at document level');
-    if (!isTextFragment(methodFrag)) throw new Error('Not a TextFragment');
+    if (!isTextFragment(methodFrag)) {throw new Error('Not a TextFragment');}
 
     // The preceding sibling should be a TextFragment with value '#'
     const idx = doc.nodes.indexOf(methodFrag);
-    if (idx <= 0) throw new Error('No preceding sibling');
+    if (idx <= 0) {throw new Error('No preceding sibling');}
     const prev = doc.nodes[idx - 1];
     if (!isTextFragment(prev)) {
         throw new Error(`Expected TextFragment before methodName, got ${prev.$type}`);
@@ -1151,7 +1151,7 @@ await test('codelens datalog: \\datalog{?X -: {has-taxon{…}}} — BraceArg has
     const doc = await parseClean(source);
     const datalогCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\datalog');
     assertOk(datalогCmd, 'Expected \\datalog command');
-    if (!isCommand(datalогCmd)) throw new Error('Not a Command');
+    if (!isCommand(datalогCmd)) {throw new Error('Not a Command');}
     const bodyArg = datalогCmd.args.find(isBraceArg);
     assertOk(bodyArg, 'Expected BraceArg on \\datalog');
     assertOk(bodyArg.$cstNode, 'Expected CST node on BraceArg (needed for text extraction in CodeLens)');
@@ -1170,12 +1170,12 @@ await test('codelens datalog: \\datalog{rule -: premise} — rule block (no ? va
     const doc = await parseClean(source);
     const datalогCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\datalog');
     assertOk(datalогCmd, 'Expected \\datalog command for rule block');
-    if (!isCommand(datalогCmd)) throw new Error('Not a Command');
+    if (!isCommand(datalогCmd)) {throw new Error('Not a Command');}
     const bodyArg = datalогCmd.args.find(isBraceArg);
     assertOk(bodyArg, 'Expected BraceArg on \\datalog (rule block)');
     // Rule blocks have at least one Command node in the body
     const hasCmd = bodyArg.nodes.some(isCommand);
-    if (!hasCmd) throw new Error('Expected at least one Command in rule block body');
+    if (!hasCmd) {throw new Error('Expected at least one Command in rule block body');}
 });
 
 // ── Contributors view: \author structure prerequisites ────────────────────────
@@ -1187,7 +1187,7 @@ await test('contributors: \\author{jms-0001} parses as a Command with a BraceArg
     const doc = await parseClean(source);
     const authorCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\author');
     assertOk(authorCmd, 'Expected \\author Command at document level');
-    if (!isCommand(authorCmd)) throw new Error('Not a Command');
+    if (!isCommand(authorCmd)) {throw new Error('Not a Command');}
     const braceArg = authorCmd.args.find(isBraceArg);
     assertOk(braceArg, 'Expected BraceArg on \\author');
     const frag = braceArg.nodes.find(isTextFragment);
@@ -1201,7 +1201,7 @@ await test('contributors: multiple \\author commands parse as separate Command n
     const authorCmds = doc.nodes.filter(n => isCommand(n) && (n as Command).name === '\\author');
     assertEqual(authorCmds.length, 2, 'Expected 2 \\author Commands');
     const ids = authorCmds.map(cmd => {
-        if (!isCommand(cmd)) throw new Error('Not a Command');
+        if (!isCommand(cmd)) {throw new Error('Not a Command');}
         const frag = cmd.args.find(isBraceArg)?.nodes.find(isTextFragment);
         return frag?.value.trim() ?? '';
     });

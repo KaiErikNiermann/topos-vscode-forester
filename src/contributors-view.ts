@@ -97,7 +97,7 @@ export class ContributorsTreeProvider implements vscode.TreeDataProvider<Node> {
         await Promise.all(
             allUris.map(async uri => {
                 const id = treeIdFromFsPath(uri.fsPath);
-                if (!id) return;
+                if (!id) {return;}
                 try {
                     const doc = await vscode.workspace.openTextDocument(uri);
                     treeIndex.set(id, { uri, text: doc.getText() });
@@ -120,7 +120,7 @@ export class ContributorsTreeProvider implements vscode.TreeDataProvider<Node> {
         while (queue.length > 0) {
             const id = queue.shift()!;
             const entry = treeIndex.get(id);
-            if (!entry) continue;
+            if (!entry) {continue;}
             for (const targetId of extractTranscludeTargets(entry.text)) {
                 if (!visited.has(targetId)) {
                     visited.add(targetId);
@@ -134,7 +134,7 @@ export class ContributorsTreeProvider implements vscode.TreeDataProvider<Node> {
         const indirectIds = new Set<string>();
         for (const tid of transcludedIds) {
             const entry = treeIndex.get(tid);
-            if (!entry) continue;
+            if (!entry) {continue;}
             for (const personId of extractAuthors(entry.text)) {
                 if (!directIds.has(personId)) {
                     indirectIds.add(personId);
@@ -213,8 +213,8 @@ export class ContributorsTreeProvider implements vscode.TreeDataProvider<Node> {
     }
 
     getChildren(element?: Node): Node[] {
-        if (!element) return this.roots;
-        if (element.kind === 'group') return element.children;
+        if (!element) {return this.roots;}
+        if (element.kind === 'group') {return element.children;}
         return [];
     }
 }

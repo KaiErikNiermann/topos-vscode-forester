@@ -30,7 +30,7 @@ function getLtexLanguage(): string {
  * Add words to ltex.dictionary in workspace settings
  */
 async function addToDictionary(words: string[]): Promise<void> {
-   if (words.length === 0) return;
+   if (words.length === 0) {return;}
    
    const language = getLtexLanguage();
    const config = vscode.workspace.getConfiguration("ltex");
@@ -48,7 +48,7 @@ async function addToDictionary(words: string[]): Promise<void> {
       }
    }
    
-   if (newWords.length === 0) return;
+   if (newWords.length === 0) {return;}
    
    // Update the dictionary
    const updatedDict = { ...currentDict };
@@ -66,7 +66,7 @@ async function addToDictionary(words: string[]): Promise<void> {
  * Add rules to ltex.disabledRules in workspace settings
  */
 async function addToDisabledRules(rules: string[]): Promise<void> {
-   if (rules.length === 0) return;
+   if (rules.length === 0) {return;}
    
    const language = getLtexLanguage();
    const config = vscode.workspace.getConfiguration("ltex");
@@ -84,7 +84,7 @@ async function addToDisabledRules(rules: string[]): Promise<void> {
       }
    }
    
-   if (newRules.length === 0) return;
+   if (newRules.length === 0) {return;}
    
    // Update the disabled rules
    const updatedRules = { ...currentRules };
@@ -115,7 +115,7 @@ function extractRuleId(diag: vscode.Diagnostic): string | undefined {
  * Queue words/rules to be added to LTeX config (batched with debounce)
  */
 function queueLtexConfigUpdate(type: "dictionary" | "disabledRules", items: string[]): void {
-   if (items.length === 0) return;
+   if (items.length === 0) {return;}
    
    if (type === "dictionary") {
       pendingDictionaryWords.push(...items);
@@ -248,7 +248,7 @@ function filterAndUpdateDiagnostics(uri: vscode.Uri): void {
             rulesToDisable.push(ruleToDisable);
             languageToolLog.appendLine(`[filter] Suppressed by rule, will disable: ${ruleToDisable}`);
          } else {
-            languageToolLog.appendLine(`[filter] Suppressed by rule (no rule ID): ${diag.message.substring(0, 50)}...`);
+            languageToolLog.appendLine(`[filter] Suppressed by rule (no rule ID): ${diag.message.slice(0, 50)}...`);
          }
       } else if (isForesterSyntaxFalsePositive(text, doc, content, diag)) {
          // This is definitely Forester syntax (command name, math content, etc.)
@@ -412,7 +412,7 @@ function extractWordForDictionary(text: string, diag: vscode.Diagnostic): string
  */
 function isValidDictionaryWord(word: string): boolean {
    // Must be at least 2 characters
-   if (word.length < 2) return false;
+   if (word.length < 2) {return false;}
    
    // Must only contain letters (possibly with hyphens/apostrophes for compound words)
    if (!/^[a-zA-Z][a-zA-Z'-]*[a-zA-Z]$/.test(word) && !/^[a-zA-Z]{2}$/.test(word)) {
@@ -435,7 +435,7 @@ function isValidDictionaryWord(word: string): boolean {
 
 export function filterSyntacticDiagnostics(uri: vscode.Uri, diagnostics: vscode.Diagnostic[]): vscode.Diagnostic[] {
    const doc = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
-   if (!doc) return diagnostics;
+   if (!doc) {return diagnostics;}
 
    const content = doc.getText();
    const ignoredRanges = buildIgnoreRanges(content);
@@ -443,7 +443,7 @@ export function filterSyntacticDiagnostics(uri: vscode.Uri, diagnostics: vscode.
    const filtered: vscode.Diagnostic[] = [];
 
    for (const diag of diagnostics) {
-      if (shouldIgnoreRule(diag)) continue;
+      if (shouldIgnoreRule(diag)) {continue;}
       if (shouldIgnoreDiagnostic(doc, content, ignoredRanges, commandRanges, diag)) {
          continue;
       }
@@ -617,7 +617,7 @@ export function shouldIgnoreRule(diag: vscode.Diagnostic): boolean {
  */
 function getRuleIdToDisable(diag: vscode.Diagnostic): string | undefined {
    const ruleId = extractRuleId(diag)?.toUpperCase();
-   if (!ruleId) return undefined;
+   if (!ruleId) {return undefined;}
    
    const msg = diag.message.toLowerCase();
    
@@ -808,7 +808,7 @@ async function triggerLtexCheckForDocument(doc: vscode.TextDocument): Promise<vo
    const currentDiags = vscode.languages.getDiagnostics(doc.uri);
    languageToolLog.appendLine(`[ltex] Current diagnostics for ${path.basename(doc.uri.fsPath)}: ${currentDiags.length}`);
    for (const d of currentDiags) {
-      languageToolLog.appendLine(`[ltex]   - [${d.source}] ${d.message.substring(0, 50)}`);
+      languageToolLog.appendLine(`[ltex]   - [${d.source}] ${d.message.slice(0, 50)}`);
    }
    
    // Try to trigger LTeX check using the command

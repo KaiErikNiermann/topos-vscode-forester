@@ -16,11 +16,11 @@ async function focusNewTree(uri: vscode.Uri): Promise<void> {
    const openMode = extensionConfig.get<string>("create.openNewTreeMode") || "background";
 
    // Handle the "off" mode - don't open the file at all
-   if (openMode === "off") return
+   if (openMode === "off") {return;}
 
    if (openMode === "background") {
-      await vscode.commands.executeCommand("vscode.open", uri, { background: true })
-      return
+      await vscode.commands.executeCommand("vscode.open", uri, { background: true });
+      return;
    }
 
    const document = await vscode.workspace.openTextDocument(uri);
@@ -33,7 +33,7 @@ async function focusNewTree(uri: vscode.Uri): Promise<void> {
    } else if (openMode === "side") {
       viewColumn = vscode.ViewColumn.Beside;
    } else {
-      throw new Error(`Unrecoginsed mode "${openMode}"`)
+      throw new Error(`Unrecoginsed mode "${openMode}"`);
    }
 
    const editor = await vscode.window.showTextDocument(document, {
@@ -110,7 +110,8 @@ export async function collectTitleInput(options: TitleInputOptions = {}): Promis
       });
 
       input.onDidHide(() => {
-         resolve(undefined); // User cancelled
+         // eslint-disable-next-line unicorn/no-useless-undefined
+         resolve(undefined); // User cancelled — undefined required by Promise<string | undefined>
          input.dispose();
       });
 
@@ -235,14 +236,14 @@ async function createNewTree(options: CreateNewTreeOptions = {}): Promise<{ tree
 
       // Get the prefix
       const prefix = await getPrefix();
-      if (!prefix) return // User cancelled
+      if (!prefix) {return;} // User cancelled
 
       // Ask for a title (with optional taxon)
       const titleResult = await collectTitleInput({
          prompt: "Enter title for the new tree (abbreviations like 'thm', 'def', 'prop' are supported)",
          placeholder: "e.g., 'Introduction to Category Theory' or 'thm: Fundamental Theorem'"
       });
-      if (!titleResult) return undefined; // User cancelled
+      if (!titleResult) {return undefined;} // User cancelled
 
       const { taxon, title } = titleResult;
 
@@ -310,16 +311,16 @@ async function createNewTree(options: CreateNewTreeOptions = {}): Promise<{ tree
 
       const uri = vscode.Uri.file(newTreeFilePath);
       const treeId = path.basename(newTreeFilePath, '.tree');
-      let newTreeContent = (await vscode.workspace.fs.readFile(uri)).toString()
+      let newTreeContent = (await vscode.workspace.fs.readFile(uri)).toString();
 
       // Handle date first, then author, blank line, then taxon and title
 
       let author = extensionConfig.get<string>("create.author") || undefined;
       const date = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-      if (!newTreeContent.includes('\\date')) newTreeContent += `\\date{${date}}\n`;
-      if (!newTreeContent.includes('\\author') && author) newTreeContent += `\\author{${author}}\n\n`;
-      if (!newTreeContent.includes('\\taxon') && taxon) newTreeContent += `\\taxon{${taxon}}\n`;
-      if (!newTreeContent.includes('\\title') && title) newTreeContent += `\\title{${title}}\n\n`;
+      if (!newTreeContent.includes('\\date')) {newTreeContent += `\\date{${date}}\n`;}
+      if (!newTreeContent.includes('\\author') && author) {newTreeContent += `\\author{${author}}\n\n`;}
+      if (!newTreeContent.includes('\\taxon') && taxon) {newTreeContent += `\\taxon{${taxon}}\n`;}
+      if (!newTreeContent.includes('\\title') && title) {newTreeContent += `\\title{${title}}\n\n`;}
 
 
       // Handle selections (append to the new tree)
@@ -379,7 +380,7 @@ export async function transcludeNewTree(): Promise<void> {
             break;
          }
       }
-      if (isPreview) break;
+      if (isPreview) {break;}
    }
 
    // If in preview mode, first make it permanent by executing keepEditor command
@@ -422,7 +423,7 @@ export async function transcludeNewTree(): Promise<void> {
  */
 export async function newTree(folder?: vscode.Uri, fromTemplate?: boolean): Promise<void> {
    const result = await createNewTree({ destFolder: folder, fromTemplate });
-   if (result) await focusNewTree(result.filePath);
+   if (result) {await focusNewTree(result.filePath);}
 }
 
 /**
@@ -459,7 +460,7 @@ export async function renameTreeCommand(treeIdParam?: string): Promise<void> {
    } else {
       // Rename the current file
       const fileName = editor.document.fileName;
-      const treeId = fileName.substring(fileName.lastIndexOf('/') + 1, fileName.lastIndexOf('.tree'));
+      const treeId = fileName.slice(fileName.lastIndexOf('/') + 1, fileName.lastIndexOf('.tree'));
       await renameTreeById(treeId);
    }
 }
@@ -535,8 +536,8 @@ export async function renameTreeById(treeId: string): Promise<void> {
    } else {
       // Add title at the beginning
       lines.unshift(`\\title{${newTitle}}`);
-      if (taxonLineIndex >= 0) taxonLineIndex++;
-      if (lastMetadataLine >= 0) lastMetadataLine++;
+      if (taxonLineIndex >= 0) {taxonLineIndex++;}
+      if (lastMetadataLine >= 0) {lastMetadataLine++;}
    }
 
    // Update, add, or remove taxon

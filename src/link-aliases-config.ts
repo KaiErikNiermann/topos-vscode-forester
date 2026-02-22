@@ -329,7 +329,7 @@ export async function createDefaultConfigFile(): Promise<void> {
          .with("Open Existing", async () => {
             await openConfigFile();
          })
-         .otherwise(() => undefined);
+         .otherwise(() => {});
    }
 
    await writeLinkAliasConfig(createDefaultConfig());

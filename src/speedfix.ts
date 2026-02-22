@@ -120,8 +120,8 @@ function isInsideMathBlock(text: string, context: string): boolean {
       return false;
    }
    
-   const beforeText = context.substring(0, textPos);
-   const afterText = context.substring(textPos + text.length);
+   const beforeText = context.slice(0, Math.max(0, textPos));
+   const afterText = context.slice(Math.max(0, textPos + text.length));
    
    // Count unmatched #{ before the text
    let mathDepth = 0;

@@ -1,3 +1,4 @@
+/* eslint-disable curly */
 /**
  * Semantic validation checks for Forester .tree files.
  *
@@ -565,7 +566,6 @@ export class ForesterChecks {
                 }
             }
         }
-
         return methods;
     }
 }

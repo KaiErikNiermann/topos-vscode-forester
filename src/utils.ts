@@ -65,7 +65,7 @@ export async function getForestConfig(): Promise<ForestConfig | null> {
    const content = await readFile(configPath, "utf-8");
 
    const { parse } = await import("smol-toml");
-   return parse(content)
+   return parse(content);
 }
 
 /**
@@ -73,7 +73,7 @@ export async function getForestConfig(): Promise<ForestConfig | null> {
  */
 export async function getTreesDirectories(): Promise<string[]> {
    try {
-      const config = await getForestConfig()
+      const config = await getForestConfig();
       return config?.forest?.trees || ["trees"]; // Default to ["trees"] if not specified
    } catch (error) {
       console.error("Failed to read forest.toml, defaulting to 'trees' directory:", error);
@@ -119,12 +119,12 @@ export async function getAvailableTemplates(): Promise<string[]> {
  */
 export async function getPrefix(): Promise<string | undefined> {
    // Get prefixes from configuration
-   const extensionConfig = vscode.workspace.getConfiguration("forester")
+   const extensionConfig = vscode.workspace.getConfiguration("forester");
 
-   const defaultPrefix = extensionConfig.get<string>('defaultPrefix')
-   if (defaultPrefix) return defaultPrefix
+   const defaultPrefix = extensionConfig.get<string>('defaultPrefix');
+   if (defaultPrefix) {return defaultPrefix;}
 
-   const configToml = await getForestConfig()
+   const configToml = await getForestConfig();
    const prefixes = configToml?.forest?.prefixes;
 
    let prefix: string | undefined;
@@ -214,8 +214,8 @@ export function parseTaxonAndTitle(input: string): { taxon?: string; title: stri
    const colonIndex = input.indexOf(':');
 
    if (colonIndex > 0 && colonIndex < 30) { // Reasonable position for a taxon
-      const potentialTaxon = input.substring(0, colonIndex).trim().toLowerCase();
-      const titlePart = input.substring(colonIndex + 1).trim();
+      const potentialTaxon = input.slice(0, Math.max(0, colonIndex)).trim().toLowerCase();
+      const titlePart = input.slice(Math.max(0, colonIndex + 1)).trim();
 
       // Check if it's a known abbreviation
       const abbreviationMap = getAbbreviationToFullNameMap();
@@ -252,7 +252,7 @@ export function parseTaxonAndTitle(input: string): { taxon?: string; title: stri
  * Checks custom configuration first, then uses built-in abbreviations
  */
 export function getTaxonAbbreviation(taxon?: string | null): string {
-   if (!taxon) return '';
+   if (!taxon) {return '';}
 
    const lowerTaxon = taxon.toLowerCase();
 
@@ -268,7 +268,7 @@ export function getTaxonAbbreviation(taxon?: string | null): string {
    }
 
    // Default to first 3 letters
-   return taxon.substring(0, 3).toLowerCase();
+   return taxon.slice(0, 3).toLowerCase();
 }
 
 /**

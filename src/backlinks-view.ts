@@ -147,7 +147,7 @@ export class BacklinksTreeProvider implements vscode.TreeDataProvider<Node> {
                         const doc = await vscode.workspace.openTextDocument(uri);
                         const text = doc.getText();
                         const rawRefs = findRefsToTarget(text, currentId);
-                        if (rawRefs.length === 0) return;
+                        if (rawRefs.length === 0) {return;}
 
                         const srcId = treeIdFromFsPath(uri.fsPath) ?? uri.fsPath;
                         const title = extractTitle(text);
@@ -169,7 +169,7 @@ export class BacklinksTreeProvider implements vscode.TreeDataProvider<Node> {
         const groups: GroupNode[] = [];
         for (const k of Object.keys(REF_PATTERNS) as RefKind[]) {
             const bucket = refsByKind.get(k)!;
-            if (bucket.size === 0) continue;
+            if (bucket.size === 0) {continue;}
 
             const fileNodes: FileNode[] = [...bucket.entries()]
                 .sort(([a], [b]) => a.localeCompare(b))
@@ -253,9 +253,9 @@ export class BacklinksTreeProvider implements vscode.TreeDataProvider<Node> {
     }
 
     getChildren(element?: Node): Node[] {
-        if (!element) return this.roots;
-        if (element.kind === 'group') return element.children;
-        if (element.kind === 'file') return element.refs;
+        if (!element) {return this.roots;}
+        if (element.kind === 'group') {return element.children;}
+        if (element.kind === 'file') {return element.refs;}
         return [];
     }
 }

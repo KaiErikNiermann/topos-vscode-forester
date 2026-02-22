@@ -48,7 +48,7 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
             // ── "Add \import{treeId}" ──────────────────────────────────────
             if (diagnostic.code === 'missing-import') {
                 const data = diagnostic.data as { treeId?: string } | undefined;
-                if (!data?.treeId) continue;
+                if (!data?.treeId) {continue;}
 
                 const { treeId } = data;
                 const insertPos = this.findImportInsertPosition(document);
@@ -76,7 +76,7 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
                 // Extract \commandName from the message prefix
                 const rest = diagnostic.message.slice(UNKNOWN_CMD_PREFIX.length);
                 const nameMatch = /^(\\[\w\-\/\?\*]+)/.exec(rest);
-                if (!nameMatch) continue;
+                if (!nameMatch) {continue;}
 
                 const cmdName = nameMatch[1]; // e.g. \foo  (includes backslash)
 
@@ -150,21 +150,21 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
 
         for (const doc of this.documents.all) {
             const root = doc.parseResult.value;
-            if (!isDocument(root)) continue;
+            if (!isDocument(root)) {continue;}
 
             for (const node of root.nodes) {
-                if (!isCommand(node) || node.name !== '\\namespace') continue;
+                if (!isCommand(node) || node.name !== '\\namespace') {continue;}
 
                 const braceArgs = node.args.filter(isBraceArg);
                 const prefixArg = braceArgs[0];
                 const bodyArg = braceArgs[1];
-                if (!prefixArg || !bodyArg) continue;
+                if (!prefixArg || !bodyArg) {continue;}
 
                 // Extract the namespace prefix string from the first brace arg
                 const prefixFrag = prefixArg.nodes.find(isTextFragment);
-                if (!prefixFrag) continue;
+                if (!prefixFrag) {continue;}
                 const prefix = prefixFrag.value.trim();
-                if (!prefix) continue;
+                if (!prefix) {continue;}
 
                 // Scan body nodes for \def\simpleName or \let\simpleName patterns
                 const bodyNodes = bodyArg.nodes;
@@ -203,7 +203,7 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
         let m: RegExpExecArray | null;
         while ((m = importRe.exec(text)) !== null) {
             const end = m.index + m[0].length;
-            if (end > lastImportOffset) lastImportOffset = end;
+            if (end > lastImportOffset) {lastImportOffset = end;}
         }
 
         if (lastImportOffset >= 0) {
@@ -234,7 +234,7 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
         let m: RegExpExecArray | null;
         while ((m = defRe.exec(text)) !== null) {
             const end = m.index + m[0].length;
-            if (end > lastDefOffset) lastDefOffset = end;
+            if (end > lastDefOffset) {lastDefOffset = end;}
         }
 
         if (lastDefOffset >= 0) {
@@ -270,7 +270,7 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
         while ((m = LET_DEF_RE.exec(text)) !== null) {
             const start = m.index;
             const end = m.index + m[0].length;
-            if (cursorOffset < start || cursorOffset > end) continue;
+            if (cursorOffset < start || cursorOffset > end) {continue;}
 
             const keyword = m[1] as 'def' | 'let';
             const other = keyword === 'def' ? 'let' : 'def';
@@ -322,16 +322,16 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
         while ((m = HASH_NAME_RE.exec(text)) !== null) {
             const nameStart = m.index + 1; // after the '#'
             const nameEnd = nameStart + m[1].length;
-            if (cursorOffset < nameStart || cursorOffset > nameEnd) continue;
+            if (cursorOffset < nameStart || cursorOffset > nameEnd) {continue;}
 
             const methodName = m[1];
 
             // Check if this method is already defined in any workspace object
-            if (this.methodExistsInWorkspace(methodName)) break;
+            if (this.methodExistsInWorkspace(methodName)) {break;}
 
             // Find insertion point: end of last method in first \object in this file
             const insertPos = this.findMethodInsertPosition(text, document);
-            if (!insertPos) break;
+            if (!insertPos) {break;}
 
             result.push({
                 title: `Create method stub [${methodName}]{}`,
@@ -358,7 +358,7 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
     private methodExistsInWorkspace(methodName: string): boolean {
         for (const doc of this.documents.all) {
             const root = doc.parseResult.value;
-            if (!isDocument(root)) continue;
+            if (!isDocument(root)) {continue;}
 
             for (const node of [...root.nodes]) {
                 // Stream contents manually to avoid a full AstUtils import here
@@ -371,7 +371,7 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
                             for (const bodyNode of bodyArg.nodes) {
                                 if (isBracketGroup(bodyNode)) {
                                     const frag = bodyNode.nodes.find(isTextFragment);
-                                    if (frag?.value.trim() === methodName) return true;
+                                    if (frag?.value.trim() === methodName) {return true;}
                                 }
                                 stack.push(bodyNode);
                             }
@@ -399,15 +399,15 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
         // Find `\object` followed by optional bracket arg and then `{`
         const objectRe = /\\(?:object|patch)[^\{]*\{/g;
         const m = objectRe.exec(text);
-        if (!m) return undefined;
+        if (!m) {return undefined;}
 
         // Walk forward from the opening brace to find the matching closing brace
         const openIdx = m.index + m[0].length - 1;
         let depth = 1;
         let i = openIdx + 1;
         while (i < text.length && depth > 0) {
-            if (text[i] === '{') depth++;
-            else if (text[i] === '}') depth--;
+            if (text[i] === '{') {depth++;}
+            else if (text[i] === '}') {depth--;}
             i++;
         }
         // i is now just past the closing brace; insert before it

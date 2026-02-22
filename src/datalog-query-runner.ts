@@ -79,16 +79,16 @@ export function evalDatalogQuery(queryText: string, forest: Forest): DatalogResu
 
 /** Extract the content of the first top-level `{…}` block. */
 function extractBraceContent(text: string): string {
-    if (!text.startsWith('{')) return text;
+    if (!text.startsWith('{')) {return text;}
     let depth = 0;
     let start = -1;
     for (let i = 0; i < text.length; i++) {
         if (text[i] === '{') {
-            if (depth === 0) start = i + 1;
+            if (depth === 0) {start = i + 1;}
             depth++;
         } else if (text[i] === '}') {
             depth--;
-            if (depth === 0) return text.slice(start, i);
+            if (depth === 0) {return text.slice(start, i);}
         }
     }
     return text.slice(1); // unmatched — return rest
@@ -143,12 +143,12 @@ function extractRelationArg(text: string, relName: string): string | undefined {
     // Form 1: \rel/relName{...}{'value'}
     const re1 = new RegExp(`\\\\rel\\/${relName}\\{[^}]*\\}\\{'([^']*)'\\}`);
     const m1 = re1.exec(text);
-    if (m1) return m1[1];
+    if (m1) {return m1[1];}
 
     // Form 2: relName(?var, 'value')
     const re2 = new RegExp(`${relName}\\([^,)]*,\\s*'([^']*)'\\)`);
     const m2 = re2.exec(text);
-    if (m2) return m2[1];
+    if (m2) {return m2[1];}
 
     return undefined;
 }

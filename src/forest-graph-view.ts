@@ -76,7 +76,7 @@ export class ForestGraphView {
     public dispose(): void {
         ForestGraphView.currentPanel = undefined;
         this._panel.dispose();
-        for (const d of this._disposables) d.dispose();
+        for (const d of this._disposables) {d.dispose();}
         this._disposables.length = 0;
     }
 
@@ -111,7 +111,7 @@ export class ForestGraphView {
 
     private _sendHighlight(): void {
         const editor = vscode.window.activeTextEditor;
-        if (!editor?.document.fileName.endsWith('.tree')) return;
+        if (!editor?.document.fileName.endsWith('.tree')) {return;}
         const treeId = path.basename(editor.document.fileName, '.tree');
         this._panel.webview.postMessage({ type: 'highlight', treeId });
     }
@@ -165,7 +165,7 @@ export class ForestGraphView {
                 continue;
             }
             for (const line of content.split('\n')) {
-                if (line.trimStart().startsWith('%')) continue; // skip comments
+                if (line.trimStart().startsWith('%')) {continue;} // skip comments
                 for (const { re, type } of EDGE_PATTERNS) {
                     re.lastIndex = 0;
                     let m: RegExpExecArray | null;

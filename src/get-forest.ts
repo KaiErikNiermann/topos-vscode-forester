@@ -122,13 +122,13 @@ export async function getForest({ forceReload, fastReturnStale }: { forceReload?
    // setting the global promise and then awaiting means that if there are calls to getForest in the meantime they will await the same promise
    const result = mostRecentQueryResult = await queryInProgressPromise;
 
-   forestChangeCallbacks.forEach(callback => {
+   for (const callback of forestChangeCallbacks) {
       try {
          callback();
       } catch (error) {
          console.error('Error in forest change callback:', error);
       }
-   });
+   }
 
    // Show completion notification (only for initial load)
    if (isInitialLoad) {
@@ -222,7 +222,7 @@ async function queryForest(): Promise<Forest> {
  */
 export function initForestMonitoring(context: vscode.ExtensionContext) {
    // Clean up any existing handlers
-   fileEventDisposables.forEach(d => d.dispose());
+   for (const d of fileEventDisposables) {d.dispose();}
    fileEventDisposables = [];
 
    const forestUpdatedOnDisk = async () => {
@@ -299,7 +299,7 @@ export function onForestChange(callback: () => void): vscode.Disposable {
  */
 export function cleanupServer(): void {
    // Dispose file event handlers
-   fileEventDisposables.forEach(d => d.dispose());
+   for (const d of fileEventDisposables) {d.dispose();}
    fileEventDisposables = [];
 
    // Clear callbacks

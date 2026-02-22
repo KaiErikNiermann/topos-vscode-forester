@@ -84,7 +84,7 @@ export class TransclusionTreeProvider implements vscode.TreeDataProvider<Node> {
         const uriByTreeId = new Map<string, vscode.Uri>();
         for (const uri of allUris) {
             const id = treeIdFromFsPath(uri.fsPath);
-            if (id) uriByTreeId.set(id, uri);
+            if (id) {uriByTreeId.set(id, uri);}
         }
 
         // Read the current file's refs (outgoing)
@@ -109,7 +109,7 @@ export class TransclusionTreeProvider implements vscode.TreeDataProvider<Node> {
                         const doc = await vscode.workspace.openTextDocument(uri);
                         if (extractRefs(doc.getText()).has(currentId)) {
                             const id = treeIdFromFsPath(uri.fsPath);
-                            if (id) incomingIds.add(id);
+                            if (id) {incomingIds.add(id);}
                         }
                     } catch {
                         // skip unreadable files
@@ -185,8 +185,8 @@ export class TransclusionTreeProvider implements vscode.TreeDataProvider<Node> {
     }
 
     getChildren(element?: Node): Node[] {
-        if (!element) return this.roots;
-        if (element.kind === 'group') return element.children;
+        if (!element) {return this.roots;}
+        if (element.kind === 'group') {return element.children;}
         return [];
     }
 }

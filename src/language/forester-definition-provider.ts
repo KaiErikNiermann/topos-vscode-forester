@@ -148,13 +148,13 @@ export class ForesterDefinitionProvider implements DefinitionProvider {
         for (const node of root.nodes) {
             if (!titleRange && isCommand(node) && node.name === '\\title') {
                 const cst = node.$cstNode;
-                if (cst) titleRange = cst.range;
+                if (cst) {titleRange = cst.range;}
             }
             if (!firstProseEnd && isTextFragment(node) && node.value.trim().length > 0) {
                 const cst = node.$cstNode;
-                if (cst) firstProseEnd = cst.range.end;
+                if (cst) {firstProseEnd = cst.range.end;}
             }
-            if (titleRange && firstProseEnd) break;
+            if (titleRange && firstProseEnd) {break;}
         }
 
         const selectionRange = titleRange ?? zero;
@@ -257,7 +257,7 @@ export class ForesterDefinitionProvider implements DefinitionProvider {
      * of \object or \patch; the BracketGroup [methodName] is the definition site.
      */
     private resolveMethodName(methodName: string, sourceRange: SimpleRange): LocationLink[] | undefined {
-        if (!methodName) return undefined;
+        if (!methodName) {return undefined;}
 
         const results: LocationLink[] = [];
         const OBJECT_CMDS: ReadonlySet<string> = new Set(['\\object', '\\patch']);
@@ -265,18 +265,18 @@ export class ForesterDefinitionProvider implements DefinitionProvider {
         for (const doc of this.documents.all) {
             const root = doc.parseResult.value;
             for (const node of AstUtils.streamAllContents(root)) {
-                if (!isCommand(node) || !OBJECT_CMDS.has(node.name)) continue;
+                if (!isCommand(node) || !OBJECT_CMDS.has(node.name)) {continue;}
 
                 // The body is the last BraceArg of \object or \patch
                 const bodyArg = [...node.args].reverse().find(isBraceArg);
-                if (!bodyArg) continue;
+                if (!bodyArg) {continue;}
 
                 // Scan body nodes for BracketGroup nodes whose first TextFragment
                 // matches the method name
                 for (const bodyNode of bodyArg.nodes) {
-                    if (!isBracketGroup(bodyNode)) continue;
+                    if (!isBracketGroup(bodyNode)) {continue;}
                     const firstText = bodyNode.nodes.find(isTextFragment);
-                    if (!firstText || firstText.value.trim() !== methodName) continue;
+                    if (!firstText || firstText.value.trim() !== methodName) {continue;}
 
                     const cst = bodyNode.$cstNode;
                     if (cst) {

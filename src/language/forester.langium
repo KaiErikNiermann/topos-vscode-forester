@@ -46,22 +46,26 @@ entry Document:
 // to appear at any node position without error.
 Node:
     Command | VerbatimBlock | MathDisplay | MathInline | WikiLink
-    | BracketGroup | ParenGroup | TextFragment | Escape;
+    | BraceGroup | BracketGroup | ParenGroup | TextFragment | Escape;
 
 // ============================================================================
 // TASK 5 — Terminal rules
 // ============================================================================
 
-// Backslash command: \name
-//   name chars: A-Z a-z 0-9  -  /  ?  *
-//   The * allows starred LaTeX commands like \inferrule*, \operatorname*
-//   (mirrors the regex in formatter-core.ts tokenize())
-terminal COMMAND_NAME: /\\[A-Za-z0-9\-\/\?\*]+/;
+// XML namespace declaration: \xmlns:prefix  (spec §4.6)
+//   e.g. \xmlns:html{http://www.w3.org/1999/xhtml}
+//   Must be ordered before COMMAND_NAME so the longer match wins.
+terminal DECL_XMLNS: /\\xmlns:[a-zA-Z]+/;
 
 // XML-style element command: \<tag> or \<prefix:tag>
 //   e.g. \<html:div>, \<svg:rect>
-//   Must be ordered before COMMAND_NAME in grammar (longer match wins).
+//   Must be ordered before COMMAND_NAME (longer match wins).
 terminal XML_COMMAND_NAME: /\\<[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?>/;
+
+// Backslash command: \name
+//   name chars: A-Z a-z 0-9  -  /  ?  *
+//   The * allows starred LaTeX commands like \inferrule*, \operatorname*
+terminal COMMAND_NAME: /\\[A-Za-z0-9\-\/\?\*]+/;
 
 // Wiki-style cross-reference: [[tree-id]]
 //   Captures [[...]] as a single opaque token.
@@ -85,6 +89,15 @@ terminal VERBATIM_BLOCK: /```[\s\S]*?```/;
 // Plain text: any run of characters that are not Forester special characters.
 // Special: \ { } [ ] ( ) \n \t (space) % # `
 terminal TEXT: /[^\\{}[\]()\n\t %#`]+/;
+
+// Bare # not followed by { (i.e. not starting math #{  or ##{).
+// Covers LaTeX #1 parameter references inside \tex bodies.
+// Must be after HASH_DISPLAY and HASH_INLINE (they win when followed by {).
+terminal BARE_HASH: /#(?!#?{)/;
+
+// Bare ` not part of a ``` fence.
+// Must be after VERBATIM_BLOCK (which wins for ```...```).
+terminal BARE_BACKTICK: /`(?!``)/;
 
 // Percent-line comment (Forester uses % like TeX)
 // Hidden: silently consumed by parser, visible in CST for formatter queries.
@@ -123,7 +136,7 @@ hidden terminal NL: /\r?\n/;
 // ============================================================================
 
 Command:
-    name=(COMMAND_NAME | XML_COMMAND_NAME) args+=Argument*;
+    name=(COMMAND_NAME | XML_COMMAND_NAME | DECL_XMLNS) args+=Argument*;
 
 // ============================================================================
 // Argument forms: {}, [], ()
@@ -142,11 +155,14 @@ ParenArg:
     '(' nodes+=Node* ')';
 
 // ============================================================================
-// Standalone groups (spec §4.2: group := '[' nodes ']' | '(' nodes ')')
-// These allow [text](url) markdown links and standalone groups at any position.
-// Brace groups { } are already implicit via BraceArg in command args;
-// standalone bare { } groups at node level are less common but could be added later.
+// Standalone groups (spec §4.2: group := '{' nodes '}' | '[' nodes ']' | '(' nodes ')')
+// All three delimiter forms can appear as standalone nodes, not just as command
+// args. BraceGroup handles TeX-style grouping like _{\alpha}, BracketGroup
+// handles [text](url) markdown links, ParenGroup handles (parenthetical).
 // ============================================================================
+
+BraceGroup:
+    '{' nodes+=Node* '}';
 
 BracketGroup:
     '[' nodes+=Node* ']';
@@ -203,7 +219,7 @@ MathEscape:
 
 // Raw text content inside math (LaTeX tokens, digits, operators, …)
 MathText:
-    value=TEXT;
+    value=(TEXT | BARE_HASH | BARE_BACKTICK);
 
 // ============================================================================
 // Escaped percent and plain text fragments
@@ -213,9 +229,9 @@ MathText:
 Escape:
     value=ESCAPE;
 
-// Plain text run
+// Plain text run (TEXT, or bare # / ` that didn't start math / verbatim)
 TextFragment:
-    value=TEXT;
+    value=(TEXT | BARE_HASH | BARE_BACKTICK);
 
 // ============================================================================
 // Wiki-style cross-references:  [[tree-id]]

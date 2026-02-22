@@ -7,14 +7,17 @@
 import * as langium from 'langium';
 
 export const ForesterTerminals = {
-    COMMAND_NAME: /\\[A-Za-z0-9\-\/\?\*]+/,
+    DECL_XMLNS: /\\xmlns:[a-zA-Z]+/,
     XML_COMMAND_NAME: /\\<[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?>/,
+    COMMAND_NAME: /\\[A-Za-z0-9\-\/\?\*]+/,
     WIKI_LINK: /\[\[[^\]\n]*\]\]/,
     ESCAPE: /\\[\\{}\[\]#%, "`;_|]/,
     HASH_DISPLAY: /##{/,
     HASH_INLINE: /#{/,
     VERBATIM_BLOCK: /```[\s\S]*?```/,
     TEXT: /[^\\{}[\]()\n\t %#`]+/,
+    BARE_HASH: /#(?!#?{)/,
+    BARE_BACKTICK: /`(?!``)/,
     COMMENT: /%[^\n]*/,
     WS: /[ \t]+/,
     NL: /\r?\n/,
@@ -57,6 +60,21 @@ export function isBraceArg(item: unknown): item is BraceArg {
     return reflection.isInstance(item, BraceArg.$type);
 }
 
+export interface BraceGroup extends langium.AstNode {
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
+    readonly $type: 'BraceGroup';
+    nodes: Array<Node>;
+}
+
+export const BraceGroup = {
+    $type: 'BraceGroup',
+    nodes: 'nodes'
+} as const;
+
+export function isBraceGroup(item: unknown): item is BraceGroup {
+    return reflection.isInstance(item, BraceGroup.$type);
+}
+
 export interface BracketArg extends langium.AstNode {
     readonly $container: Command;
     readonly $type: 'BracketArg';
@@ -73,7 +91,7 @@ export function isBracketArg(item: unknown): item is BracketArg {
 }
 
 export interface BracketGroup extends langium.AstNode {
-    readonly $container: BraceArg | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
     readonly $type: 'BracketGroup';
     nodes: Array<Node>;
 }
@@ -88,7 +106,7 @@ export function isBracketGroup(item: unknown): item is BracketGroup {
 }
 
 export interface Command extends langium.AstNode {
-    readonly $container: BraceArg | BracketArg | BracketGroup | Document | MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup | ParenArg | ParenGroup;
     readonly $type: 'Command';
     args: Array<Argument>;
     name: string;
@@ -119,7 +137,7 @@ export function isDocument(item: unknown): item is Document {
 }
 
 export interface Escape extends langium.AstNode {
-    readonly $container: BraceArg | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
     readonly $type: 'Escape';
     value: string;
 }
@@ -164,7 +182,7 @@ export function isMathBracketGroup(item: unknown): item is MathBracketGroup {
 }
 
 export interface MathDisplay extends langium.AstNode {
-    readonly $container: BraceArg | BracketArg | BracketGroup | Document | MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup | ParenArg | ParenGroup;
     readonly $type: 'MathDisplay';
     nodes: Array<MathNode>;
 }
@@ -194,7 +212,7 @@ export function isMathEscape(item: unknown): item is MathEscape {
 }
 
 export interface MathInline extends langium.AstNode {
-    readonly $container: BraceArg | BracketArg | BracketGroup | Document | MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup | ParenArg | ParenGroup;
     readonly $type: 'MathInline';
     nodes: Array<MathNode>;
 }
@@ -248,7 +266,7 @@ export function isMathText(item: unknown): item is MathText {
     return reflection.isInstance(item, MathText.$type);
 }
 
-export type Node = BracketGroup | Command | Escape | MathDisplay | MathInline | ParenGroup | TextFragment | VerbatimBlock | WikiLink;
+export type Node = BraceGroup | BracketGroup | Command | Escape | MathDisplay | MathInline | ParenGroup | TextFragment | VerbatimBlock | WikiLink;
 
 export const Node = {
     $type: 'Node'
@@ -274,7 +292,7 @@ export function isParenArg(item: unknown): item is ParenArg {
 }
 
 export interface ParenGroup extends langium.AstNode {
-    readonly $container: BraceArg | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
     readonly $type: 'ParenGroup';
     nodes: Array<Node>;
 }
@@ -289,7 +307,7 @@ export function isParenGroup(item: unknown): item is ParenGroup {
 }
 
 export interface TextFragment extends langium.AstNode {
-    readonly $container: BraceArg | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
     readonly $type: 'TextFragment';
     value: string;
 }
@@ -304,7 +322,7 @@ export function isTextFragment(item: unknown): item is TextFragment {
 }
 
 export interface VerbatimBlock extends langium.AstNode {
-    readonly $container: BraceArg | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
     readonly $type: 'VerbatimBlock';
     content: string;
 }
@@ -319,7 +337,7 @@ export function isVerbatimBlock(item: unknown): item is VerbatimBlock {
 }
 
 export interface WikiLink extends langium.AstNode {
-    readonly $container: BraceArg | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
     readonly $type: 'WikiLink';
     content: string;
 }
@@ -336,6 +354,7 @@ export function isWikiLink(item: unknown): item is WikiLink {
 export type ForesterAstType = {
     Argument: Argument
     BraceArg: BraceArg
+    BraceGroup: BraceGroup
     BracketArg: BracketArg
     BracketGroup: BracketGroup
     Command: Command
@@ -374,6 +393,16 @@ export class ForesterAstReflection extends langium.AbstractAstReflection {
                 }
             },
             superTypes: [Argument.$type]
+        },
+        BraceGroup: {
+            name: BraceGroup.$type,
+            properties: {
+                nodes: {
+                    name: BraceGroup.nodes,
+                    defaultValue: []
+                }
+            },
+            superTypes: [Node.$type]
         },
         BracketArg: {
             name: BracketArg.$type,

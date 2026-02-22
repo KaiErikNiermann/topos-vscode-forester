@@ -372,16 +372,52 @@ export class ForestGraphView {
     const taxonSet = [...new Set(data.nodes.map(n => n.taxon || '(untaxoned)'))].sort();
     const colorOf  = d3.scaleOrdinal(d3.schemeTableau10).domain(taxonSet);
 
+    // ── Cluster centres: one per taxon, arranged in a circle ─────────────────
+    const taxonByNode = new Map(data.nodes.map(n => [n.id, n.taxon || '(untaxoned)']));
+    const clusterArr  = [...taxonSet];
+    const clusterCenters = new Map();
+    clusterArr.forEach((taxon, i) => {
+      const angle = (2 * Math.PI * i) / Math.max(clusterArr.length, 1) - Math.PI / 2;
+      const r = clusterArr.length < 2 ? 0 : Math.min(W(), H()) * 0.32;
+      clusterCenters.set(taxon, {
+        x: W() / 2 + r * Math.cos(angle),
+        y: H() / 2 + r * Math.sin(angle),
+      });
+    });
+
+    // Seed each node near its cluster centre so the sim converges quickly
+    for (const d of data.nodes) {
+      const c = clusterCenters.get(taxonByNode.get(d.id));
+      if (c) { d.x = c.x + (Math.random() - 0.5) * 80; d.y = c.y + (Math.random() - 0.5) * 80; }
+    }
+
+    // Custom force: pull every node gently toward its cluster centre
+    function forceCluster(alpha) {
+      const str = alpha * 0.14;
+      for (const d of data.nodes) {
+        const c = clusterCenters.get(taxonByNode.get(d.id));
+        if (!c) continue;
+        d.vx -= (d.x - c.x) * str;
+        d.vy -= (d.y - c.y) * str;
+      }
+    }
+
     // ── Force simulation ─────────────────────────────────────────────────────
     const sim = d3.forceSimulation(data.nodes)
       .force('link',   d3.forceLink(data.edges)
                           .id(d => d.id)
-                          .distance(90)
-                          .strength(0.25))
+                          .distance(e => {
+                            const sId = typeof e.source === 'object' ? e.source.id : e.source;
+                            const tId = typeof e.target === 'object' ? e.target.id : e.target;
+                            // Short links within a cluster, long links across clusters
+                            return taxonByNode.get(sId) === taxonByNode.get(tId) ? 70 : 240;
+                          })
+                          .strength(0.4))
       .force('charge', d3.forceManyBody()
-                          .strength(d => -80 - (inDegree[d.id] || 0) * 8))
-      .force('center', d3.forceCenter(W() / 2, H() / 2))
-      .force('collide', d3.forceCollide(d => nodeRadius(d) + 4));
+                          .strength(d => -300 - (inDegree[d.id] || 0) * 20))
+      .force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04))
+      .force('collide', d3.forceCollide(d => nodeRadius(d) + 22))
+      .force('cluster', forceCluster);
 
     function nodeRadius(d) {
       return 5 + Math.sqrt(inDegree[d.id] || 0) * 1.8;
@@ -577,7 +613,13 @@ export class ForestGraphView {
 
     // ── Resize ────────────────────────────────────────────────────────────────
     window.addEventListener('resize', () => {
-      sim.force('center', d3.forceCenter(W() / 2, H() / 2));
+      // Recompute cluster centres for the new viewport dimensions
+      clusterArr.forEach((taxon, i) => {
+        const angle = (2 * Math.PI * i) / Math.max(clusterArr.length, 1) - Math.PI / 2;
+        const r = clusterArr.length < 2 ? 0 : Math.min(W(), H()) * 0.32;
+        clusterCenters.set(taxon, { x: W() / 2 + r * Math.cos(angle), y: H() / 2 + r * Math.sin(angle) });
+      });
+      sim.force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04));
       sim.alpha(0.15).restart();
     });
 

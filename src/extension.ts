@@ -442,6 +442,19 @@ export async function activate(context: vscode.ExtensionContext) {
          "forester.showGraphView",
          () => ForestGraphView.createOrShow(context.extensionUri)
       ),
+      vscode.commands.registerCommand(
+         "forester.restartLanguageServer",
+         async () => {
+            if (!langiumClient) return;
+            await vscode.window.withProgress(
+               { location: vscode.ProgressLocation.Notification, title: 'Restarting Forester language server…', cancellable: false },
+               async () => {
+                  await langiumClient!.stop();
+                  await langiumClient!.start();
+               },
+            );
+         }
+      ),
       // ── Datalog query runner (invoked from CodeLens in the language server) ──
       vscode.commands.registerCommand(
          "forester.runDatalogQuery",

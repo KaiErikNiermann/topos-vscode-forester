@@ -146,6 +146,12 @@
             "title": "Run Datalog Query",
             "category": "Forester",
             "icon": "$(play)"
+         },
+         {
+            "command": "forester.restartLanguageServer",
+            "title": "Restart Language Server",
+            "category": "Forester",
+            "icon": "$(debug-restart)"
          }
       ],
       "views": {

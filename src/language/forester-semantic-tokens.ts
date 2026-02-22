@@ -14,7 +14,7 @@
 import type { AstNode } from 'langium';
 import type { LangiumServices, SemanticTokenAcceptor } from 'langium/lsp';
 import { AbstractSemanticTokenProvider } from 'langium/lsp';
-import { SemanticTokenTypes } from 'vscode-languageserver';
+import { SemanticTokenModifiers, SemanticTokenTypes } from 'vscode-languageserver';
 import {
     isCommand,
     isBraceArg,
@@ -52,6 +52,15 @@ const PATH_ARG_COMMANDS: ReadonlySet<string> = new Set([
     'transclude', 'import', 'export', 'ref',
 ]);
 
+// Commands that introduce a lexical binding (\def\name or \let\name)
+// The Command immediately following these in the same parent nodes array
+// is the name being defined — it gets the `declaration` modifier.
+const LEXICAL_BINDING_COMMANDS: ReadonlySet<string> = new Set(['\\def', '\\let']);
+
+// Dynamic variable operations — get a `modification` modifier to distinguish
+// them visually from lexical bindings (def/let).
+const DYNAMIC_VAR_COMMANDS: ReadonlySet<string> = new Set(['\\put', '\\get', '\\alloc']);
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export class ForesterSemanticTokenProvider extends AbstractSemanticTokenProvider {
@@ -84,13 +93,52 @@ export class ForesterSemanticTokenProvider extends AbstractSemanticTokenProvider
             return;
         }
 
-        // Strip the leading backslash for the set lookup
         const name = rawName.slice(1);
         const tokenType = BUILTIN_COMMANDS.has(name)
             ? SemanticTokenTypes.keyword
             : SemanticTokenTypes.function;
 
+        // Dynamic variable operations (\put, \get, \alloc) → modification modifier
+        if (DYNAMIC_VAR_COMMANDS.has(rawName)) {
+            accept({ node, property: 'name', type: tokenType, modifier: SemanticTokenModifiers.modification });
+            return;
+        }
+
+        // Lexical binding keywords (\def, \let) → definition modifier
+        if (LEXICAL_BINDING_COMMANDS.has(rawName)) {
+            accept({ node, property: 'name', type: tokenType, modifier: SemanticTokenModifiers.definition });
+            return;
+        }
+
+        // User macro that is the name being defined (immediately after \def or \let)
+        // → declaration modifier so editors can show it differently from call sites
+        if (!BUILTIN_COMMANDS.has(name) && this.isBindingSite(node)) {
+            accept({ node, property: 'name', type: tokenType, modifier: SemanticTokenModifiers.declaration });
+            return;
+        }
+
         accept({ node, property: 'name', type: tokenType });
+    }
+
+    /**
+     * Return true if `node` is the Command immediately following a \def or \let
+     * in the same parent container — i.e., it is the name being bound.
+     *
+     * Example: \def\myMacro{body}
+     *   parent.nodes = [..., Command(\def), Command(\myMacro), ...]
+     */
+    private isBindingSite(node: Command): boolean {
+        const container = node.$container as { nodes?: AstNode[] };
+        const siblings = container.nodes;
+        if (!siblings) {
+            return false;
+        }
+        const idx = siblings.indexOf(node);
+        if (idx <= 0) {
+            return false;
+        }
+        const prev = siblings[idx - 1];
+        return isCommand(prev) && LEXICAL_BINDING_COMMANDS.has(prev.name);
     }
 
     /**

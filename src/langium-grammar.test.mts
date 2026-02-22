@@ -740,6 +740,82 @@ await test('parse errors outside \\startverb…\\stopverb are NOT suppressed', a
     }
 });
 
+// ── Validator: arity checks (Task 4) ─────────────────────────────────────────
+
+await test('\\title{text}: valid arity — no arity warning', async () => {
+    const doc = await parse('\\title{My Tree}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const arityWarns = diags.filter(d => d.message.includes('brace argument'));
+    if (arityWarns.length > 0) {
+        throw new Error(`Unexpected arity warnings: ${arityWarns.map(d => d.message).join('; ')}`);
+    }
+});
+
+await test('\\link{uri}: missing second brace arg — arity warning', async () => {
+    const doc = await parse('\\link{https://example.com}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const arityWarns = diags.filter(d => d.message.includes('\\link') && d.message.includes('brace argument'));
+    if (arityWarns.length === 0) {
+        throw new Error('Expected arity warning for \\link with 1 brace arg');
+    }
+});
+
+await test('\\link{uri}{text}: valid two brace args — no arity warning', async () => {
+    const doc = await parse('\\link{https://example.com}{click here}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const arityWarns = diags.filter(d => d.message.includes('\\link') && d.message.includes('brace argument'));
+    if (arityWarns.length > 0) {
+        throw new Error(`Unexpected arity warnings: ${arityWarns.map(d => d.message).join('; ')}`);
+    }
+});
+
+await test('\\meta{key}: missing second brace arg — arity warning', async () => {
+    const doc = await parse('\\meta{doi}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const arityWarns = diags.filter(d => d.message.includes('\\meta') && d.message.includes('brace argument'));
+    if (arityWarns.length === 0) {
+        throw new Error('Expected arity warning for \\meta with 1 brace arg');
+    }
+});
+
+// ── Validator: date format checks (Task 5) ───────────────────────────────────
+
+await test('\\date{2024-01-15}: valid ISO date — no date-format warning', async () => {
+    const doc = await parse('\\date{2024-01-15}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const dateWarns = diags.filter(d => d.message.includes('ISO 8601'));
+    if (dateWarns.length > 0) {
+        throw new Error(`Unexpected date warnings: ${dateWarns.map(d => d.message).join('; ')}`);
+    }
+});
+
+await test('\\date{not-a-date}: invalid date format — date-format warning', async () => {
+    const doc = await parse('\\date{not-a-date}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const dateWarns = diags.filter(d => d.message.includes('ISO 8601'));
+    if (dateWarns.length === 0) {
+        throw new Error('Expected ISO 8601 date-format warning for \\date{not-a-date}');
+    }
+});
+
+await test('\\date{2024-13-01}: invalid month — date-format warning', async () => {
+    const doc = await parse('\\date{2024-13-01}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const dateWarns = diags.filter(d => d.message.includes('ISO 8601'));
+    if (dateWarns.length === 0) {
+        throw new Error('Expected ISO 8601 date-format warning for invalid month 13');
+    }
+});
+
+await test('\\date{2024-12-32}: invalid day — date-format warning', async () => {
+    const doc = await parse('\\date{2024-12-32}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const dateWarns = diags.filter(d => d.message.includes('ISO 8601'));
+    if (dateWarns.length === 0) {
+        throw new Error('Expected ISO 8601 date-format warning for invalid day 32');
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

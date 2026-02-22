@@ -13,6 +13,7 @@ import type { DefaultSharedModuleContext, LangiumServices, LangiumSharedServices
 import { createDefaultModule, createDefaultSharedModule } from 'langium/lsp';
 import { ForesterGeneratedModule, ForesterGeneratedSharedModule } from './generated/module.js';
 import { ForesterDocumentValidator } from './forester-validator.js';
+import { registerForesterValidationChecks } from './forester-validator-checks.js';
 
 /**
  * Forester-specific services added on top of the default Langium LSP services.
@@ -53,6 +54,7 @@ export function createForesterServices(context: DefaultSharedModuleContext): {
     ) as ForesterServices;
 
     shared.ServiceRegistry.register(Forester);
+    registerForesterValidationChecks(Forester);
 
     return { shared, Forester };
 }

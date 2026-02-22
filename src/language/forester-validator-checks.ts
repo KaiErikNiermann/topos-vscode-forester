@@ -16,6 +16,8 @@
  *   • checkMissingImport      — hint when \macro is defined in another tree that is
  *                               not yet imported; provides data for the quick-fix
  *                               CodeActionProvider to offer "Add \import{id}" (Task 7)
+ *   • checkTransclusionCycle  — warn when \transclude{id} would create a cycle in the
+ *                               transclusion graph across the loaded workspace (Task 3)
  */
 import type { AstNode, ValidationAcceptor, ValidationChecks, LangiumDocuments } from 'langium';
 import { AstUtils } from 'langium';
@@ -406,6 +408,73 @@ export class ForesterChecks {
     }
 
     /**
+     * Warn when a \transclude{target} creates a cycle in the transclusion graph
+     * across the loaded workspace (A → B → … → A).
+     *
+     * Uses BFS from the target tree: if BFS reaches the current tree ID, there is
+     * a cycle.  Registered as a 'slow' check.
+     */
+    checkTransclusionCycle(node: Command, accept: ValidationAcceptor): void {
+        if (!this.documents || node.name !== '\\transclude') return;
+
+        const target = firstBraceArgText(node);
+        if (!target) return;
+
+        const currentDoc = AstUtils.getDocument(node);
+        const currentTreeId = treeIdFromUriPath(currentDoc.uri.path);
+        if (!currentTreeId) return;
+
+        // Build the workspace-wide transclusion graph lazily
+        const graph = this.buildTransclusionGraph();
+
+        // BFS from `target`; if we can reach `currentTreeId` → cycle
+        const visited = new Set<string>();
+        const queue: string[] = [target];
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            if (current === currentTreeId) {
+                const braceArg = node.args.find(isBraceArg);
+                accept(
+                    'warning',
+                    `Transclusion cycle detected: '${currentTreeId}' transitively transcludes itself via '${target}'`,
+                    { node: braceArg ?? node },
+                );
+                return;
+            }
+            if (visited.has(current)) continue;
+            visited.add(current);
+            for (const next of graph.get(current) ?? []) {
+                queue.push(next);
+            }
+        }
+    }
+
+    /**
+     * Build a map from each tree ID to the set of tree IDs it directly transcludes,
+     * by scanning all loaded workspace documents.
+     */
+    private buildTransclusionGraph(): Map<string, Set<string>> {
+        const graph = new Map<string, Set<string>>();
+        if (!this.documents) return graph;
+
+        for (const doc of this.documents.all) {
+            const docTreeId = treeIdFromUriPath(doc.uri.path);
+            if (!docTreeId) continue;
+
+            const targets = new Set<string>();
+            for (const n of AstUtils.streamAllContents(doc.parseResult.value)) {
+                if (isCommand(n) && n.name === '\\transclude') {
+                    const id = firstBraceArgText(n);
+                    if (id) targets.add(id);
+                }
+            }
+            if (targets.size > 0) graph.set(docTreeId, targets);
+        }
+
+        return graph;
+    }
+
+    /**
      * Scan all loaded workspace documents for \\def\\name and \\let\\name
      * binding sites and return the set of defined macro names (with leading backslash).
      */
@@ -468,6 +537,7 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
             checker.checkCrossRefTarget,
             checker.checkUnresolvedCommand,
             checker.checkMissingImport,
+            checker.checkTransclusionCycle,
         ],
     };
 

@@ -134,6 +134,12 @@
             "title": "Change Forester Open Behaviour",
             "category": "Forester",
             "icon": "$(settings-gear)"
+         },
+         {
+            "command": "forester.showGraphView",
+            "title": "Show Forest Graph View",
+            "category": "Forester",
+            "icon": "$(type-hierarchy)"
          }
       ],
       "views": {

@@ -25,6 +25,7 @@ import {
    addLinkPatternCommand,
    removeLinkPatternCommand,
 } from "./link-aliases-config";
+import { ForestGraphView } from "./forest-graph-view";
 
 const textDecoder = new TextDecoder("utf-8");
 
@@ -391,6 +392,10 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand(
          "forester.removeLinkPattern",
          removeLinkPatternCommand
+      ),
+      vscode.commands.registerCommand(
+         "forester.showGraphView",
+         () => ForestGraphView.createOrShow(context.extensionUri)
       )
    );
 

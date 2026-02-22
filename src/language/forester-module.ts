@@ -16,6 +16,7 @@ import { ForesterDocumentValidator } from './forester-validator.js';
 import { registerForesterValidationChecks } from './forester-validator-checks.js';
 import { ForesterSemanticTokenProvider } from './forester-semantic-tokens.js';
 import { ForesterDefinitionProvider } from './forester-definition-provider.js';
+import { ForesterCodeLensProvider } from './forester-codelens-provider.js';
 
 /**
  * Forester-specific services added on top of the default Langium LSP services.
@@ -37,6 +38,7 @@ export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = 
     lsp: {
         SemanticTokenProvider: (services) => new ForesterSemanticTokenProvider(services),
         DefinitionProvider: (services) => new ForesterDefinitionProvider(services),
+        CodeLensProvider: (services) => new ForesterCodeLensProvider(services),
     },
 };
 

@@ -1016,6 +1016,48 @@ await test('namespace: body without \\def has no binding pair', async () => {
     }
 });
 
+// ── Semantic tokens: datalog context detection (Task 5) ──────────────────────
+// The isInsideDatalog() check walks $container up to find \datalog{...}.
+// These tests verify the AST structure the check relies on.
+
+await test('datalog: ?Var TextFragment inside \\datalog{} is a direct Document-level child of BraceArg of \\datalog', async () => {
+    // In real usage, isInsideDatalog walks up: TextFragment → BraceArg → Command(\datalog)
+    const source = '\\datalog{?X}';
+    const doc = await parseClean(source);
+    const datalогCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\datalog');
+    assertOk(datalогCmd, 'Expected \\datalog command at document level');
+    if (!isCommand(datalогCmd)) throw new Error('Not a Command');
+
+    const bodyArg = datalогCmd.args.find(isBraceArg);
+    assertOk(bodyArg, 'Expected BraceArg on \\datalog');
+
+    // The BraceArg's $container is the \datalog Command
+    if (!isCommand(bodyArg.$container)) throw new Error('BraceArg.$container is not a Command');
+    assertEqual(bodyArg.$container.name, '\\datalog', 'BraceArg.$container should be \\datalog');
+
+    // ?X is a TextFragment inside the body
+    const varFrag = bodyArg.nodes.find(n => isTextFragment(n) && n.value.startsWith('?'));
+    assertOk(varFrag, 'Expected ?X TextFragment inside \\datalog body');
+});
+
+await test('datalog: \\rel/has-taxon inside \\datalog{} is a Command with slash in name', async () => {
+    const source = '\\datalog{\\rel/has-taxon{a}{b}}';
+    const doc = await parseClean(source);
+    const datalогCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\datalog');
+    assertOk(datalогCmd, 'Expected \\datalog command');
+    if (!isCommand(datalогCmd)) throw new Error('Not a Command');
+
+    const bodyArg = datalогCmd.args.find(isBraceArg);
+    assertOk(bodyArg, 'Expected BraceArg on \\datalog');
+
+    const relCmd = bodyArg.nodes.find(n => isCommand(n) && (n as Command).name.includes('/'));
+    assertOk(relCmd, 'Expected Command with "/" in name inside \\datalog body');
+    if (!isCommand(relCmd)) throw new Error('Not a Command');
+    if (!relCmd.name.startsWith('\\rel/')) {
+        throw new Error(`Expected \\rel/... command, got: ${relCmd.name}`);
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

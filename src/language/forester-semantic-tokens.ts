@@ -74,7 +74,46 @@ export class ForesterSemanticTokenProvider extends AbstractSemanticTokenProvider
             return;
         }
         if (isTextFragment(node)) {
-            this.maybeHighlightTreeId(node, accept);
+            if (this.isInsideDatalog(node)) {
+                this.highlightDatalogText(node, accept);
+            } else {
+                this.maybeHighlightTreeId(node, accept);
+            }
+        }
+    }
+
+    /**
+     * Return true when `node` is nested (at any depth) inside the BraceArg
+     * of a \datalog{…} command.
+     */
+    private isInsideDatalog(node: AstNode): boolean {
+        let current: AstNode | undefined = node.$container;
+        while (current !== undefined) {
+            if (isBraceArg(current)) {
+                const parent = current.$container;
+                if (isCommand(parent) && parent.name === '\\datalog') {
+                    return true;
+                }
+            }
+            current = current.$container;
+        }
+        return false;
+    }
+
+    /**
+     * Apply datalog-specific semantic tokens to a TextFragment inside \datalog{…}:
+     *   • `?Var`  — variable token  (?-prefixed identifiers)
+     *   • `@`     — string token    (URI constant marker, followed by BraceArg)
+     *   • `'…`    — string token    (tick constant — content literal)
+     */
+    private highlightDatalogText(node: TextFragment, accept: SemanticTokenAcceptor): void {
+        const v = node.value;
+        if (v.startsWith('?')) {
+            accept({ node, property: 'value', type: SemanticTokenTypes.variable });
+        } else if (v === '@' || v.startsWith('@')) {
+            accept({ node, property: 'value', type: SemanticTokenTypes.string });
+        } else if (v.startsWith("'")) {
+            accept({ node, property: 'value', type: SemanticTokenTypes.string });
         }
     }
 
@@ -90,6 +129,13 @@ export class ForesterSemanticTokenProvider extends AbstractSemanticTokenProvider
         // XML element command: \<html:div> → macro token
         if (rawName.startsWith('\\<')) {
             accept({ node, property: 'name', type: SemanticTokenTypes.macro });
+            return;
+        }
+
+        // Datalog relation: a command with a '/' in its name inside \datalog{…}
+        // e.g. \rel/has-taxon{arg1}{arg2} → method token
+        if (rawName.includes('/') && this.isInsideDatalog(node)) {
+            accept({ node, property: 'name', type: SemanticTokenTypes.method });
             return;
         }
 

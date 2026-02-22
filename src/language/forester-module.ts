@@ -1,12 +1,16 @@
 /**
  * Langium dependency-injection module for the Forester language.
- * Wires custom services (formatter, hover provider) into the Langium container.
+ * Wires custom services into the Langium container.
+ *
+ * Formatting is handled by the handrolled formatter-core.ts via the VSCode
+ * DocumentFormattingEditProvider (formatter.ts), NOT by the Langium LSP.
+ * The Langium AbstractFormatter (forester-formatter.ts) is intentionally
+ * NOT registered here — it has word-splitting issues with TEXT tokens.
  */
-import type { LangiumSharedCoreServices, Module } from 'langium';
+import type { Module } from 'langium';
 import { inject } from 'langium';
 import type { DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, PartialLangiumServices } from 'langium/lsp';
 import { createDefaultModule, createDefaultSharedModule } from 'langium/lsp';
-import { ForesterFormatter } from './forester-formatter.js';
 import { ForesterGeneratedModule, ForesterGeneratedSharedModule } from './generated/module.js';
 
 /**
@@ -20,14 +24,9 @@ export type ForesterServices = LangiumServices & ForesterAddedServices;
 
 /**
  * DI module registering Forester-specific overrides.
- *
- * Task 15-20: ForesterFormatter registered as lsp.Formatter.
- * Task 23-26: HoverProvider will be added here once implemented.
+ * Formatting is NOT registered here — handled by formatter-core.ts instead.
  */
 export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = {
-    lsp: {
-        Formatter: () => new ForesterFormatter(),
-    },
 };
 
 /**

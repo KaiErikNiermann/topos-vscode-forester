@@ -201,6 +201,7 @@ export class ForestGraphView {
     /* Edges — intra-cluster links are prominent; cross-cluster are subdued */
     .link { stroke-opacity: 0.65; fill: none; }
     .link.cross-cluster { stroke-opacity: 0.13; stroke-dasharray: 5 4; }
+    .link.cross-cluster.link-active { stroke-opacity: 0.55; }
     .link.transclude { stroke: #4fc3f7; }
     .link.import     { stroke: #81c784; }
     .link.export     { stroke: #ffb74d; }
@@ -580,6 +581,11 @@ export class ForestGraphView {
         const src = resolveId(d.source);
         const tgt = resolveId(d.target);
         return !(visible.has(src) && visible.has(tgt));
+      });
+      // Promote visible cross-cluster links to full opacity while a node is highlighted
+      linkSel.classed('link-active', d => {
+        if (!d._cross || !currentHighlight) return false;
+        return visible.has(resolveId(d.source)) && visible.has(resolveId(d.target));
       });
     }
 

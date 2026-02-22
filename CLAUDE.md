@@ -10,32 +10,32 @@ This is a VSCode extension (`topos-vscode-forester`) that provides language supp
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Compile (type-check + bundle via esbuild)
-npm run compile
+pnpm run compile
 
 # Watch mode for development
-npm run watch
+pnpm run watch
 
 # Type-check only (no build)
-npm run check-types
+pnpm run check-types
 
 # Lint
-npm run lint
+pnpm run lint
 
 # Run individual test suites (no test runner; tests are standalone scripts)
-npm run test:formatter          # src/formatter.test.ts
-npm run test:latex-hover        # src/latex-hover-core.test.ts
-npm run test:tag-closure-inlay  # src/tag-closure-inlay-core.test.ts
-npm run test:subtree-auto-id    # src/subtree-auto-id.test.ts
-npm run test:language-server    # requires compile first
+pnpm run test:formatter          # src/formatter.test.ts
+pnpm run test:latex-hover        # src/latex-hover-core.test.ts
+pnpm run test:tag-closure-inlay  # src/tag-closure-inlay-core.test.ts
+pnpm run test:subtree-auto-id    # src/subtree-auto-id.test.ts
+pnpm run test:language-server    # requires compile first
 
 # Package the extension
-npm run package
+pnpm run package
 
 # Package and install locally in VSCode
-npm run install-local
+pnpm run install-local
 ```
 
 The build uses esbuild (configured in `esbuild.js`) to bundle `src/extension.ts` → `out/extension.js`. The `vscode` module is always external.
@@ -80,9 +80,9 @@ The formatter in `formatter-core.ts` uses a tokenizer that recognizes: commands 
 ## Model selection
 
 **Use `claude-haiku-4-5-20251001` for mechanical, deterministic tasks:**
-- Fixing ESLint errors reported by `npm run lint`
-- Applying `npm run lint:fix` and then cleaning up remaining auto-fixable issues
-- Correcting TypeScript type errors flagged by `npm run check-types`
+- Fixing ESLint errors reported by `pnpm run lint`
+- Applying `pnpm run lint:fix` and then cleaning up remaining auto-fixable issues
+- Correcting TypeScript type errors flagged by `pnpm run check-types`
 - Renaming symbols, reordering imports, adjusting semicolons/formatting
 
 **Use the current (larger) model for:**
@@ -92,8 +92,8 @@ The formatter in `formatter-core.ts` uses a tokenizer that recognizes: commands 
 
 ### Lint workflow
 ```bash
-npm run lint:fix          # auto-fix deterministic issues (no AI needed)
-npm run lint              # show remaining issues
+pnpm run lint:fix          # auto-fix deterministic issues (no AI needed)
+pnpm run lint              # show remaining issues
 
 # For remaining non-auto-fixable issues, prefer haiku:
 # claude --model claude-haiku-4-5-20251001 -p "fix lint errors in src/foo.ts"

@@ -5,6 +5,7 @@
    "repository": "github:kniermann/forester-lang-support",
    "publisher": "kniermann",
    "version": "0.3.0",
+   "packageManager": "pnpm@10.14.0",
    "engines": {
       "vscode": "^1.86.0"
    },
@@ -14,7 +15,6 @@
       "Programming Languages"
    ],
    "activationEvents": [
-      "onLanguage:forester",
       "workspaceContains:**/*.tree",
       "workspaceContains:forest.toml"
    ],
@@ -359,7 +359,9 @@
                "items": {
                   "type": "string"
                },
-               "default": ["basic-macros"],
+               "default": [
+                  "basic-macros"
+               ],
                "description": "Tree IDs to omit from the Forest Graph view. Edges to/from excluded nodes are also hidden. Useful for suppressing macro-only trees (like 'basic-macros') that would otherwise appear as a hub connected to almost every other tree."
             }
          }
@@ -431,32 +433,32 @@
       }
    },
    "scripts": {
-      "vscode:prepublish": "npm run package-ext",
-      "compile": "npm run check-types && node esbuild.js",
-      "check-types": "tsc --noEmit",
+      "vscode:prepublish": "pnpm run package-ext",
+      "compile": "pnpm run check-types && node esbuild.js",
+      "check-types": "tsc",
       "watch": "npm-run-all -p watch:*",
       "watch:esbuild": "node esbuild.js --watch",
       "watch:tsc": "tsc --noEmit --watch --preserveWatchOutput",
       "watch:grammar": "langium generate --watch",
       "langium:generate": "langium generate",
-      "build": "npm run compile",
+      "build": "pnpm run compile",
       "lint": "eslint src --ext ts,mts",
       "lint:fix": "eslint src --ext ts,mts --fix",
-      "test:formatter": "npx tsx src/formatter.test.ts",
-      "test:langium-formatter": "npx esbuild src/langium-formatter.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-formatter-test.mjs && node out/langium-formatter-test.mjs",
-      "test:langium-hover": "npx esbuild src/langium-hover.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-hover-test.mjs && node out/langium-hover-test.mjs",
-      "test:langium-grammar": "npx esbuild src/langium-grammar.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-grammar-test.mjs && node out/langium-grammar-test.mjs",
-      "test:latex-hover": "npx tsx src/latex-hover-core.test.ts",
-      "test:tag-closure-inlay": "npx tsx src/tag-closure-inlay-core.test.ts",
-      "test:subtree-auto-id": "npx tsx src/subtree-auto-id.test.ts",
-      "test:language-server": "npm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
-      "package-ext": "npm run check-types && node esbuild.js --production",
-      "package": "npm run package-ext && vsce package",
-      "install-local": "npm run package && code --install-extension forester-lang-support-*.vsix",
-      "package-install": "npm run package && code --install-extension forester-lang-support-*.vsix"
+      "test:formatter": "pnpm dlx tsx src/formatter.test.ts",
+      "test:langium-formatter": "pnpm dlx esbuild src/langium-formatter.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-formatter-test.mjs && node out/langium-formatter-test.mjs",
+      "test:langium-hover": "pnpm dlx esbuild src/langium-hover.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-hover-test.mjs && node out/langium-hover-test.mjs",
+      "test:langium-grammar": "pnpm dlx esbuild src/langium-grammar.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-grammar-test.mjs && node out/langium-grammar-test.mjs",
+      "test:latex-hover": "pnpm dlx tsx src/latex-hover-core.test.ts",
+      "test:tag-closure-inlay": "pnpm dlx tsx src/tag-closure-inlay-core.test.ts",
+      "test:subtree-auto-id": "pnpm dlx tsx src/subtree-auto-id.test.ts",
+      "test:language-server": "pnpm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
+      "package-ext": "pnpm run check-types && node esbuild.js --production",
+      "package": "pnpm run package-ext && vsce package",
+      "install-local": "pnpm run package && code --install-extension forester-lang-support-*.vsix",
+      "package-install": "pnpm run package && code --install-extension forester-lang-support-*.vsix"
    },
    "devDependencies": {
-      "@types/node": "18.x",
+      "@types/node": "^18.19.130",
       "@types/vscode": "^1.86.0",
       "@typescript-eslint/eslint-plugin": "^6.19.1",
       "@typescript-eslint/parser": "^6.19.1",

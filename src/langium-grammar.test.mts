@@ -836,6 +836,57 @@ await test('no duplicate \\import: different tree-ids — no warning', async () 
     }
 });
 
+// ── Validator: unresolved command check (Task 2) ──────────────────────────────
+
+await test('known builtin \\title: no unresolved-command warning', async () => {
+    const doc = await parse('\\title{Hello}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const warns = diags.filter(d => d.message.includes('Unknown command'));
+    if (warns.length > 0) {
+        throw new Error(`Unexpected unresolved-command warning for \\title: ${warns[0].message}`);
+    }
+});
+
+await test('workspace macro defined by \\def: no unresolved-command warning', async () => {
+    // The macro is defined and then used in the same document.
+    // collectWorkspaceMacros() scans the single loaded doc, so \\foo is found.
+    const doc = await parse('\\def\\foo{body}\n\\foo');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const warns = diags.filter(d => d.message.includes('Unknown command \\foo'));
+    if (warns.length > 0) {
+        throw new Error(`Unexpected unresolved-command warning for workspace macro: ${warns[0].message}`);
+    }
+});
+
+await test('command in #{…} math mode: no unresolved-command warning', async () => {
+    // \\frac is not a Forester builtin or workspace macro, but it is in math mode.
+    const doc = await parse('#{\\frac{a}{b}}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const warns = diags.filter(d => d.message.includes('Unknown command \\frac'));
+    if (warns.length > 0) {
+        throw new Error(`Unexpected warning for TeX command inside math: ${warns[0].message}`);
+    }
+});
+
+await test('command in ##{…} display math mode: no unresolved-command warning', async () => {
+    const doc = await parse('##{\\sum_{i=1}^n}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const warns = diags.filter(d => d.message.includes('Unknown command \\sum'));
+    if (warns.length > 0) {
+        throw new Error(`Unexpected warning for TeX command inside display math: ${warns[0].message}`);
+    }
+});
+
+await test('command inside \\tex{}{} body: no unresolved-command warning', async () => {
+    // \\frac is a TeX command — should be suppressed inside \\tex body.
+    const doc = await parse('\\tex{}{\\frac{a}{b}}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const warns = diags.filter(d => d.message.includes('Unknown command \\frac'));
+    if (warns.length > 0) {
+        throw new Error(`Unexpected warning for TeX command inside \\tex body: ${warns[0].message}`);
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

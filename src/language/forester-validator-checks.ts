@@ -11,11 +11,23 @@
  * Slow checks (run on save / explicit trigger):
  *   • checkImportExportTarget — \import/\export/\transclude{id} must reference a
  *                               known .tree file in the workspace index (Task 3)
+ *   • checkUnresolvedCommand  — warn on unknown commands in Text_mode; suppressed
+ *                               inside #{}, ##{}, and \tex{}{} bodies (Task 2)
  */
-import type { ValidationAcceptor, ValidationChecks, LangiumDocuments } from 'langium';
+import type { AstNode, ValidationAcceptor, ValidationChecks, LangiumDocuments } from 'langium';
 import { AstUtils } from 'langium';
 import type { ForesterAstType, Command, Document } from './generated/ast.js';
-import { isBraceArg, isCommand, isDocument, isTextFragment } from './generated/ast.js';
+import {
+    isBraceArg,
+    isCommand,
+    isDocument,
+    isTextFragment,
+    isMathInline,
+    isMathDisplay,
+    isMathBraceGroup,
+    isMathBracketGroup,
+    isMathParenGroup,
+} from './generated/ast.js';
 import type { ForesterServices } from './forester-module.js';
 
 // ── Arity table ──────────────────────────────────────────────────────────────
@@ -57,7 +69,84 @@ const CROSS_REF_COMMANDS: ReadonlySet<string> = new Set([
     '\\import', '\\export', '\\transclude', '\\ref',
 ]);
 
+// Complete set of Forester built-in commands (full name, including leading backslash).
+// Commands matching this set are never "unresolved".
+const ALL_BUILTIN_COMMANDS: ReadonlySet<string> = new Set([
+    // Metadata / top-level
+    '\\title', '\\taxon', '\\author', '\\contributor', '\\date', '\\parent',
+    '\\tag', '\\meta', '\\number', '\\solution',
+    // Links and cross-references
+    '\\transclude', '\\import', '\\export', '\\ref', '\\link',
+    // Block-level layout
+    '\\p', '\\ul', '\\ol', '\\li', '\\blockquote', '\\subtree', '\\scope',
+    '\\figure', '\\query', '\\texfig', '\\ltexfig',
+    // Inline
+    '\\em', '\\strong', '\\code',
+    // Code / verbatim
+    '\\codeblock', '\\pre', '\\startverb', '\\stopverb',
+    // Math / TeX
+    '\\tex',
+    // Macro / binding system
+    '\\def', '\\let', '\\put', '\\get', '\\alloc', '\\open', '\\namespace',
+    // Object system
+    '\\object', '\\patch', '\\call',
+]);
+
+// Commands whose arguments are TeX content — suppress unresolved-command warnings
+// inside any of their BraceArg children.
+const TEX_CONTENT_COMMANDS: ReadonlySet<string> = new Set([
+    '\\tex', '\\texfig', '\\ltexfig',
+]);
+
+// Commands that introduce a lexical binding (\\def \\let)
+const LEXICAL_BINDING_COMMANDS: ReadonlySet<string> = new Set(['\\def', '\\let']);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Return true if `node` is inside a TeX-mode context:
+ *   • directly inside a MathInline (#{…}) or MathDisplay (##{…}) subtree
+ *   • directly inside any BraceArg of a \tex / \texfig / \ltexfig command
+ *
+ * Walk up the $container chain until we either find a math/TeX ancestor
+ * or reach the document root.
+ */
+function isInTexMode(node: AstNode): boolean {
+    let current: AstNode | undefined = node.$container;
+    while (current !== undefined) {
+        // Inside math #{…} or ##{…}
+        if (isMathInline(current) || isMathDisplay(current)) {
+            return true;
+        }
+        // Inside an explicit { } group within math
+        if (isMathBraceGroup(current) || isMathBracketGroup(current) || isMathParenGroup(current)) {
+            return true;
+        }
+        // Inside a BraceArg of \tex, \texfig, or \ltexfig
+        if (isBraceArg(current)) {
+            const parent = current.$container;
+            if (isCommand(parent) && TEX_CONTENT_COMMANDS.has(parent.name)) {
+                return true;
+            }
+        }
+        current = current.$container;
+    }
+    return false;
+}
+
+/**
+ * Return true if `node` is the Command immediately following a \def or \let
+ * in the same parent nodes array — i.e., it is the name being bound.
+ */
+function isBindingSite(node: Command): boolean {
+    const container = node.$container as AstNode & { nodes?: AstNode[] };
+    const siblings = container.nodes;
+    if (!siblings) return false;
+    const idx = siblings.indexOf(node);
+    if (idx <= 0) return false;
+    const prev = siblings[idx - 1];
+    return isCommand(prev) && LEXICAL_BINDING_COMMANDS.has(prev.name);
+}
 
 /** Extract the raw text content from the first BraceArg of a Command. */
 function firstBraceArgText(node: Command): string {
@@ -202,6 +291,78 @@ export class ForesterChecks {
             { node: braceArg ?? node },
         );
     }
+
+    /**
+     * Warn when a command is neither a Forester built-in nor a macro defined
+     * anywhere in the loaded workspace.
+     *
+     * Suppressed when:
+     *   • The command is a known built-in (ALL_BUILTIN_COMMANDS).
+     *   • The command is an XML namespace declaration (\\xmlns:…) or XML element (\\<…>).
+     *   • The command is in TeX mode: inside #{…}, ##{…}, or an arg of \\tex/\\texfig/\\ltexfig.
+     *   • The command is a binding site (the name being introduced by \\def/\\let).
+     *   • The workspace index is empty (avoids false positives in tests / fresh workspaces).
+     *
+     * Registered as a 'slow' check — does not run on every keystroke.
+     */
+    checkUnresolvedCommand(node: Command, accept: ValidationAcceptor): void {
+        if (!this.documents) return;
+
+        // Skip XML-special command name forms
+        if (node.name.startsWith('\\xmlns:') || node.name.startsWith('\\<')) return;
+
+        // Skip known builtins
+        if (ALL_BUILTIN_COMMANDS.has(node.name)) return;
+
+        // Skip if in a TeX-mode context (math or \tex{}{} body)
+        if (isInTexMode(node)) return;
+
+        // Skip binding sites (name being introduced by \def or \let)
+        if (isBindingSite(node)) return;
+
+        // Collect workspace-defined macros (all \def\name and \let\name across all docs)
+        const workspaceMacros = this.collectWorkspaceMacros();
+
+        // Skip if the workspace index is effectively empty (avoid spurious warnings)
+        if (workspaceMacros.size === 0) return;
+
+        if (!workspaceMacros.has(node.name)) {
+            accept(
+                'warning',
+                `Unknown command ${node.name} — not a Forester built-in or workspace macro. `
+                + 'Check spelling or add a \\def/\\let binding.',
+                { node },
+            );
+        }
+    }
+
+    /**
+     * Scan all loaded workspace documents for \\def\\name and \\let\\name
+     * binding sites and return the set of defined macro names (with leading backslash).
+     */
+    private collectWorkspaceMacros(): Set<string> {
+        const macros = new Set<string>();
+        if (!this.documents) return macros;
+
+        for (const doc of this.documents.all) {
+            for (const node of AstUtils.streamAllContents(doc.parseResult.value)) {
+                if (!isCommand(node) || !LEXICAL_BINDING_COMMANDS.has(node.name)) continue;
+
+                // The macro name is the Command immediately following \def or \let
+                const container = node.$container as AstNode & { nodes?: AstNode[] };
+                const siblings = container.nodes;
+                if (!siblings) continue;
+                const idx = siblings.indexOf(node);
+                if (idx < 0 || idx + 1 >= siblings.length) continue;
+                const next = siblings[idx + 1];
+                if (isCommand(next)) {
+                    macros.add(next.name);
+                }
+            }
+        }
+
+        return macros;
+    }
 }
 
 // ── Registration ──────────────────────────────────────────────────────────────
@@ -228,6 +389,7 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
     const slowChecks: ValidationChecks<ForesterAstType> = {
         Command: [
             checker.checkCrossRefTarget,
+            checker.checkUnresolvedCommand,
         ],
     };
 

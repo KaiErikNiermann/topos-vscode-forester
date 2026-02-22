@@ -4,6 +4,7 @@
  * Provides inline action hints above definitions and at file headers:
  *   • Top of file: "N incoming links" (transclude + import + export + ref) — Task 14
  *   • Above \def\macroName: "N references" — Task 13
+ *   • Above \datalog{…}: "Run datalog query" or "Datalog rules" action
  *
  * This also serves as the lightweight workspace-index implementation (Task 16):
  * all reference counting is computed on demand by walking loaded workspace
@@ -72,6 +73,35 @@ export class ForesterCodeLensProvider implements CodeLensProvider {
             const count = this.countMacroReferences(macroName);
             const label = count === 1 ? '1 reference' : `${count} references`;
             lenses.push(makeCodeLens(range, label));
+        }
+
+        // ── Run query / datalog rules for \datalog{…} blocks ─────────────────
+        for (const node of AstUtils.streamAllContents(document.parseResult.value)) {
+            if (!isCommand(node) || node.name !== '\\datalog') continue;
+
+            const cst = node.$cstNode;
+            if (!cst) continue;
+
+            const bodyArg = node.args.find(isBraceArg);
+            if (!bodyArg?.$cstNode) continue;
+
+            // Extract text inside the braces (strip leading '{' and trailing '}')
+            const rawText = document.textDocument.getText(bodyArg.$cstNode.range);
+            const queryText = rawText.startsWith('{') && rawText.endsWith('}')
+                ? rawText.slice(1, -1).trim()
+                : rawText.trim();
+
+            const isQuery = queryText.includes('-:');
+            const label = isQuery ? '$(play) Run datalog query' : '$(symbol-misc) Datalog rules';
+
+            lenses.push({
+                range: cst.range,
+                command: {
+                    title: label,
+                    command: 'forester.runDatalogQuery',
+                    arguments: [queryText],
+                },
+            });
         }
 
         return lenses.length > 0 ? lenses : undefined;

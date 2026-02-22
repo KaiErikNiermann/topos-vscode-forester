@@ -10,6 +10,7 @@ import { EmptyFileSystem } from 'langium';
 import { parseHelper } from 'langium/test';
 import {
     isBraceArg,
+    isBraceGroup,
     isBracketArg,
     isBracketGroup,
     isCommand,
@@ -1137,6 +1138,44 @@ await test('object method check: #undefinedMethod — hint warning', async () =>
     if (methodHints.length === 0) {
         throw new Error('Expected hint for undefined method #ghostMethod');
     }
+});
+
+// ── CodeLens: datalog block detection prerequisites ───────────────────────────
+// ForesterCodeLensProvider detects \datalog{...} via AstUtils.streamAllContents
+// and extracts the body BraceArg text.  These tests verify the AST structure.
+
+await test('codelens datalog: \\datalog{?X -: {has-taxon{…}}} — BraceArg has CstNode for text extraction', async () => {
+    // The provider extracts body text via bodyArg.$cstNode.range, then strips the braces.
+    // Verify: (a) BraceArg exists, (b) it has a CstNode, (c) the inner constraint is a nested BraceArg
+    const source = "\\datalog{?X -: {\\rel/has-taxon{?X}{'Reference'}}}";
+    const doc = await parseClean(source);
+    const datalогCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\datalog');
+    assertOk(datalогCmd, 'Expected \\datalog command');
+    if (!isCommand(datalогCmd)) throw new Error('Not a Command');
+    const bodyArg = datalогCmd.args.find(isBraceArg);
+    assertOk(bodyArg, 'Expected BraceArg on \\datalog');
+    assertOk(bodyArg.$cstNode, 'Expected CST node on BraceArg (needed for text extraction in CodeLens)');
+    // The body contains a standalone BraceGroup (not BraceArg) holding the constraint expression
+    // In Forester grammar, {…} at node level is BraceGroup; only Command args use BraceArg.
+    const nestedGroup = bodyArg.nodes.find(isBraceGroup);
+    assertOk(nestedGroup, 'Expected nested BraceGroup (constraint group) inside \\datalog body');
+    // That BraceGroup should contain the relation Command
+    const relCmd = nestedGroup.nodes.find(n => isCommand(n) && (n as Command).name.includes('has-taxon'));
+    assertOk(relCmd, 'Expected \\rel/has-taxon Command inside constraint BraceGroup');
+});
+
+await test('codelens datalog: \\datalog{rule -: premise} — rule block (no ? var)', async () => {
+    // Rule blocks don't start with ?X -: but still get a "Datalog rules" lens
+    const source = '\\datalog{\\rel/is-article{?X} -: {\\rel/has-taxon{?X}{?T}}}';
+    const doc = await parseClean(source);
+    const datalогCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\datalog');
+    assertOk(datalогCmd, 'Expected \\datalog command for rule block');
+    if (!isCommand(datalогCmd)) throw new Error('Not a Command');
+    const bodyArg = datalогCmd.args.find(isBraceArg);
+    assertOk(bodyArg, 'Expected BraceArg on \\datalog (rule block)');
+    // Rule blocks have at least one Command node in the body
+    const hasCmd = bodyArg.nodes.some(isCommand);
+    if (!hasCmd) throw new Error('Expected at least one Command in rule block body');
 });
 
 // ── Summary ───────────────────────────────────────────────────────────────────

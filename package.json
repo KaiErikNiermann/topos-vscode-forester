@@ -140,6 +140,12 @@
             "title": "Show Forest Graph View",
             "category": "Forester",
             "icon": "$(type-hierarchy)"
+         },
+         {
+            "command": "forester.runDatalogQuery",
+            "title": "Run Datalog Query",
+            "category": "Forester",
+            "icon": "$(play)"
          }
       ],
       "views": {

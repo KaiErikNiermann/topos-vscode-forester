@@ -28,6 +28,7 @@ import {
 import { ForestGraphView } from "./forest-graph-view";
 import { TransclusionTreeProvider } from "./transclusion-tree-view";
 import { BacklinksTreeProvider } from "./backlinks-view";
+import { evalDatalogQuery } from "./datalog-query-runner";
 
 const textDecoder = new TextDecoder("utf-8");
 
@@ -426,6 +427,38 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand(
          "forester.showGraphView",
          () => ForestGraphView.createOrShow(context.extensionUri)
+      ),
+      // ── Datalog query runner (invoked from CodeLens in the language server) ──
+      vscode.commands.registerCommand(
+         "forester.runDatalogQuery",
+         async (queryText: string) => {
+            const channel = vscode.window.createOutputChannel('Forester Datalog');
+            channel.show(true);
+            channel.appendLine('─'.repeat(60));
+            channel.appendLine('Forester Datalog Query');
+            channel.appendLine('─'.repeat(60));
+            channel.appendLine(queryText);
+            channel.appendLine('─'.repeat(60));
+
+            const forest = await getForest({ fastReturnStale: true });
+            const result = evalDatalogQuery(queryText, forest);
+
+            channel.appendLine(result.message);
+            if (result.rows.length > 0) {
+               channel.appendLine('');
+               // Column widths
+               const widths = result.columns.map((col, i) =>
+                  Math.max(col.length, ...result.rows.map(r => (r[i] ?? '').length))
+               );
+               const header = result.columns.map((col, i) => col.padEnd(widths[i])).join('  ');
+               const divider = widths.map(w => '-'.repeat(w)).join('  ');
+               channel.appendLine(header);
+               channel.appendLine(divider);
+               for (const row of result.rows) {
+                  channel.appendLine(row.map((cell, i) => cell.padEnd(widths[i])).join('  '));
+               }
+            }
+         }
       )
    );
 

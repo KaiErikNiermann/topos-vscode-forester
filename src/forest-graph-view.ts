@@ -198,8 +198,9 @@ export class ForestGraphView {
     }
     svg { width: 100%; height: 100%; display: block; }
 
-    /* Edges */
-    .link { stroke-opacity: 0.5; fill: none; }
+    /* Edges — intra-cluster links are prominent; cross-cluster are subdued */
+    .link { stroke-opacity: 0.65; fill: none; }
+    .link.cross-cluster { stroke-opacity: 0.13; stroke-dasharray: 5 4; }
     .link.transclude { stroke: #4fc3f7; }
     .link.import     { stroke: #81c784; }
     .link.export     { stroke: #ffb74d; }
@@ -326,6 +327,10 @@ export class ForestGraphView {
       <div class="edge-item">
         <div class="edge-line" style="background:#ce93d8"></div>ref
       </div>
+      <div class="edge-item" style="opacity:0.45;margin-top:3px">
+        <div class="edge-line" style="background:repeating-linear-gradient(90deg,#888 0,#888 4px,transparent 4px,transparent 8px)"></div>
+        <span style="font-style:italic">cross-cluster</span>
+      </div>
     </div>
     <button id="reset-btn">Reset zoom</button>
   </div>
@@ -385,15 +390,21 @@ export class ForestGraphView {
       });
     });
 
-    // Seed each node near its cluster centre so the sim converges quickly
-    for (const d of data.nodes) {
-      const c = clusterCenters.get(taxonByNode.get(d.id));
-      if (c) { d.x = c.x + (Math.random() - 0.5) * 80; d.y = c.y + (Math.random() - 0.5) * 80; }
+    // Tag edges as cross-cluster before D3 resolves node references
+    for (const e of data.edges) {
+      e._cross = taxonByNode.get(e.source) !== taxonByNode.get(e.target);
     }
 
-    // Custom force: pull every node gently toward its cluster centre
+    // Seed each node tightly near its cluster centre so the sim converges quickly
+    for (const d of data.nodes) {
+      const c = clusterCenters.get(taxonByNode.get(d.id));
+      if (c) { d.x = c.x + (Math.random() - 0.5) * 50; d.y = c.y + (Math.random() - 0.5) * 50; }
+    }
+
+    // Custom force: pull every node toward its cluster centre
+    // Stronger pull (0.26) keeps nodes from drifting between clusters
     function forceCluster(alpha) {
-      const str = alpha * 0.14;
+      const str = alpha * 0.26;
       for (const d of data.nodes) {
         const c = clusterCenters.get(taxonByNode.get(d.id));
         if (!c) continue;
@@ -406,17 +417,13 @@ export class ForestGraphView {
     const sim = d3.forceSimulation(data.nodes)
       .force('link',   d3.forceLink(data.edges)
                           .id(d => d.id)
-                          .distance(e => {
-                            const sId = typeof e.source === 'object' ? e.source.id : e.source;
-                            const tId = typeof e.target === 'object' ? e.target.id : e.target;
-                            // Short links within a cluster, long links across clusters
-                            return taxonByNode.get(sId) === taxonByNode.get(tId) ? 70 : 240;
-                          })
-                          .strength(0.4))
+                          .distance(e => e._cross ? 280 : 55)
+                          // Cross-cluster links pull very weakly — clusters stay cohesive
+                          .strength(e => e._cross ? 0.05 : 0.6))
       .force('charge', d3.forceManyBody()
                           .strength(d => -300 - (inDegree[d.id] || 0) * 20))
       .force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04))
-      .force('collide', d3.forceCollide(d => nodeRadius(d) + 22))
+      .force('collide', d3.forceCollide(d => nodeRadius(d) + 14))
       .force('cluster', forceCluster);
 
     function nodeRadius(d) {
@@ -436,13 +443,15 @@ export class ForestGraphView {
       });
 
     // ── Draw edges ───────────────────────────────────────────────────────────
+    // Cross-cluster links are drawn first so they render behind intra-cluster ones
     const linkG = g.append('g').attr('class', 'links');
     const linkSel = linkG.selectAll('line')
-      .data(data.edges)
+      .data([...data.edges].sort((a, b) => (b._cross ? 0 : 1) - (a._cross ? 0 : 1)))
       .join('line')
-        .attr('class', d => 'link ' + d.type)
-        .attr('stroke-width', 1.2)
-        .attr('marker-end', d => 'url(#arr-' + d.type + ')');
+        .attr('class', d => 'link ' + d.type + (d._cross ? ' cross-cluster' : ''))
+        .attr('stroke-width', d => d._cross ? 0.7 : 1.5)
+        // Arrowheads only on prominent intra-cluster links to avoid visual noise
+        .attr('marker-end', d => d._cross ? null : 'url(#arr-' + d.type + ')');
 
     // ── Draw nodes ───────────────────────────────────────────────────────────
     const nodeG = g.append('g').attr('class', 'nodes');

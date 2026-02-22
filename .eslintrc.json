@@ -2,25 +2,73 @@
     "root": true,
     "parser": "@typescript-eslint/parser",
     "parserOptions": {
-        "ecmaVersion": 6,
+        "ecmaVersion": 2022,
         "sourceType": "module"
     },
     "plugins": [
-        "@typescript-eslint"
+        "@typescript-eslint",
+        "sonarjs",
+        "unicorn",
+        "security"
     ],
     "rules": {
+        // ── TypeScript ────────────────────────────────────────────────────────
         "@typescript-eslint/naming-convention": [
             "warn",
             {
                 "selector": "import",
-                "format": [ "camelCase", "PascalCase" ]
+                "format": ["camelCase", "PascalCase"]
             }
         ],
         "@typescript-eslint/semi": "warn",
+        "semi": "off",
+
+        // ── General correctness ───────────────────────────────────────────────
         "curly": "warn",
         "eqeqeq": "warn",
         "no-throw-literal": "warn",
-        "semi": "off"
+
+        // ── SonarJS: code quality & maintainability ───────────────────────────
+        // Flags functions that are hard to understand due to nested conditions
+        "sonarjs/cognitive-complexity": ["warn", 20],
+        // Flags string literals repeated 4+ times (extract to a constant)
+        "sonarjs/no-duplicate-string": ["warn", { "threshold": 4 }],
+        // Flags near-duplicate function bodies
+        "sonarjs/no-identical-functions": "warn",
+        // Flags !(a == b) — should be a != b
+        "sonarjs/no-inverted-boolean-check": "warn",
+        // Flags `if (x === true)` — just `if (x)` is fine
+        "sonarjs/no-redundant-boolean": "warn",
+        // Flags `const x = expr; return x;` — just return directly
+        "sonarjs/prefer-immediate-return": "warn",
+        // Flags `arr.length == 0` — use `=== 0`
+        "sonarjs/no-collection-size-mischeck": "warn",
+
+        // ── Unicorn: modern JS practices ──────────────────────────────────────
+        // Prefer for-of over Array.forEach (better perf, supports break/continue)
+        "unicorn/no-array-for-each": "warn",
+        // Prefer .includes() over .indexOf() >= 0
+        "unicorn/prefer-includes": "warn",
+        // Prefer .slice() over .substr() / .substring()
+        "unicorn/prefer-string-slice": "warn",
+        // Always throw `new Error()`, not bare `Error()`
+        "unicorn/throw-new-error": "warn",
+        // Don't pass explicit `undefined` to optional parameters
+        "unicorn/no-useless-undefined": "warn",
+        // Prefer `x ? a : b` over `if (x) { return a; } return b;`
+        "unicorn/prefer-ternary": "warn",
+
+        // ── Security ─────────────────────────────────────────────────────────
+        // Skip object-injection — too many false positives in TS with index signatures
+        "security/detect-object-injection": "off",
+        // Warn on regex built from variables (potential ReDoS injection)
+        "security/detect-non-literal-regexp": "warn",
+        // Warn on regex patterns that are catastrophic backtracking risks
+        "security/detect-unsafe-regex": "warn",
+        // Warn on == comparisons in auth-sensitive contexts (timing attacks)
+        "security/detect-possible-timing-attacks": "warn",
+        // Off: VSCode extension paths always come from workspace URIs, not user input
+        "security/detect-non-literal-fs-filename": "off"
     },
     "ignorePatterns": [
         "out",

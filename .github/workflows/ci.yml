@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main, langium-migration]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run check-types
+
+      - name: Lint
+        run: npm run lint
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (esbuild bundles)
+        # Skips tsc --noEmit here (already done in lint-typecheck job)
+        run: node esbuild.js
+
+      - name: Formatter tests
+        run: npm run test:formatter
+
+      - name: Langium grammar tests
+        run: npm run test:langium-grammar
+
+      - name: LaTeX hover tests
+        run: npm run test:latex-hover
+
+      - name: Tag closure inlay tests
+        run: npm run test:tag-closure-inlay
+
+      - name: Subtree auto-ID tests
+        run: npm run test:subtree-auto-id
+
+  package:
+    name: Package extension
+    runs-on: ubuntu-latest
+    needs: test
+    # Only run on pushes to main (PRs just need tests to pass)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package
+        run: npm run package
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: topos-vscode-forester-vsix
+          path: "*.vsix"
+          retention-days: 30

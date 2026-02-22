@@ -5,3 +5,10 @@ node_modules
 *.vsix
 test-forest/
 *.tree
+.serena/
+# Claude local state (sessions, conversation history, etc.)
+.claude/projects/
+.claude/*.local.json
+# Track project-level hook scripts and settings
+!.claude/hooks/
+!.claude/settings.json

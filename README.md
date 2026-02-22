@@ -1,131 +1,223 @@
-
-
 # topos-vscode-forester
 
-VSCode support for [Forester](https://www.jonmsterling.com/jms-005P.xml), a tool for tending forests of evergreen notes. This extension was forked from [vscode-forester](https://github.com/Trebor-Huang/vscode-forester) and developed further by the [topos institute](https://topos.institute/)
+VSCode support for [Forester](https://www.jonmsterling.com/jms-005P.xml), a tool for tending forests of evergreen notes. Forked from [vscode-forester](https://github.com/Trebor-Huang/vscode-forester) and extended by the [Topos Institute](https://topos.institute/).
 
+---
 
 ## Features
 
-- Navigte between trees: Ctrl+click (or Cmd+click) on tree references like `\transclude{tree-id}` to navigate to tree
+### Language Support
+
+- **Syntax highlighting** for `.tree` files, including `\startverb%tex` blocks that inherit your installed TeX highlighter.
+- **Tree ID completions** — type a partial title, ID, or taxon to filter trees; Tab inserts the ID.
+- **Go-to-definition / Ctrl+click** on `\transclude{id}`, `\ref{id}`, `[text](id)`, and `[[id]]` links.
+- **Inline title hints** — the title and taxon of a transcluded/imported/exported tree appear beside the link.
+- **LaTeX hover preview** — hover over `#{...}`, `##{...}`, or `\tex{...}{...}` to see a rendered preview.
+- **Tag closure inlay hints** — shows the opening command name after its closing brace (e.g., `} ul`). Configurable allowlist of tags.
+- **Subtree auto-ID** — new `\subtree{...}` blocks get the next canonical 4-character lowercase base36 ID automatically (opt-in).
 
 ![navigate links](demo/link.gif)
 
-- Language highlight.
-  - Use `\startverb%tex` to retain TeX highlighting (which agrees with whatever TeX language support you happen to have installed) in verbatim environments. Otherwise the verbatim part will not be highlighted.
+![auto completion](demo/image.png)
 
-- Tree ID completion: You can type in a part of the title/ID/taxon to filter for trees. Press tabs to insert the ID (which will replace the title you entered).
+![inline hints](demo/hint.png)
 
-![auto compleation](demo/image.png)
+---
 
-- Automatic title hints: will automatically show the title and taxon of a tree beside a transclusion link
+### Formatter
 
-![alt text](demo/hint.png)
+- **Document and range formatter** (Shift+Alt+F or right-click → Format Document).
+- Preserves verbatim blocks (`\startverb`/`\stopverb`), `\tex{...}{...}`, and `\codeblock{...}{...}` exactly.
+- **`Forester: Scan Macros for Formatter`** — scans the workspace for macro definitions and adds them to the ignored-commands list automatically.
+- **`Forester: Format All Tree Files`** — bulk-format every `.tree` file in the workspace.
+- `forester.formatter.ignoredCommands` — commands whose content is never reformatted.
+- `forester.formatter.autoScanMacros` — auto-scan on startup (default: on).
 
-- Tree creation: Quick model for adding a new tree. (Hot tip: If you have text selected when you run the command, that text will be moved to the new tree.)
+---
 
-![alt text](demo/new-tree.png)
+### Tree Creation & Editing
 
-- Tree rename: Easily change the title and taxon of whatever tree is active. (Hot tip: Can also rename via hovering over the link of a tree or double clicking on the tree in the experimental table of contents)
+- **`Forester: New Tree`** — create a new tree; prompts for prefix and template (both have configurable defaults). If text is selected, it is moved into the new tree.
+- **`Forester: New Tree from Template`** — like above but always prompts for a template even if a default is set.
+- **`Forester: Transclude New Tree`** (`Ctrl+Shift+T` / `Cmd+Shift+T`) — create a new tree and insert a `\transclude{}` link at the cursor.
+- **`Forester: Rename Tree`** — rename the active tree's title and/or taxon. Also triggers when hovering over a link.
+- **`Forester: Set Default Prefix / Template / Open Behaviour`** — configure creation defaults without touching settings JSON.
 
-## Experimental Features
+![new tree](demo/new-tree.png)
 
-- Forest status: beta status bar item showing whether or not the forest is in a valid state
+---
 
-![alt text](demo/status.png)
+### Sidebar Views
 
-- Interactive forest structure view: a new beta panel that shows the transclusion structure of a set of trees going back to the root
+Four views are registered in the Explorer sidebar under the **Forester** panel:
 
-![alt text](demo/toc.png)
+| View | Description |
+|------|-------------|
+| **Forester Structure** | Transclusion tree rooted at the active file, with taxon labels and click-to-navigate. |
+| **Forester Transclusions** | All trees transcluded by the active file (direct). |
+| **Forester Backlinks** | All trees that transclude, import, export, or reference the active file. |
+| **Forester Contributors** | Direct contributors (`\author{…}` in the current tree) and indirect contributors (authors of transitively transcluded trees). Clicking opens the person's `.tree` file. |
 
-## Commands
+![forest structure view](demo/toc.png)
 
-| Command | Shortcut | Description |
-|---------|----------|-------------|
-| `Forester: New Tree` | *not-set* | Create a new tree. You will be asked for a prefix and a template to use, defaults can be set for both (including "no template") if you always use the same. If you have text selected when you execute the command the text will be moved into the new tree. |
-| `Forester: New Tree From Template` | *not-set* | Same as "new tree" but will always ask for a template even if a default is set. |
-| `Forester: Transclude New Tree` | `Ctrl+Shift+T` (Mac: `Cmd+Shift+T`) | Same as "new tree" but inserts a transclusion link to new tree at the cursor. |
-| `Forester: Rename Tree` | | Rename the current tree, unless cursor is within a link and then rename that tree. Can also trigger via hovering the link. |
-| `Forester: Show Forest Structure View` | | Display the forest structure view in the Explorer sidebar |
+---
 
-## Requirements
+### Forest Graph View
 
-You need forester installed, see [here](https://www.jonmsterling.com/jms-005P.xml) for the instructions. Configure the paths in the settings. Since this plugin is in early development, you will often need the `HEAD` commit of forester to be compatible.
+**`Forester: Show Forest Graph View`** opens an interactive D3.js force-directed graph of the entire forest.
+
+- **Nodes** sized by in-degree, coloured by taxon.
+- **Edges** for `\transclude`, `\import`, `\export`, `\ref`, `[text](addr)`, and `[[addr]]` links — each type has a distinct colour.
+- **Clustering** (dropdown in the panel): *By taxon*, *By community* (label propagation over all edge types), or *None*.
+- **Cross-cluster links** are visually de-emphasised (dashed, low opacity) and promoted on hover.
+- **Hover** a node to highlight its 1-hop neighbourhood; click to open the `.tree` file.
+- **Search** box and taxon legend with click-to-filter.
+- `forester.graphView.excludedNodes` — tree IDs to hide from the graph (default: `["basic-macros"]`).
+
+---
+
+### Language Server
+
+A full Langium-based language server runs in a background process and provides:
+
+- **Diagnostics** — undefined references, duplicate IDs, unresolved object method calls, and more.
+- **Completions** — tree IDs, command names, taxons, tags.
+- **Hover** — tree title, taxon, and metadata on hover over a link.
+- **Code actions** — quick fixes for common issues.
+- **`Forester: Restart Language Server`** — restart the LSP without reloading the window.
+
+---
+
+### LanguageTool Grammar Integration
+
+Integrates with the [LanguageTool VSCode extension](https://marketplace.visualstudio.com/items?itemName=adamvoss.vscode-languagetool) to provide grammar and spell checking, with Forester-aware filtering to suppress false positives on commands, IDs, and syntax.
+
+**Setup:**
+1. Install `adamvoss.vscode-languagetool` and a language pack (e.g. `adamvoss.vscode-languagetool-en`).
+2. **Disable** the base LanguageTool extension — the Forester extension takes over its language server with filtering applied.
+
+**Commands:**
+- **`Forester: Check All Tree Files (Grammar)`** — run a full grammar check across the workspace.
+- **`Forester: SpeedFix`** — rapid keyboard-driven workflow for spelling and grammar corrections.
+- **`Forester: Auto-Hide Forester Syntax Noise`** — suppress common false-positive patterns in workspace LTeX settings.
+
+**Filtering:** Forester commands, brace arguments, verbatim blocks, code blocks, and whitespace/punctuation rules are automatically stripped before text reaches LanguageTool.
+
+**Custom ignores:** Add a `.foresterLangIgnore` file to your workspace root (one regex per line). Use the "Add to .foresterLangIgnore" code action (lightbulb) to populate it quickly.
+
+---
+
+### Datalog Queries
+
+`\datalog{...}` blocks in `.tree` files get a **CodeLens** button:
+- **(▶ Run datalog query)** — evaluates the query against the forest index and shows results in the output panel.
+- **(⬡ Datalog rules)** — shown for rule-only blocks (no `:-` head).
+
+Supported predicates: `has-taxon`, `has-tag`, `is-reference`, `is-person`, `is-article`.
+
+---
+
+### Forest Status Bar
+
+A status bar item shows whether the forest is in a valid state (parsed successfully by `forester`).
+
+![status bar](demo/status.png)
+
+---
+
+## Commands Reference
+
+| Command | Default keybinding | Description |
+|---|---|---|
+| `Forester: New Tree` | — | Create a new tree |
+| `Forester: New Tree from Template` | — | Create a new tree, always prompting for template |
+| `Forester: Transclude New Tree` | `Ctrl+Shift+T` | Create a new tree and insert a transclusion link |
+| `Forester: Rename Tree` | — | Rename the active (or linked) tree |
+| `Forester: Show Forest Structure View` | — | Open the Explorer sidebar forest view |
+| `Forester: Show Forest Graph View` | — | Open the interactive D3 graph panel |
+| `Forester: Scan Macros for Formatter` | — | Auto-detect macros and update formatter ignore list |
+| `Forester: Format All Tree Files` | — | Bulk-format all `.tree` files |
+| `Forester: Check All Tree Files (Grammar)` | — | Full LanguageTool pass over the workspace |
+| `Forester: SpeedFix` | — | Rapid spelling/grammar correction workflow |
+| `Forester: Auto-Hide Forester Syntax Noise` | — | Suppress syntax false-positives in LTeX settings |
+| `Forester: Run Datalog Query` | — | Evaluate a `\datalog{...}` block against the forest |
+| `Forester: Restart Language Server` | — | Restart the Langium LSP without reloading the window |
+| `Forester: Set Default Prefix` | — | Set the default tree ID prefix |
+| `Forester: Set Default Template` | — | Set the default tree template |
+| `Forester: Change Forester Open Behaviour` | — | Change how newly created trees are opened |
+
+---
 
 ## Extension Settings
 
-- Use `forester.path` to configure the path to forester. It needs to include the name of the executable too.
-- Use `forester.config` to specify the forester config file. This should usually be edited per workspace, instead of globally.
-  - In the toml file, add a line `prefixes = ["prfx", ...]` to specify the prefixes to pick from. This is used when creating new trees.
-- Use `forester.defaultPrefix` to if you set this property you won't be asked for a prefix.
-- Use `forester.create.author` to specify default author for new trees (omitted if not set).
-- Use `forester.create.random` to control whether the tree ID is generated randomly or sequentially.
-- Use `forester.create.openNewTreeMode` to control how newly created trees are opened in the editor:
-  - `"off"`: Do not open the new tree
-  - `"background"`: Open the new tree in the background (default)
-  - `"side"`: Open the new tree to the side in a new editor column
-  - `"active"`: Open the new tree as the active editor
-- Use `forester.completion.showID` to toggle whether the tree ID is shown in completions. It is recommended to use smaller fonts when switching on this feature. There are also plugins to create keybindings for setting toggles, in case you need to switch it on and off quickly. VSCode also has a lot of useful settings in the `editor.suggest` section worth looking at in conjunction.
-- Use `forester.decorations.enabled` to enable or disable inline title hints next to transclude/import/export commands (enabled by default).
-- Use `forester.taxonCustomization` to customize how different taxons are abreviated and how they appear in the tree structure:
+### Core
+
+| Setting | Default | Description |
+|---|---|---|
+| `forester.path` | `"forester"` | Path to the `forester` executable |
+| `forester.config` | `""` | Path to `forest.toml` (per-workspace) |
+
+### Tree creation
+
+| Setting | Default | Description |
+|---|---|---|
+| `forester.defaultPrefix` | `""` | Default ID prefix (skips the prompt if set) |
+| `forester.defaultTemplate` | `""` | Default template (use `"(No template)"` to skip selection) |
+| `forester.create.author` | `""` | Default `\author{}` for new trees |
+| `forester.create.random` | `false` | Generate IDs randomly instead of sequentially |
+| `forester.create.openNewTreeMode` | `"background"` | How new trees are opened: `off`, `background`, `side`, `active` |
+
+### Editor features
+
+| Setting | Default | Description |
+|---|---|---|
+| `forester.completion.showID` | `false` | Show tree ID in completion items |
+| `forester.decorations.enabled` | `true` | Inline title hints beside transclusion links |
+| `forester.hover.latex.enabled` | `true` | LaTeX preview on hover |
+| `forester.inlayHints.tagClosures.enabled` | `true` | Inlay hints showing the opening command after `}` |
+| `forester.inlayHints.tagClosures.tags` | `["ol","ul","li",…]` | Commands that receive closure hints |
+| `forester.subtree.autoId.enabled` | `false` | Auto-assign base36 IDs to new `\subtree{}` blocks |
+| `forester.subtree.autoId.template` | `\\subtree[<id>]{…}` | Snippet template for subtree completion |
+
+### Formatter
+
+| Setting | Default | Description |
+|---|---|---|
+| `forester.formatter.ignoredCommands` | `[]` | Commands whose body is never reformatted |
+| `forester.formatter.autoScanMacros` | `true` | Auto-scan for macro definitions on startup |
+
+### Graph view
+
+| Setting | Default | Description |
+|---|---|---|
+| `forester.graphView.excludedNodes` | `["basic-macros"]` | Tree IDs hidden from the graph (and their edges) |
+
+### Taxon customisation
 
 ```json
 {
   "forester.taxonCustomization": {
-    "theorem": {
-      "emoji": "⭐",
-      "abbreviation": "thm"
-    },
-    "definition": {
-      "emoji": "🧪",
-      "abbreviation": "def"
-    }
+    "theorem":    { "emoji": "⭐", "abbreviation": "thm" },
+    "definition": { "emoji": "🧪", "abbreviation": "def" }
   }
 }
 ```
 
-## LanguageTool Integration
+Use `"$default"` as a key to set the fallback emoji for unknown taxons.
 
-This extension includes a LanguageTool integration that provides grammar and spell checking for `.tree` files with special filtering to avoid false positives on Forester syntax.
+### LanguageTool
 
-### Setup
+| Setting | Default | Description |
+|---|---|---|
+| `forester.languageTool.enable` | `true` | Enable LanguageTool integration |
+| `forester.languageTool.language` | `"en"` | LanguageTool language code |
+| `forester.languageTool.autoPopulateLtexConfig` | `true` | Auto-add Forester noise to LTeX dictionary/disabled rules |
+| `forester.languageTool.javaOpts` | `""` | Extra `JAVA_OPTS` for the LanguageTool server |
 
-1. **Install LanguageTool extension**: Install the base LanguageTool extension (`adamvoss.vscode-languagetool`) and a language pack (e.g., `adamvoss.vscode-languagetool-en` for English).
+---
 
-2. **Disable the original LanguageTool extension**: After installing, **disable** the original LanguageTool extension. The Forester extension will use its language server but apply filtering to avoid false positives on Forester commands.
+## Requirements
 
-3. **Configure settings** (optional):
-
-   ```json
-   {
-     "forester.languageTool.enable": true,
-     "languageTool.language": "en"
-   }
-   ```
-
-### What gets filtered
-
-The integration automatically filters:
-
-- **Forester commands**: `\title`, `\taxon`, `\author`, `\transclude`, `\import`, `\export`, `\li`, `\ul`, `\ol`, `\strong`, `\em`, `\code`, etc.
-- **Command arguments**: Text inside braces `{...}` that are arguments to commands
-- **Whitespace rules**: LanguageTool's whitespace/punctuation spacing complaints
-- **Parenthesis rules**: Opening/closing parenthesis spacing complaints
-- **Code blocks**: Content in `\startverb`/`\stopverb` blocks and `\verb|...|` inline code
-
-### Custom ignore patterns
-
-Create a `.foresterLangIgnore` file in your workspace root to add custom ignore patterns (one regex pattern per line):
-
-```text
-# Ignore specific terms
-LaTeX
-Forester
-topos
-
-# Ignore patterns
-^[A-Z]{2,}$  # Ignore all-caps abbreviations
-```
-
-Use the "Add to .foresterLangIgnore" code action (lightbulb menu) to quickly add patterns when hovering over a diagnostic.
-
+- [Forester](https://www.jonmsterling.com/jms-005P.xml) installed and on your PATH (or configured via `forester.path`).
+- A `forest.toml` in your workspace root (or set `forester.config`).
+- For LanguageTool integration: `adamvoss.vscode-languagetool` + a language pack.

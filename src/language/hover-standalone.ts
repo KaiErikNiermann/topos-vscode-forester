@@ -5,17 +5,21 @@
  * over the parsed Langium AST.  Exported as an ESM bundle (esbuild) and
  * consumed by latex-hover.ts via dynamic import().
  *
+ * Uses the LangiumParser directly (not parseHelper from langium/test) to avoid
+ * pulling in vscode-jsonrpc and other LSP-only dependencies that cause
+ * "Dynamic require of util" errors in the ESM bundle.
+ *
  * Task 4 – Infrastructure: standalone parse + CST offset navigation
  * Task 5 – #{...} MathInline snippet
  * Task 6 – ##{...} MathDisplay snippet
  * Task 7 – \tex{preamble}{body} Command snippet
  */
 
-import type { AstNode } from 'langium';
-import { CstUtils, EmptyFileSystem } from 'langium';
-import { parseHelper } from 'langium/test';
-import { isBraceArg, isCommand, isMathDisplay, isMathInline } from './generated/ast.js';
-import { createForesterServices } from './forester-module.js';
+import type { AstNode, LangiumCoreServices, LangiumParser, ParseResult } from 'langium';
+import { CstUtils, EmptyFileSystem, inject } from 'langium';
+import { createDefaultCoreModule, createDefaultSharedCoreModule } from 'langium';
+import { isBraceArg, isCommand, isMathDisplay, isMathInline, type Document } from './generated/ast.js';
+import { ForesterGeneratedModule, ForesterGeneratedSharedModule } from './generated/module.js';
 
 // ── Snippet types ─────────────────────────────────────────────────────────────
 
@@ -34,16 +38,24 @@ export interface LangiumHoverSnippet {
     preamble?: string;
 }
 
-// ── Service singleton ─────────────────────────────────────────────────────────
+// ── Parser singleton (lightweight, no LSP/validation) ───────────────────────
 
-let _parse: ReturnType<typeof parseHelper> | undefined;
+let _parser: LangiumParser | undefined;
 
-function getParse(): ReturnType<typeof parseHelper> {
-    if (!_parse) {
-        const { Forester } = createForesterServices(EmptyFileSystem);
-        _parse = parseHelper(Forester);
+function getParser(): LangiumParser {
+    if (!_parser) {
+        const shared = inject(
+            createDefaultSharedCoreModule({ fileSystemProvider: () => EmptyFileSystem }),
+            ForesterGeneratedSharedModule,
+        );
+        const Forester = inject(
+            createDefaultCoreModule({ shared }),
+            ForesterGeneratedModule,
+        ) as LangiumCoreServices;
+        shared.ServiceRegistry.register(Forester);
+        _parser = Forester.parser.LangiumParser;
     }
-    return _parse;
+    return _parser;
 }
 
 // ── Content extraction helpers ────────────────────────────────────────────────
@@ -123,9 +135,9 @@ export async function findHoverSnippetAtOffset(
     text: string,
     offset: number,
 ): Promise<LangiumHoverSnippet | undefined> {
-    const parse = getParse();
-    const document = await parse(text);
-    const rootCstNode = document.parseResult.value.$cstNode;
+    const parser = getParser();
+    const parseResult: ParseResult<Document> = parser.parse(text);
+    const rootCstNode = parseResult.value.$cstNode;
     if (!rootCstNode) return undefined;
 
     const leafNode = CstUtils.findLeafNodeAtOffset(rootCstNode, offset);

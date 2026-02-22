@@ -3,6 +3,12 @@ const esbuild = require("esbuild");
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
 
+// Banner for ESM bundles that contain CJS dependencies (e.g. vscode-jsonrpc).
+// Provides `require` via createRequire so that `require("util")` etc. work.
+const esmBanner = {
+    js: 'import { createRequire } from "module"; const require = createRequire(import.meta.url);',
+};
+
 async function main() {
     // ── Extension host bundle (CJS, loaded by VSCode) ────────────────────────
     const ctx = await esbuild.context({
@@ -54,6 +60,7 @@ async function main() {
         outfile: "out/language/format-standalone.mjs",
         external: ["vscode"],
         logLevel: "info",
+        banner: esmBanner,
     });
 
     // ── Langium hover standalone bundle (ESM, dynamically imported) ───────────
@@ -70,6 +77,7 @@ async function main() {
         outfile: "out/language/hover-standalone.mjs",
         external: ["vscode"],
         logLevel: "info",
+        banner: esmBanner,
     });
 
     if (watch) {

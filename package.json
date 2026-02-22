@@ -152,6 +152,14 @@
                "contextualTitle": "Forester Structure",
                "when": "workspaceHasForesterFiles",
                "visibility": "hidden"
+            },
+            {
+               "id": "foresterTransclusionView",
+               "name": "Forester Transclusions",
+               "icon": "$(type-hierarchy)",
+               "contextualTitle": "Forester Transclusions",
+               "when": "workspaceHasForesterFiles",
+               "visibility": "hidden"
             }
          ]
       },

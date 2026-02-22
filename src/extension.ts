@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { TextDecoder } from "util";
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from "vscode-languageclient/node";
 
 import { Forest, cleanupServer, getForest, onForestChange, initForestMonitoring, getTree, initStatusBar, getForestStatus } from "./get-forest";
 import { getRoot, getAvailableTemplates } from "./utils";
@@ -10,8 +12,23 @@ import { ForesterDocumentFormattingEditProvider, ForesterDocumentRangeFormatting
 import { initFormatterConfig, scanMacrosCommand, refreshIgnoredCommandsCache, clearIgnoredCommandsCache } from "./formatter-config";
 import { initLanguageToolBridge, checkAllTreeFilesCommand } from "./languageToolIntegration";
 import { registerSpeedFixCommand } from "./speedfix";
+import { SubtreeAutoIdFeature } from "./subtree-auto-id";
+import { ForesterLatexHoverService } from "./latex-hover";
+import { ForesterTagClosureInlayHintsProvider } from "./tag-closure-inlay";
+import {
+   initLinkAliasConfig,
+   buildAutocompleteRegex,
+   buildDefinitionRegex,
+   getTriggerCharacters,
+   createDefaultConfigFile,
+   openConfigFile,
+   addLinkPatternCommand,
+   removeLinkPatternCommand,
+} from "./link-aliases-config";
 
 const textDecoder = new TextDecoder("utf-8");
+
+let langiumClient: LanguageClient | undefined;
 
 function suggest(trees: Forest, range: vscode.Range) {
    var results: vscode.CompletionItem[] = [];
@@ -152,6 +169,20 @@ export async function activate(context: vscode.ExtensionContext) {
    // Set context for conditional visibility - extension only activates when Forester files exist
    vscode.commands.executeCommand('setContext', 'workspaceHasForesterFiles', true);
 
+   // ── Langium language server (LSP client) ──────────────────────────────────
+   const serverModule = context.asAbsolutePath(path.join('out', 'language', 'main.js'));
+   const serverOptions: ServerOptions = {
+      run:   { module: serverModule, transport: TransportKind.ipc },
+      debug: { module: serverModule, transport: TransportKind.ipc,
+               options: { execArgv: ['--nolazy', '--inspect=6009'] } },
+   };
+   const clientOptions: LanguageClientOptions = {
+      documentSelector: [{ scheme: 'file', language: 'forester' }],
+   };
+   langiumClient = new LanguageClient('foresterLangServer', 'Forester Language Server', serverOptions, clientOptions);
+   langiumClient.start();
+   context.subscriptions.push(langiumClient);
+
    // Register the WebView tree provider
    const webviewProvider = new ForesterWebviewProvider(context.extensionUri, context);
 
@@ -177,6 +208,8 @@ export async function activate(context: vscode.ExtensionContext) {
    await initFormatterConfig();
    await refreshIgnoredCommandsCache();
    await initLanguageToolBridge(context);
+
+   new SubtreeAutoIdFeature().activate(context);
 
    // Watch for configuration changes to refresh the ignored commands cache
    context.subscriptions.push(
@@ -310,7 +343,7 @@ export async function activate(context: vscode.ExtensionContext) {
          await vscode.commands.executeCommand('foresterTreeView.focus');
       }),
       vscode.commands.registerCommand('forester.refreshTreeView', () => {
-         getForest({ forceReload: true })
+         getForest({ forceReload: true });
          webviewProvider.refresh();
       }),
       vscode.commands.registerCommand('forester.collapseAllTreeView', () => {
@@ -341,7 +374,24 @@ export async function activate(context: vscode.ExtensionContext) {
             // Get just the base name (e.g., "test-0001.tree" instead of full path)
             baseName: editor.document.fileName.split('/').pop() || '',
          };
-      })
+      }),
+      // Link alias configuration commands
+      vscode.commands.registerCommand(
+         "forester.configureLinkAliases",
+         openConfigFile
+      ),
+      vscode.commands.registerCommand(
+         "forester.createLinkAliasConfig",
+         createDefaultConfigFile
+      ),
+      vscode.commands.registerCommand(
+         "forester.addLinkPattern",
+         addLinkPatternCommand
+      ),
+      vscode.commands.registerCommand(
+         "forester.removeLinkPattern",
+         removeLinkPatternCommand
+      )
    );
 
    // Initialize forest monitoring (handles file watching internally)
@@ -349,6 +399,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
    // Initialize status bar
    initStatusBar(context);
+
+   // Initialize link alias configuration (file watching for .forester-links.json)
+   initLinkAliasConfig(context);
 
    // Initialize transclude decorations
    const transcludeDecorations = new TranscludeDecorationProvider();
@@ -392,37 +445,31 @@ export async function activate(context: vscode.ExtensionContext) {
             }
 
             // Check for link patterns that contain the cursor position
-            // We need to check for patterns that might span around the cursor
-            // Pattern matches: \ref{id}, \transclude{id}, \import{id}, \export{id}, [text](id), [[id]]
-            const patterns = [
-               /\\ref\{([^}]*)\}/g,
-               /\\transclude\{([^}]*)\}/g,
-               /\\import\{([^}]*)\}/g,
-               /\\export\{([^}]*)\}/g,
-               /\[[^\]]*\]\(([^)]*)\)/g, // [text](id)
-               /\[\[([^\]]*)\]\]/g, // [[id]]
-            ];
+            // Use configurable patterns from link-aliases-config
+            const patterns = await buildDefinitionRegex();
 
             let treeId: string | undefined;
 
             // Check each pattern to see if cursor is within a match
             for (const pattern of patterns) {
-               let match;
-               while ((match = pattern.exec(line)) !== null) {
+               let matchResult;
+               while ((matchResult = pattern.exec(line)) !== null) {
                   // Check if cursor is within this match
-                  const matchStart = match.index;
-                  const matchEnd = match.index + match[0].length;
+                  const matchStart = matchResult.index;
+                  const matchEnd = matchResult.index + matchResult[0].length;
 
                   if (
                      position.character >= matchStart &&
                      position.character <= matchEnd
                   ) {
                      // Extract the tree ID from capture group 1
-                     treeId = match[1];
+                     treeId = matchResult[1];
                      break;
                   }
                }
-               if (treeId) break;
+               if (treeId) {
+                  break;
+               }
             }
 
             if (!treeId) {
@@ -468,8 +515,38 @@ export async function activate(context: vscode.ExtensionContext) {
 
    context.subscriptions.push(definitionProvider);
 
+   const latexHoverService = new ForesterLatexHoverService(context);
+   context.subscriptions.push(latexHoverService);
+
+   const latexHoverProvider = vscode.languages.registerHoverProvider(
+      { scheme: "file", language: "forester" },
+      {
+         provideHover(document, position, token) {
+            return latexHoverService.provideHover(document, position, token);
+         },
+      },
+   );
+   context.subscriptions.push(latexHoverProvider);
+
+   const tagClosureInlayHintsProvider = new ForesterTagClosureInlayHintsProvider();
+   context.subscriptions.push(tagClosureInlayHintsProvider);
+
+   const tagClosureInlayHintsRegistration = vscode.languages.registerInlayHintsProvider(
+      { scheme: "file", language: "forester" },
+      tagClosureInlayHintsProvider,
+   );
+   context.subscriptions.push(tagClosureInlayHintsRegistration);
+
+   context.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration(e => {
+         if (e.affectsConfiguration("forester.inlayHints.tagClosures")) {
+            tagClosureInlayHintsProvider.refresh();
+         }
+      }),
+   );
+
    // Register hover provider for transcludes with rename action
-   const hoverProvider = vscode.languages.registerHoverProvider(
+   const transcludeHoverProvider = vscode.languages.registerHoverProvider(
       { scheme: "file", language: "forester" },
       {
          async provideHover(document, position) {
@@ -526,32 +603,38 @@ export async function activate(context: vscode.ExtensionContext) {
       }
    );
 
-   context.subscriptions.push(hoverProvider);
+   context.subscriptions.push(transcludeHoverProvider);
 
-   context.subscriptions.push(
-      vscode.languages.registerCompletionItemProvider(
+   // Register completion provider with dynamic trigger characters from link aliases
+   const registerCompletionProvider = async () => {
+      const triggerChars = await getTriggerCharacters();
+
+      return vscode.languages.registerCompletionItemProvider(
          { scheme: "file", language: "forester" },
          {
             async provideCompletionItems(doc, pos) {
-               // see if we should complete
-               // \transclude{, \import{, \export{, \ref, [link](, [[link
-               // There are three matching groups for the replacing content
-               const tagPattern =
-                  /(?:\\transclude{|\\import{|\\export{|\\ref{)([^}]*)$|\[[^\[]*\]\(([^\)]*)$|\[\[([^\]]*)$/d;
+               // Build dynamic regex from configurable link patterns
+               const { regex: tagPattern, patternCount } = await buildAutocompleteRegex();
+
                const text = doc.getText(
                   new vscode.Range(new vscode.Position(pos.line, 0), pos),
                );
-               let match = tagPattern.exec(text);
-               if (match === null || match.indices === undefined) {
+
+               let matchResult = tagPattern.exec(text);
+               if (matchResult === null || matchResult.indices === undefined) {
                   return [];
                }
 
-               // Get the needed range
-               let ix =
-                  match.indices[1]?.[0] ??
-                  match.indices[2]?.[0] ??
-                  match.indices[3]?.[0] ??
-                  pos.character;
+               // Get the needed range - find the first matching capture group
+               let ix = pos.character;
+               for (let i = 1; i <= patternCount; i++) {
+                  const indices = matchResult.indices[i];
+                  if (indices) {
+                     ix = indices[0];
+                     break;
+                  }
+               }
+
                let range = new vscode.Range(
                   new vscode.Position(pos.line, ix),
                   pos,
@@ -561,17 +644,18 @@ export async function activate(context: vscode.ExtensionContext) {
 
                return suggest(forest, range);
             },
-            // resolveCompletionItem, we can extend the CompletionItem class to inject more information
          },
-         "{",
-         "(",
-         "[",
-      ),
-   );
+         ...triggerChars,
+      );
+   };
+
+   const completionProvider = await registerCompletionProvider();
+   context.subscriptions.push(completionProvider);
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {
+export function deactivate(): Thenable<void> | undefined {
    // Clean up server resources
    cleanupServer();
+   return langiumClient?.stop();
 }

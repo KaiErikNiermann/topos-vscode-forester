@@ -21,6 +21,23 @@ async function main() {
         ],
     });
 
+    // ── Langium language server bundle (CJS, spawned as a Node.js worker) ────
+    // main.ts is the LSP entry point; it is started by the extension host via
+    // vscode-languageclient and communicates over IPC.  vscode is marked
+    // external because it is not available in the language server process.
+    const serverCtx = await esbuild.context({
+        entryPoints: ["src/language/main.ts"],
+        bundle: true,
+        format: "cjs",
+        minify: production,
+        sourcemap: !production,
+        sourcesContent: false,
+        platform: "node",
+        outfile: "out/language/main.js",
+        external: ["vscode"],
+        logLevel: "info",
+    });
+
     // ── Langium formatter standalone bundle (ESM, dynamically imported) ──────
     // format-standalone.ts wraps the Langium AbstractFormatter for use outside
     // the LSP server.  It is ESM-only (langium is ESM), so it is bundled
@@ -57,11 +74,14 @@ async function main() {
 
     if (watch) {
         await ctx.watch();
+        await serverCtx.watch();
         await langiumCtx.watch();
         await hoverCtx.watch();
     } else {
         await ctx.rebuild();
         await ctx.dispose();
+        await serverCtx.rebuild();
+        await serverCtx.dispose();
         await langiumCtx.rebuild();
         await langiumCtx.dispose();
         await hoverCtx.rebuild();

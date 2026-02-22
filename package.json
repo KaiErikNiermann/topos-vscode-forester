@@ -353,6 +353,14 @@
                "type": "boolean",
                "default": true,
                "description": "Automatically scan workspace for macro definitions and add them to ignored commands."
+            },
+            "forester.graphView.excludedNodes": {
+               "type": "array",
+               "items": {
+                  "type": "string"
+               },
+               "default": ["basic-macros"],
+               "description": "Tree IDs to omit from the Forest Graph view. Edges to/from excluded nodes are also hidden. Useful for suppressing macro-only trees (like 'basic-macros') that would otherwise appear as a hub connected to almost every other tree."
             }
          }
       },

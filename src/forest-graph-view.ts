@@ -127,9 +127,17 @@ export class ForestGraphView {
 
     private async _buildGraphData(): Promise<{ nodes: GraphNode[]; edges: GraphEdge[] }> {
         const forest = await getForest({ fastReturnStale: true });
-        const treeIds = new Set(forest.map(t => t.uri));
 
-        const nodes: GraphNode[] = forest.map(t => ({
+        const excluded = new Set<string>(
+            vscode.workspace
+                .getConfiguration('forester')
+                .get<string[]>('graphView.excludedNodes', ['basic-macros']),
+        );
+
+        const filteredForest = forest.filter(t => !excluded.has(t.uri));
+        const treeIds = new Set(filteredForest.map(t => t.uri));
+
+        const nodes: GraphNode[] = filteredForest.map(t => ({
             id: t.uri,
             title: t.title ?? t.uri,
             taxon: t.taxon,
@@ -138,14 +146,18 @@ export class ForestGraphView {
         }));
 
         const EDGE_PATTERNS: ReadonlyArray<{ re: RegExp; type: GraphEdge['type'] }> = [
-            { re: /\\transclude\{([^}]+)\}/g, type: 'transclude' },
-            { re: /\\import\{([^}]+)\}/g,     type: 'import' },
-            { re: /\\export\{([^}]+)\}/g,     type: 'export' },
-            { re: /\\ref\{([^}]+)\}/g,        type: 'ref' },
+            { re: /\\transclude\{([^}]+)\}/g,  type: 'transclude' },
+            { re: /\\import\{([^}]+)\}/g,      type: 'import' },
+            { re: /\\export\{([^}]+)\}/g,      type: 'export' },
+            { re: /\\ref\{([^}]+)\}/g,         type: 'ref' },
+            // [label](addr) — Markdown-style Forester link; text in non-capturing group
+            { re: /\[[^\[]*\]\(([^)]+)\)/g,   type: 'ref' },
+            // [[addr]] — double-bracket Forester link
+            { re: /\[\[([^\]]+)\]\]/g,         type: 'ref' },
         ];
 
         const edges: GraphEdge[] = [];
-        for (const tree of forest) {
+        for (const tree of filteredForest) {
             let content: string;
             try {
                 content = fs.readFileSync(tree.sourcePath, 'utf-8');
@@ -185,7 +197,7 @@ export class ForestGraphView {
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none';
                  script-src https://cdn.jsdelivr.net 'nonce-${nonce}';
-                 style-src 'nonce-${nonce}';">
+                 style-src 'nonce-${nonce}' 'unsafe-inline';">
   <title>Forest Graph</title>
   <style nonce="${nonce}">
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -246,6 +258,23 @@ export class ForestGraphView {
       border-radius: 3px; font-size: 11px; outline: none;
     }
     #search:focus { border-color: var(--vscode-focusBorder, #007acc); }
+
+    /* Cluster method row */
+    .ctrl-row {
+      display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+    }
+    .ctrl-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--vscode-descriptionForeground, #888); flex-shrink: 0;
+    }
+    .ctrl-select {
+      flex: 1; padding: 3px 5px; font-size: 11px;
+      background: var(--vscode-input-background, #3c3c3c);
+      color: var(--vscode-input-foreground, #ccc);
+      border: 1px solid var(--vscode-input-border, #3c3c3c);
+      border-radius: 3px; outline: none; cursor: pointer;
+    }
+    .ctrl-select:focus { border-color: var(--vscode-focusBorder, #007acc); }
 
     /* Taxon legend */
     .legend-item {
@@ -313,26 +342,17 @@ export class ForestGraphView {
   <div id="controls">
     <h3>Forest Graph</h3>
     <input id="search" type="text" placeholder="Search trees\u2026" />
+    <div class="ctrl-row">
+      <span class="ctrl-label">Cluster</span>
+      <select id="cluster-method" class="ctrl-select">
+        <option value="taxon" selected>By taxon</option>
+        <option value="community">By community</option>
+        <option value="none">None</option>
+      </select>
+    </div>
     <div id="taxon-legend"></div>
     <hr>
-    <div class="edge-legend">
-      <div class="edge-item">
-        <div class="edge-line" style="background:#4fc3f7"></div>transclude
-      </div>
-      <div class="edge-item">
-        <div class="edge-line" style="background:#81c784"></div>import
-      </div>
-      <div class="edge-item">
-        <div class="edge-line" style="background:#ffb74d"></div>export
-      </div>
-      <div class="edge-item">
-        <div class="edge-line" style="background:#ce93d8"></div>ref
-      </div>
-      <div class="edge-item" style="opacity:0.45;margin-top:3px">
-        <div class="edge-line" style="background:repeating-linear-gradient(90deg,#888 0,#888 4px,transparent 4px,transparent 8px)"></div>
-        <span style="font-style:italic">cross-cluster</span>
-      </div>
-    </div>
+    <div class="edge-legend" id="edge-legend"></div>
     <button id="reset-btn">Reset zoom</button>
   </div>
 
@@ -350,8 +370,7 @@ export class ForestGraphView {
     // ── Pre-compute in-degree (before D3 resolves edge references) ───────────
     const inDegree = Object.create(null);
     for (const e of data.edges) {
-      const tgt = e.target;
-      inDegree[tgt] = (inDegree[tgt] || 0) + 1;
+      inDegree[e.target] = (inDegree[e.target] || 0) + 1;
     }
 
     // ── Dimensions ───────────────────────────────────────────────────────────
@@ -374,62 +393,114 @@ export class ForestGraphView {
         .translate(-W() / 2, -H() / 2));
     });
 
-    // ── Colour scale (taxon → colour) ─────────────────────────────────────
+    // ── Colour scale (taxon → colour, stable across all cluster modes) ────────
     const taxonSet = [...new Set(data.nodes.map(n => n.taxon || '(untaxoned)'))].sort();
     const colorOf  = d3.scaleOrdinal(d3.schemeTableau10).domain(taxonSet);
 
-    // ── Cluster centres: one per taxon, arranged in a circle ─────────────────
-    const taxonByNode = new Map(data.nodes.map(n => [n.id, n.taxon || '(untaxoned)']));
-    const clusterArr  = [...taxonSet];
-    const clusterCenters = new Map();
-    clusterArr.forEach((taxon, i) => {
-      const angle = (2 * Math.PI * i) / Math.max(clusterArr.length, 1) - Math.PI / 2;
-      const r = clusterArr.length < 2 ? 0 : Math.min(W(), H()) * 0.32;
-      clusterCenters.set(taxon, {
-        x: W() / 2 + r * Math.cos(angle),
-        y: H() / 2 + r * Math.sin(angle),
-      });
-    });
-
-    // Tag edges as cross-cluster before D3 resolves node references
+    // ── Undirected adjacency list (all edge types, built before sim mutates edges)
+    const adj = new Map(data.nodes.map(n => [n.id, new Set()]));
     for (const e of data.edges) {
-      e._cross = taxonByNode.get(e.source) !== taxonByNode.get(e.target);
+      adj.get(e.source)?.add(e.target);
+      adj.get(e.target)?.add(e.source);
     }
 
-    // Seed each node tightly near its cluster centre so the sim converges quickly
-    for (const d of data.nodes) {
-      const c = clusterCenters.get(taxonByNode.get(d.id));
-      if (c) { d.x = c.x + (Math.random() - 0.5) * 50; d.y = c.y + (Math.random() - 0.5) * 50; }
+    // ── Community detection via label propagation (20 iterations) ────────────
+    function detectCommunities() {
+      const labels = new Map(data.nodes.map(n => [n.id, n.id]));
+      for (let iter = 0; iter < 20; iter++) {
+        let changed = false;
+        const order = [...data.nodes].sort(() => Math.random() - 0.5);
+        for (const node of order) {
+          const nbrs = [...(adj.get(node.id) || [])];
+          if (nbrs.length === 0) continue;
+          const freq = new Map();
+          for (const nbr of nbrs) {
+            const lbl = labels.get(nbr);
+            freq.set(lbl, (freq.get(lbl) || 0) + 1);
+          }
+          let best = labels.get(node.id), bestN = 0;
+          for (const [lbl, n] of freq) { if (n > bestN) { best = lbl; bestN = n; } }
+          if (best !== labels.get(node.id)) { labels.set(node.id, best); changed = true; }
+        }
+        if (!changed) break;
+      }
+      const uniq = [...new Set(labels.values())].sort();
+      const norm = new Map(uniq.map((l, i) => [l, i]));
+      return new Map([...labels].map(([k, v]) => [k, norm.get(v)]));
+    }
+
+    // ── Mutable cluster state ─────────────────────────────────────────────────
+    let clusterByNode = new Map();
+    let clusterCenters = new Map();
+    let clusterKeys = [];
+
+    function computeClusterCenters() {
+      clusterKeys = [...new Set(clusterByNode.values())].sort((a, b) =>
+        String(a).localeCompare(String(b)));
+      clusterCenters.clear();
+      clusterKeys.forEach((key, i) => {
+        const angle = (2 * Math.PI * i) / Math.max(clusterKeys.length, 1) - Math.PI / 2;
+        const r = clusterKeys.length < 2 ? 0 : Math.min(W(), H()) * 0.32;
+        clusterCenters.set(key, {
+          x: W() / 2 + r * Math.cos(angle),
+          y: H() / 2 + r * Math.sin(angle),
+        });
+      });
+    }
+
+    function tagEdges() {
+      for (const e of data.edges) {
+        const src = typeof e.source === 'object' ? e.source.id : e.source;
+        const tgt = typeof e.target === 'object' ? e.target.id : e.target;
+        e._cross = clusterByNode.get(src) !== clusterByNode.get(tgt);
+      }
+    }
+
+    function seedNodes() {
+      for (const d of data.nodes) {
+        const c = clusterCenters.get(clusterByNode.get(d.id));
+        if (c) {
+          d.x = c.x + (Math.random() - 0.5) * 50;
+          d.y = c.y + (Math.random() - 0.5) * 50;
+          d.vx = 0; d.vy = 0;
+        }
+      }
     }
 
     // Custom force: pull every node toward its cluster centre
-    // Stronger pull (0.26) keeps nodes from drifting between clusters
     function forceCluster(alpha) {
+      if (clusterKeys.length < 2) return; // single cluster or no clustering — skip
       const str = alpha * 0.26;
       for (const d of data.nodes) {
-        const c = clusterCenters.get(taxonByNode.get(d.id));
+        const c = clusterCenters.get(clusterByNode.get(d.id));
         if (!c) continue;
         d.vx -= (d.x - c.x) * str;
         d.vy -= (d.y - c.y) * str;
       }
     }
 
-    // ── Force simulation ─────────────────────────────────────────────────────
-    const sim = d3.forceSimulation(data.nodes)
-      .force('link',   d3.forceLink(data.edges)
-                          .id(d => d.id)
-                          .distance(e => e._cross ? 280 : 55)
-                          // Cross-cluster links pull very weakly — clusters stay cohesive
-                          .strength(e => e._cross ? 0.05 : 0.6))
-      .force('charge', d3.forceManyBody()
-                          .strength(d => -300 - (inDegree[d.id] || 0) * 20))
-      .force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04))
-      .force('collide', d3.forceCollide(d => nodeRadius(d) + 14))
-      .force('cluster', forceCluster);
+    // Initialise with taxon clustering (before sim creation so edges are still strings)
+    clusterByNode = new Map(data.nodes.map(n => [n.id, n.taxon || '(untaxoned)']));
+    computeClusterCenters();
+    tagEdges();
+    seedNodes();
 
+    // ── Node radius ───────────────────────────────────────────────────────────
     function nodeRadius(d) {
       return 5 + Math.sqrt(inDegree[d.id] || 0) * 1.8;
     }
+
+    // ── Force simulation ─────────────────────────────────────────────────────
+    const sim = d3.forceSimulation(data.nodes)
+      .force('link', d3.forceLink(data.edges)
+        .id(d => d.id)
+        .distance(e => e._cross ? 280 : 55)
+        .strength(e => e._cross ? 0.05 : 0.6))
+      .force('charge', d3.forceManyBody()
+        .strength(d => -300 - (inDegree[d.id] || 0) * 20))
+      .force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04))
+      .force('collide', d3.forceCollide(d => nodeRadius(d) + 14))
+      .force('cluster', forceCluster);
 
     // ── Drag behaviour ───────────────────────────────────────────────────────
     const drag = d3.drag()
@@ -443,15 +514,13 @@ export class ForestGraphView {
         d.fx = null; d.fy = null;
       });
 
-    // ── Draw edges ───────────────────────────────────────────────────────────
-    // Cross-cluster links are drawn first so they render behind intra-cluster ones
+    // ── Draw edges (cross-cluster first so they render behind intra-cluster) ──
     const linkG = g.append('g').attr('class', 'links');
     const linkSel = linkG.selectAll('line')
       .data([...data.edges].sort((a, b) => (b._cross ? 0 : 1) - (a._cross ? 0 : 1)))
       .join('line')
         .attr('class', d => 'link ' + d.type + (d._cross ? ' cross-cluster' : ''))
         .attr('stroke-width', d => d._cross ? 0.7 : 1.5)
-        // Arrowheads only on prominent intra-cluster links to avoid visual noise
         .attr('marker-end', d => d._cross ? null : 'url(#arr-' + d.type + ')');
 
     // ── Draw nodes ───────────────────────────────────────────────────────────
@@ -475,8 +544,8 @@ export class ForestGraphView {
         showTooltip(ev, d);
       })
       .on('mousemove', moveTooltip)
-      .on('mouseout',  (ev, d) => {
-        currentHighlight = editorHighlight; // restore persistent highlight (or null)
+      .on('mouseout',  () => {
+        currentHighlight = editorHighlight;
         applyVisibility();
         hideTooltip();
       });
@@ -500,7 +569,36 @@ export class ForestGraphView {
     document.getElementById('stats').textContent =
       data.nodes.length + ' nodes \u00b7 ' + data.edges.length + ' edges';
 
-    // ── Taxon legend ─────────────────────────────────────────────────────────
+    // ── Apply clustering (called on dropdown change; linkSel/sim already exist) ─
+    function applyClustering(method) {
+      if (method === 'taxon') {
+        clusterByNode = new Map(data.nodes.map(n => [n.id, n.taxon || '(untaxoned)']));
+      } else if (method === 'community') {
+        const comm = detectCommunities();
+        clusterByNode = new Map([...comm].map(([k, v]) => [k, v]));
+      } else {
+        // 'none': single cluster — forceCluster is disabled when clusterKeys.length < 2
+        clusterByNode = new Map(data.nodes.map(n => [n.id, 0]));
+      }
+      computeClusterCenters();
+      tagEdges(); // edges are D3 node objects at this point
+      seedNodes();
+      sim.force('link')
+        .distance(e => e._cross ? 280 : 55)
+        .strength(e => e._cross ? 0.05 : 0.6);
+      // Refresh link visual classes
+      linkSel
+        .attr('class', d => 'link ' + d.type + (d._cross ? ' cross-cluster' : ''))
+        .attr('stroke-width', d => d._cross ? 0.7 : 1.5)
+        .attr('marker-end', d => d._cross ? null : 'url(#arr-' + d.type + ')');
+      sim.alpha(0.9).restart();
+    }
+
+    document.getElementById('cluster-method').addEventListener('change', ev => {
+      applyClustering(ev.target.value);
+    });
+
+    // ── Taxon legend (DOM API — avoids CSP blocking of innerHTML inline styles)
     const hiddenTaxons = new Set();
     const legendEl = document.getElementById('taxon-legend');
 
@@ -513,10 +611,23 @@ export class ForestGraphView {
     for (const taxon of taxonSet) {
       const item = document.createElement('div');
       item.className = 'legend-item';
-      item.innerHTML =
-        '<div class="swatch" style="background:' + colorOf(taxon) + '"></div>' +
-        '<span class="legend-label">' + taxon + '</span>' +
-        '<span class="legend-count">' + (taxonCounts[taxon] || 0) + '</span>';
+
+      const swatch = document.createElement('div');
+      swatch.className = 'swatch';
+      swatch.style.background = colorOf(taxon); // set via JS — not blocked by style-src CSP
+
+      const label = document.createElement('span');
+      label.className = 'legend-label';
+      label.textContent = taxon;
+
+      const count = document.createElement('span');
+      count.className = 'legend-count';
+      count.textContent = String(taxonCounts[taxon] || 0);
+
+      item.appendChild(swatch);
+      item.appendChild(label);
+      item.appendChild(count);
+
       item.addEventListener('click', () => {
         if (hiddenTaxons.has(taxon)) {
           hiddenTaxons.delete(taxon);
@@ -529,6 +640,41 @@ export class ForestGraphView {
       });
       legendEl.appendChild(item);
     }
+
+    // ── Edge legend (DOM API for consistency) ─────────────────────────────────
+    const EDGE_ENTRIES = [
+      { color: '#4fc3f7', label: 'transclude' },
+      { color: '#81c784', label: 'import' },
+      { color: '#ffb74d', label: 'export' },
+      { color: '#ce93d8', label: 'ref' },
+    ];
+    const edgeLegendEl = document.getElementById('edge-legend');
+    for (const { color, label } of EDGE_ENTRIES) {
+      const item = document.createElement('div');
+      item.className = 'edge-item';
+      const line = document.createElement('div');
+      line.className = 'edge-line';
+      line.style.background = color;
+      const lbl = document.createElement('span');
+      lbl.textContent = label;
+      item.appendChild(line);
+      item.appendChild(lbl);
+      edgeLegendEl.appendChild(item);
+    }
+    // Cross-cluster indicator
+    const crossItem = document.createElement('div');
+    crossItem.className = 'edge-item';
+    crossItem.style.opacity = '0.45';
+    crossItem.style.marginTop = '3px';
+    const crossLine = document.createElement('div');
+    crossLine.className = 'edge-line';
+    crossLine.style.background = 'repeating-linear-gradient(90deg,#888 0,#888 4px,transparent 4px,transparent 8px)';
+    const crossLbl = document.createElement('span');
+    crossLbl.style.fontStyle = 'italic';
+    crossLbl.textContent = 'cross-cluster';
+    crossItem.appendChild(crossLine);
+    crossItem.appendChild(crossLbl);
+    edgeLegendEl.appendChild(crossItem);
 
     // ── Search ────────────────────────────────────────────────────────────────
     let searchQuery = '';
@@ -593,9 +739,7 @@ export class ForestGraphView {
     const tooltip = document.getElementById('tooltip');
 
     function showTooltip(ev, d) {
-      const taxonHtml = d.taxon
-        ? '<b>' + d.taxon + '</b><br>'
-        : '';
+      const taxonHtml = d.taxon ? '<b>' + d.taxon + '</b><br>' : '';
       const tagsHtml = d.tags.length > 0
         ? '<span style="color:var(--vscode-descriptionForeground,#888)">' +
           d.tags.join(', ') + '</span><br>'
@@ -612,16 +756,13 @@ export class ForestGraphView {
     function moveTooltip(ev) {
       const x = ev.clientX + 14;
       const y = ev.clientY - 10;
-      // Keep tooltip on screen
       const tw = tooltip.offsetWidth;
       const th = tooltip.offsetHeight;
       tooltip.style.left = Math.min(x, W() - tw - 4) + 'px';
       tooltip.style.top  = Math.max(4, Math.min(y, H() - th - 4)) + 'px';
     }
 
-    function hideTooltip() {
-      tooltip.style.display = 'none';
-    }
+    function hideTooltip() { tooltip.style.display = 'none'; }
 
     // Clear persistent highlight when clicking on empty canvas
     svg.on('click', () => {
@@ -635,19 +776,14 @@ export class ForestGraphView {
       const msg = ev.data;
       if (msg.type === 'highlight') {
         editorHighlight = msg.treeId;
-        currentHighlight = msg.treeId; // also apply immediately if not hovering
+        currentHighlight = msg.treeId;
         applyVisibility();
       }
     });
 
     // ── Resize ────────────────────────────────────────────────────────────────
     window.addEventListener('resize', () => {
-      // Recompute cluster centres for the new viewport dimensions
-      clusterArr.forEach((taxon, i) => {
-        const angle = (2 * Math.PI * i) / Math.max(clusterArr.length, 1) - Math.PI / 2;
-        const r = clusterArr.length < 2 ? 0 : Math.min(W(), H()) * 0.32;
-        clusterCenters.set(taxon, { x: W() / 2 + r * Math.cos(angle), y: H() / 2 + r * Math.sin(angle) });
-      });
+      computeClusterCenters();
       sim.force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04));
       sim.alpha(0.15).restart();
     });

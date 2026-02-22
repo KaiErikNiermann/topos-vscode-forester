@@ -1178,6 +1178,38 @@ await test('codelens datalog: \\datalog{rule -: premise} — rule block (no ? va
     if (!hasCmd) throw new Error('Expected at least one Command in rule block body');
 });
 
+// ── Contributors view: \author structure prerequisites ────────────────────────
+// ContributorsTreeProvider extracts \author{personId} via regex on file text.
+// These tests verify the parse-level existence of \author as a Command node.
+
+await test('contributors: \\author{jms-0001} parses as a Command with a BraceArg', async () => {
+    const source = '\\author{jms-0001}';
+    const doc = await parseClean(source);
+    const authorCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\author');
+    assertOk(authorCmd, 'Expected \\author Command at document level');
+    if (!isCommand(authorCmd)) throw new Error('Not a Command');
+    const braceArg = authorCmd.args.find(isBraceArg);
+    assertOk(braceArg, 'Expected BraceArg on \\author');
+    const frag = braceArg.nodes.find(isTextFragment);
+    assertOk(frag, 'Expected TextFragment inside \\author BraceArg');
+    assertEqual(frag.value.trim(), 'jms-0001', 'Author person ID should be "jms-0001"');
+});
+
+await test('contributors: multiple \\author commands parse as separate Command nodes', async () => {
+    const source = '\\author{jms-0001}\\author{jms-0002}';
+    const doc = await parseClean(source);
+    const authorCmds = doc.nodes.filter(n => isCommand(n) && (n as Command).name === '\\author');
+    assertEqual(authorCmds.length, 2, 'Expected 2 \\author Commands');
+    const ids = authorCmds.map(cmd => {
+        if (!isCommand(cmd)) throw new Error('Not a Command');
+        const frag = cmd.args.find(isBraceArg)?.nodes.find(isTextFragment);
+        return frag?.value.trim() ?? '';
+    });
+    if (!ids.includes('jms-0001') || !ids.includes('jms-0002')) {
+        throw new Error(`Expected both author IDs, got: ${ids.join(', ')}`);
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

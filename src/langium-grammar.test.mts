@@ -816,6 +816,26 @@ await test('\\date{2024-12-32}: invalid day — date-format warning', async () =
     }
 });
 
+// ── Validator: import/export hygiene (Task 3) ────────────────────────────────
+
+await test('duplicate \\import: warns on second occurrence', async () => {
+    const doc = await parse('\\import{jms-0001}\n\\import{jms-0001}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const dupeWarns = diags.filter(d => d.message.includes('Duplicate import'));
+    if (dupeWarns.length === 0) {
+        throw new Error('Expected duplicate import warning');
+    }
+});
+
+await test('no duplicate \\import: different tree-ids — no warning', async () => {
+    const doc = await parse('\\import{jms-0001}\n\\import{jms-0002}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const dupeWarns = diags.filter(d => d.message.includes('Duplicate import'));
+    if (dupeWarns.length > 0) {
+        throw new Error(`Unexpected duplicate import warning: ${dupeWarns.map(d => d.message).join('; ')}`);
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

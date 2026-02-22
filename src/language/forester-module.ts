@@ -14,6 +14,7 @@ import { createDefaultModule, createDefaultSharedModule } from 'langium/lsp';
 import { ForesterGeneratedModule, ForesterGeneratedSharedModule } from './generated/module.js';
 import { ForesterDocumentValidator } from './forester-validator.js';
 import { registerForesterValidationChecks } from './forester-validator-checks.js';
+import { ForesterSemanticTokenProvider } from './forester-semantic-tokens.js';
 
 /**
  * Forester-specific services added on top of the default Langium LSP services.
@@ -31,6 +32,9 @@ export type ForesterServices = LangiumServices & ForesterAddedServices;
 export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = {
     validation: {
         DocumentValidator: (services) => new ForesterDocumentValidator(services),
+    },
+    lsp: {
+        SemanticTokenProvider: (services) => new ForesterSemanticTokenProvider(services),
     },
 };
 

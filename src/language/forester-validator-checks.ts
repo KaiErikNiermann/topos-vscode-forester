@@ -21,9 +21,10 @@
  */
 import type { AstNode, ValidationAcceptor, ValidationChecks, LangiumDocuments } from 'langium';
 import { AstUtils } from 'langium';
-import type { ForesterAstType, Command, Document } from './generated/ast.js';
+import type { ForesterAstType, Command, Document, TextFragment } from './generated/ast.js';
 import {
     isBraceArg,
+    isBracketGroup,
     isCommand,
     isDocument,
     isTextFragment,
@@ -501,6 +502,72 @@ export class ForesterChecks {
 
         return macros;
     }
+
+    // ── Object method call checks ─────────────────────────────────────────────
+
+    /**
+     * Warn when a `#methodName` call site refers to a method that is not
+     * defined in any \object or \patch block in the loaded workspace.
+     *
+     * Detection: TextFragment.value is the method name AND the immediately
+     * preceding sibling in the same container is TextFragment('#').
+     *
+     * Emitted as 'hint' to keep it unobtrusive — the workspace index may
+     * be incomplete (e.g. not all files loaded yet).
+     */
+    checkUnresolvedMethod(node: TextFragment, accept: ValidationAcceptor): void {
+        const val = node.value.trim();
+        if (!val || val === '#') return;
+        if (!this.isMethodNameSite(node)) return;
+
+        const known = this.collectWorkspaceMethods();
+        if (!known.has(val)) {
+            accept('hint', `Method '${val}' is not defined in any workspace object or patch block`, {
+                node,
+                property: 'value',
+            });
+        }
+    }
+
+    /**
+     * Return true when `node` is immediately preceded by a TextFragment('#')
+     * in its parent container's nodes array — i.e. it is the name part of
+     * a `#methodName` method call.
+     */
+    private isMethodNameSite(node: TextFragment): boolean {
+        const container = node.$container as AstNode & { nodes?: AstNode[] };
+        const siblings = container.nodes;
+        if (!siblings) return false;
+        const idx = siblings.indexOf(node);
+        if (idx <= 0) return false;
+        const prev = siblings[idx - 1];
+        return isTextFragment(prev) && prev.value === '#';
+    }
+
+    /**
+     * Collect every method name defined inside \object or \patch body blocks
+     * across all loaded workspace documents.
+     */
+    private collectWorkspaceMethods(): Set<string> {
+        const methods = new Set<string>();
+        const OBJECT_CMDS: ReadonlySet<string> = new Set(['\\object', '\\patch']);
+
+        for (const doc of this.documents.all) {
+            const root = doc.parseResult.value;
+            for (const node of AstUtils.streamAllContents(root)) {
+                if (!isCommand(node) || !OBJECT_CMDS.has(node.name)) continue;
+                const bodyArg = [...node.args].reverse().find(isBraceArg);
+                if (!bodyArg) continue;
+                for (const bodyNode of bodyArg.nodes) {
+                    if (!isBracketGroup(bodyNode)) continue;
+                    const frag = bodyNode.nodes.find(isTextFragment);
+                    if (frag?.value.trim()) methods.add(frag.value.trim());
+                }
+            }
+        }
+
+        return methods;
+    }
 }
 
 // ── Module-level helpers ──────────────────────────────────────────────────────
@@ -538,6 +605,9 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
             checker.checkUnresolvedCommand,
             checker.checkMissingImport,
             checker.checkTransclusionCycle,
+        ],
+        TextFragment: [
+            checker.checkUnresolvedMethod,
         ],
     };
 

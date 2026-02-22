@@ -1115,6 +1115,30 @@ await test('object: #method TextFragment is immediately preceded by # TextFragme
     assertEqual(prev.value, '#', 'Preceding node should be TextFragment("#")');
 });
 
+// ── Validator: object method call checks (Task 2 diagnostics) ────────────────
+
+await test('object method check: #method on defined method — no warning', async () => {
+    // Define an object with method1, then call #method1
+    const source = '\\def\\myObj{\\object[self]{[method1]{}}}\\get\\myObj#method1';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const methodWarns = diags.filter(d => d.message.includes("'method1'") && d.message.includes('not defined'));
+    if (methodWarns.length > 0) {
+        throw new Error(`Unexpected method warning for defined method: ${methodWarns[0].message}`);
+    }
+});
+
+await test('object method check: #undefinedMethod — hint warning', async () => {
+    // No object defines "ghostMethod" in this document
+    const source = '\\get\\myObj#ghostMethod';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const methodHints = diags.filter(d => d.message.includes("'ghostMethod'") && d.message.includes('not defined'));
+    if (methodHints.length === 0) {
+        throw new Error('Expected hint for undefined method #ghostMethod');
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

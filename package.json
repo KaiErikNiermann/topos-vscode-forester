@@ -1,9 +1,9 @@
 {
-   "name": "topos-vscode-forester",
-   "displayName": "Topos VSCode Forester",
+   "name": "forester-lang-support",
+   "displayName": "Forester Language Support",
    "description": "Enhanced VSCode support for forester",
-   "repository": "github:filmerjarred/topos-vscode-forester",
-   "publisher": "JarredFilmer",
+   "repository": "github:kniermann/forester-lang-support",
+   "publisher": "kniermann",
    "version": "0.3.0",
    "engines": {
       "vscode": "^1.86.0"
@@ -370,7 +370,7 @@
             "editor.tabSize": 2,
             "editor.wordBasedSuggestions": "off",
             "editor.formatOnSave": false,
-            "editor.defaultFormatter": "jarredfilmer.topos-vscode-forester"
+            "editor.defaultFormatter": "kniermann.forester-lang-support"
          }
       },
       "languages": [
@@ -452,8 +452,8 @@
       "test:language-server": "npm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
       "package-ext": "npm run check-types && node esbuild.js --production",
       "package": "npm run package-ext && vsce package",
-      "install-local": "npm run package && code --install-extension topos-vscode-forester-*.vsix",
-      "package-install": "npm run package && code --install-extension topos-vscode-forester-*.vsix"
+      "install-local": "npm run package && code --install-extension forester-lang-support-*.vsix",
+      "package-install": "npm run package && code --install-extension forester-lang-support-*.vsix"
    },
    "devDependencies": {
       "@types/node": "18.x",

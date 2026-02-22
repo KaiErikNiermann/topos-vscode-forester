@@ -167,7 +167,7 @@ export class ForesterLatexHoverService implements vscode.Disposable {
    private readonly disposables: vscode.Disposable[] = [];
 
    constructor(private readonly context: vscode.ExtensionContext) {
-      this.storageRoot = context.globalStorageUri ?? vscode.Uri.file(join(tmpdir(), "topos-vscode-forester"));
+      this.storageRoot = context.globalStorageUri ?? vscode.Uri.file(join(tmpdir(), "forester-lang-support"));
       this.cacheRoot = vscode.Uri.joinPath(this.storageRoot, "latex-hover");
       this.cacheSvgDir = vscode.Uri.joinPath(this.cacheRoot, "svgs");
       this.tempDir = vscode.Uri.joinPath(this.cacheRoot, "tmp");

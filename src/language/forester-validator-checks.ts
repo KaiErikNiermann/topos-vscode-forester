@@ -13,6 +13,9 @@
  *                               known .tree file in the workspace index (Task 3)
  *   • checkUnresolvedCommand  — warn on unknown commands in Text_mode; suppressed
  *                               inside #{}, ##{}, and \tex{}{} bodies (Task 2)
+ *   • checkMissingImport      — hint when \macro is defined in another tree that is
+ *                               not yet imported; provides data for the quick-fix
+ *                               CodeActionProvider to offer "Add \import{id}" (Task 7)
  */
 import type { AstNode, ValidationAcceptor, ValidationChecks, LangiumDocuments } from 'langium';
 import { AstUtils } from 'langium';
@@ -337,6 +340,72 @@ export class ForesterChecks {
     }
 
     /**
+     * Hint-level check: \foo is defined in a different workspace tree that is not
+     * yet imported by the current document.
+     *
+     * Emits a 'hint' diagnostic with code 'missing-import' and data { treeId }
+     * so the ForesterCodeActionProvider can offer "Add \import{treeId}".
+     * Registered as a 'slow' check — does not run on every keystroke.
+     */
+    checkMissingImport(node: Command, accept: ValidationAcceptor): void {
+        if (!this.documents) return;
+        if (node.name.startsWith('\\xmlns:') || node.name.startsWith('\\<')) return;
+        if (ALL_BUILTIN_COMMANDS.has(node.name)) return;
+        if (isInTexMode(node)) return;
+        if (isBindingSite(node)) return;
+
+        // Determine the current document's tree ID
+        const currentDoc = AstUtils.getDocument(node);
+        const currentTreeId = treeIdFromUriPath(currentDoc.uri.path);
+        if (!currentTreeId) return;
+
+        // Find other tree files (in the workspace) that define this macro
+        const definingTrees: string[] = [];
+        for (const doc of this.documents.all) {
+            if (doc.uri.toString() === currentDoc.uri.toString()) continue;
+            const docTreeId = treeIdFromUriPath(doc.uri.path);
+            if (!docTreeId) continue;
+
+            for (const n of AstUtils.streamAllContents(doc.parseResult.value)) {
+                if (!isCommand(n) || !LEXICAL_BINDING_COMMANDS.has(n.name)) continue;
+                const container2 = n.$container as AstNode & { nodes?: AstNode[] };
+                const siblings2 = container2.nodes;
+                if (!siblings2) continue;
+                const idx2 = siblings2.indexOf(n);
+                if (idx2 < 0 || idx2 + 1 >= siblings2.length) continue;
+                const next2 = siblings2[idx2 + 1];
+                if (isCommand(next2) && next2.name === node.name) {
+                    definingTrees.push(docTreeId);
+                    break; // found in this doc — move to next doc
+                }
+            }
+        }
+
+        if (definingTrees.length === 0) return;
+
+        // Collect what the current document already imports
+        const importedTrees = new Set<string>();
+        for (const n of AstUtils.streamAllContents(currentDoc.parseResult.value)) {
+            if (isCommand(n) && n.name === '\\import') {
+                const id = firstBraceArgText(n);
+                if (id) importedTrees.add(id);
+            }
+        }
+
+        // Report for the first unimported defining tree
+        for (const treeId of definingTrees) {
+            if (!importedTrees.has(treeId)) {
+                accept(
+                    'hint',
+                    `Command ${node.name} is defined in tree '${treeId}' which is not imported`,
+                    { node, code: 'missing-import', data: { treeId } },
+                );
+                return; // one suggestion per call site is enough
+            }
+        }
+    }
+
+    /**
      * Scan all loaded workspace documents for \\def\\name and \\let\\name
      * binding sites and return the set of defined macro names (with leading backslash).
      */
@@ -365,6 +434,14 @@ export class ForesterChecks {
     }
 }
 
+// ── Module-level helpers ──────────────────────────────────────────────────────
+
+/** Extract tree ID from a URI path (basename without .tree extension). */
+export function treeIdFromUriPath(path: string): string | undefined {
+    const basename = path.slice(path.lastIndexOf('/') + 1);
+    return basename.endsWith('.tree') ? basename.slice(0, -5) : undefined;
+}
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 /**
@@ -390,6 +467,7 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
         Command: [
             checker.checkCrossRefTarget,
             checker.checkUnresolvedCommand,
+            checker.checkMissingImport,
         ],
     };
 

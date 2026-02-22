@@ -42,7 +42,7 @@ entry Document:
 
 // Top-level structural nodes
 Node:
-    Command | VerbatimBlock | MathDisplay | MathInline | TextFragment | Escape;
+    Command | VerbatimBlock | MathDisplay | MathInline | WikiLink | TextFragment | Escape;
 
 // ============================================================================
 // TASK 5 — Terminal rules
@@ -52,6 +52,16 @@ Node:
 //   name chars: A-Z a-z 0-9  -  /  ?
 //   (mirrors the regex in formatter-core.ts tokenize())
 terminal COMMAND_NAME: /\\[A-Za-z0-9\-\/\?]+/;
+
+// XML-style element command: \<tag> or \<prefix:tag>
+//   e.g. \<html:div>, \<svg:rect>
+//   Must be ordered before COMMAND_NAME in grammar (longer match wins).
+terminal XML_COMMAND_NAME: /\\<[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?>/;
+
+// Wiki-style cross-reference: [[tree-id]]
+//   Captures [[...]] as a single opaque token.
+//   Must be ordered before the '[' keyword (longer match wins).
+terminal WIKI_LINK: /\[\[[^\]\n]*\]\]/;
 
 // Escaped percent  \%  — treat as literal text, not a comment start
 // (the tokenizer special-cases this before the comment rule)
@@ -107,7 +117,7 @@ hidden terminal NL: /\r?\n/;
 // ============================================================================
 
 Command:
-    name=COMMAND_NAME args+=Argument*;
+    name=(COMMAND_NAME | XML_COMMAND_NAME) args+=Argument*;
 
 // ============================================================================
 // Argument forms: {}, [], ()
@@ -174,3 +184,10 @@ Escape:
 // Plain text run
 TextFragment:
     value=TEXT;
+
+// ============================================================================
+// Wiki-style cross-references:  [[tree-id]]
+// ============================================================================
+
+WikiLink:
+    content=WIKI_LINK;

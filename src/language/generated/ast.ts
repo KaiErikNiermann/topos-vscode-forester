@@ -8,6 +8,8 @@ import * as langium from 'langium';
 
 export const ForesterTerminals = {
     COMMAND_NAME: /\\[A-Za-z0-9\-\/\?]+/,
+    XML_COMMAND_NAME: /\\<[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?>/,
+    WIKI_LINK: /\[\[[^\]\n]*\]\]/,
     ESCAPED_PERCENT: /\\%/,
     HASH_DISPLAY: /##{/,
     HASH_INLINE: /#{/,
@@ -186,7 +188,7 @@ export function isMathText(item: unknown): item is MathText {
     return reflection.isInstance(item, MathText.$type);
 }
 
-export type Node = Command | Escape | MathDisplay | MathInline | TextFragment | VerbatimBlock;
+export type Node = Command | Escape | MathDisplay | MathInline | TextFragment | VerbatimBlock | WikiLink;
 
 export const Node = {
     $type: 'Node'
@@ -241,6 +243,21 @@ export function isVerbatimBlock(item: unknown): item is VerbatimBlock {
     return reflection.isInstance(item, VerbatimBlock.$type);
 }
 
+export interface WikiLink extends langium.AstNode {
+    readonly $container: BraceArg | BracketArg | Document | ParenArg;
+    readonly $type: 'WikiLink';
+    content: string;
+}
+
+export const WikiLink = {
+    $type: 'WikiLink',
+    content: 'content'
+} as const;
+
+export function isWikiLink(item: unknown): item is WikiLink {
+    return reflection.isInstance(item, WikiLink.$type);
+}
+
 export type ForesterAstType = {
     Argument: Argument
     BraceArg: BraceArg
@@ -257,6 +274,7 @@ export type ForesterAstType = {
     ParenArg: ParenArg
     TextFragment: TextFragment
     VerbatimBlock: VerbatimBlock
+    WikiLink: WikiLink
 }
 
 export class ForesterAstReflection extends langium.AbstractAstReflection {
@@ -394,6 +412,15 @@ export class ForesterAstReflection extends langium.AbstractAstReflection {
             properties: {
                 content: {
                     name: VerbatimBlock.content
+                }
+            },
+            superTypes: [Node.$type]
+        },
+        WikiLink: {
+            name: WikiLink.$type,
+            properties: {
+                content: {
+                    name: WikiLink.content
                 }
             },
             superTypes: [Node.$type]

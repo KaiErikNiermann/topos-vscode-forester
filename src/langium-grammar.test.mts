@@ -20,6 +20,7 @@ import {
     isMathText,
     isTextFragment,
     isVerbatimBlock,
+    isWikiLink,
     type Command,
     type Document,
 } from './language/generated/ast.js';
@@ -398,6 +399,62 @@ await test('math display with nested inline math is not ambiguous', async () => 
     // Inside display math, #{inner} is another MathInline node
     const innerMi = md.nodes.find(isMathInline);
     assertOk(innerMi, 'Expected nested MathInline inside MathDisplay');
+});
+
+// ── WikiLink and XML element names (grammar additions) ────────────────────────
+
+await test('[[tree-id]] parses as WikiLink node', async () => {
+    const doc = await parseClean('\\p{See [[some-tree-id]] for details.}');
+    const p = doc.nodes.find(isCommand);
+    assertOk(p, 'Expected \\p command');
+    const brace = p.args.find(isBraceArg);
+    assertOk(brace, 'Expected BraceArg');
+    const wl = brace.nodes.find(isWikiLink);
+    assertOk(wl, 'Expected WikiLink inside \\p');
+    if (wl.content !== '[[some-tree-id]]') {
+        throw new Error(`Expected content "[[some-tree-id]]", got "${wl.content}"`);
+    }
+});
+
+await test('[[id]] at document level parses as WikiLink', async () => {
+    const doc = await parseClean('[[my-tree]]');
+    const wl = doc.nodes.find(isWikiLink);
+    assertOk(wl, 'Expected top-level WikiLink');
+    if (wl.content !== '[[my-tree]]') {
+        throw new Error(`Expected "[[my-tree]]", got "${wl.content}"`);
+    }
+});
+
+await test('[[id]] does not break surrounding parse', async () => {
+    const doc = await parseClean('\\title{Test}\n[[ref]]\n\\p{After}');
+    const cmds = doc.nodes.filter(isCommand);
+    if (cmds.length < 2) {
+        throw new Error(`Expected 2 commands, got ${cmds.length}`);
+    }
+    const wl = doc.nodes.find(isWikiLink);
+    assertOk(wl, 'Expected WikiLink between commands');
+});
+
+await test('\\<html:div> parses as Command with XML_COMMAND_NAME', async () => {
+    const doc = await parseClean('\\<html:div>[class]{container}{Content}');
+    const cmd = doc.nodes.find(isCommand);
+    assertOk(cmd, 'Expected Command');
+    if (cmd.name !== '\\<html:div>') {
+        throw new Error(`Expected name "\\<html:div>", got "${cmd.name}"`);
+    }
+    // Should have bracket arg + two brace args
+    if (cmd.args.length < 3) {
+        throw new Error(`Expected ≥3 args, got ${cmd.args.length}`);
+    }
+});
+
+await test('\\<svg:rect> parses as Command with XML_COMMAND_NAME', async () => {
+    const doc = await parseClean('\\<svg:rect>{Content}');
+    const cmd = doc.nodes.find(isCommand);
+    assertOk(cmd, 'Expected Command');
+    if (cmd.name !== '\\<svg:rect>') {
+        throw new Error(`Expected "\\<svg:rect>", got "${cmd.name}"`);
+    }
 });
 
 // ── Summary ───────────────────────────────────────────────────────────────────

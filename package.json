@@ -1,482 +1,485 @@
 {
-   "name": "forester-lang-support",
-   "displayName": "Forester Language Support",
-   "description": "Enhanced VSCode support for forester",
-   "repository": "github:kniermann/forester-lang-support",
-   "publisher": "kniermann",
-   "version": "0.3.0",
-   "packageManager": "pnpm@10.14.0",
-   "engines": {
-      "vscode": "^1.86.0"
-   },
-   "markdown": "github",
-   "icon": "resources/ForesterTopos.png",
-   "categories": [
-      "Programming Languages"
-   ],
-   "activationEvents": [
-      "workspaceContains:**/*.tree",
-      "workspaceContains:forest.toml"
-   ],
-   "main": "./out/extension.js",
-   "contributes": {
-      "commands": [
-         {
-            "command": "forester.scanMacros",
-            "title": "Scan Macros for Formatter",
-            "category": "Forester",
-            "icon": "$(search)"
-         },
-         {
-            "command": "forester.checkAllTreeFiles",
-            "title": "Check All Tree Files (Grammar)",
-            "category": "Forester",
-            "icon": "$(checklist)"
-         },
-         {
-            "command": "forester.speedFix",
-            "title": "SpeedFix - Rapid Spelling/Grammar Fixes",
-            "category": "Forester",
-            "icon": "$(zap)"
-         },
-         {
-            "command": "forester.autoHideSyntaxNoise",
-            "title": "Auto-Hide Forester Syntax Noise",
-            "category": "Forester",
-            "icon": "$(filter)"
-         },
-         {
-            "command": "forester.formatAllTrees",
-            "title": "Format All Tree Files",
-            "category": "Forester",
-            "icon": "$(file-code)"
-         },
-         {
-            "command": "forester.configureLinkAliases",
-            "title": "Configure Link Aliases",
-            "category": "Forester",
-            "icon": "$(symbol-reference)"
-         },
-         {
-            "command": "forester.createLinkAliasConfig",
-            "title": "Create Link Aliases Config File",
-            "category": "Forester",
-            "icon": "$(new-file)"
-         },
-         {
-            "command": "forester.addLinkPattern",
-            "title": "Add Link Alias Pattern",
-            "category": "Forester",
-            "icon": "$(add)"
-         },
-         {
-            "command": "forester.removeLinkPattern",
-            "title": "Remove Link Alias Pattern",
-            "category": "Forester",
-            "icon": "$(remove)"
-         },
-         {
-            "command": "forester.newTree",
-            "title": "New Tree",
-            "category": "Forester",
-            "icon": "$(diff-added)"
-         },
-         {
-            "command": "forester.newFromTemplate",
-            "title": "New Tree from Template",
-            "category": "Forester",
-            "icon": "$(file-add)"
-         },
-         {
-            "command": "forester.transcludeNewTree",
-            "title": "Transclude New Tree",
-            "category": "Forester",
-            "icon": "$(diff-added)"
-         },
-         {
-            "command": "forester.showForestStructureView",
-            "title": "Show Forest Structure View",
-            "category": "Forester",
-            "icon": "$(list-tree)"
-         },
-         {
-            "command": "forester.refreshTreeView",
-            "title": "Refresh",
-            "category": "Forester",
-            "icon": "$(refresh)"
-         },
-         {
-            "command": "forester.collapseAllTreeView",
-            "title": "Collapse All",
-            "category": "Forester",
-            "icon": "$(collapse-all)"
-         },
-         {
-            "command": "forester.renameTree",
-            "title": "Rename Tree",
-            "category": "Forester",
-            "icon": "$(edit)"
-         },
-         {
-            "command": "forester.setDefaultPrefix",
-            "title": "Set Default Prefix",
-            "category": "Forester",
-            "icon": "$(settings-gear)"
-         },
-         {
-            "command": "forester.setDefaultTemplate",
-            "title": "Set Default Template",
-            "category": "Forester",
-            "icon": "$(settings-gear)"
-         },
-         {
-            "command": "forester.changeOpenBehaviour",
-            "title": "Change Forester Open Behaviour",
-            "category": "Forester",
-            "icon": "$(settings-gear)"
-         },
-         {
-            "command": "forester.showGraphView",
-            "title": "Show Forest Graph View",
-            "category": "Forester",
-            "icon": "$(type-hierarchy)"
-         },
-         {
-            "command": "forester.runDatalogQuery",
-            "title": "Run Datalog Query",
-            "category": "Forester",
-            "icon": "$(play)"
-         },
-         {
-            "command": "forester.restartLanguageServer",
-            "title": "Restart Language Server",
-            "category": "Forester",
-            "icon": "$(debug-restart)"
-         }
-      ],
-      "views": {
-         "explorer": [
-            {
-               "type": "webview",
-               "id": "foresterTreeView",
-               "name": "Forester Structure",
-               "icon": "$(symbol-namespace)",
-               "contextualTitle": "Forester Structure",
-               "when": "workspaceHasForesterFiles",
-               "visibility": "hidden"
-            },
-            {
-               "id": "foresterTransclusionView",
-               "name": "Forester Transclusions",
-               "icon": "$(type-hierarchy)",
-               "contextualTitle": "Forester Transclusions",
-               "when": "workspaceHasForesterFiles",
-               "visibility": "hidden"
-            },
-            {
-               "id": "foresterBacklinksView",
-               "name": "Forester Backlinks",
-               "icon": "$(references)",
-               "contextualTitle": "Forester Backlinks",
-               "when": "workspaceHasForesterFiles",
-               "visibility": "hidden"
-            },
-            {
-               "id": "foresterContributorsView",
-               "name": "Forester Contributors",
-               "icon": "$(account)",
-               "contextualTitle": "Forester Contributors",
-               "when": "workspaceHasForesterFiles",
-               "visibility": "hidden"
-            }
-         ]
+  "name": "forester-lang-support",
+  "displayName": "Forester Language Support",
+  "description": "Enhanced VSCode support for forester",
+  "repository": "github:kniermann/forester-lang-support",
+  "publisher": "kniermann",
+  "version": "0.3.0",
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "vscode": "^1.86.0"
+  },
+  "markdown": "github",
+  "icon": "resources/ForesterTopos.png",
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/*.tree",
+    "workspaceContains:forest.toml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "forester.scanMacros",
+        "title": "Scan Macros for Formatter",
+        "category": "Forester",
+        "icon": "$(search)"
       },
-      "keybindings": [
-         {
-            "command": "forester.renameTree",
-            "key": "ctrl+r",
-            "mac": "cmd+r",
-            "when": "editorTextFocus && resourceExtname == .tree"
-         },
-         {
-            "command": "forester.speedFix",
-            "key": "ctrl+shift+.",
-            "mac": "cmd+shift+.",
-            "when": "workspaceHasForesterFiles"
-         }
-      ],
-      "configuration": {
-         "title": "Forester",
-         "properties": {
-            "forester.config": {
-               "type": "string",
-               "default": "",
-               "markdownDescription": "Specifies the forester config file (defaults to `forest.toml`). This should usually be edited per workspace, instead of globally."
-            },
-            "forester.path": {
-               "type": "string",
-               "default": "forester",
-               "description": "Specifies the path to forester. Note that VSCode usually does not inherit the shell PATH variable."
-            },
-            "forester.defaultPrefix": {
-               "type": "string",
-               "default": "",
-               "description": "Default prefix for new trees (e.g., 'jms', 'ssl'). Will be prompted if not set."
-            },
-            "forester.defaultTemplate": {
-               "type": "string",
-               "default": "",
-               "description": "Default template for new trees (e.g., 'daily', 'paper'). Will be prompted if not set. Use '(No template)' to skip template selection."
-            },
-            "forester.create.author": {
-               "type": "string",
-               "default": "",
-               "description": "Default author for new trees (e.g., 'sophie-libkind'). Omitted if not set."
-            },
-            "forester.completion.showID": {
-               "type": "boolean",
-               "default": false,
-               "description": "Controls whether the tree ID is shown in completions."
-            },
-            "forester.subtree.autoId.enabled": {
-               "type": "boolean",
-               "default": false,
-               "description": "When enabled, new \\subtree blocks get the next canonical 4-character lowercase base36 ID (^[0-9a-z]{4}$), ignoring arbitrary text IDs."
-            },
-            "forester.subtree.autoId.template": {
-               "type": "string",
-               "default": "\\subtree[<id>]{\n  \\title{$1}\n}$0",
-               "markdownDescription": "Template used by subtree completion. Use `<id>` for the generated canonical 4-character base36 subtree ID and snippet placeholders like `$1`/`$0`."
-            },
-            "forester.create.random": {
-               "type": "boolean",
-               "default": false,
-               "description": "Controls whether the tree ID is generated randomly or sequentially."
-            },
-            "forester.decorations.enabled": {
-               "type": "boolean",
-               "default": true,
-               "description": "Show inline title hints next to transclude/import/export commands."
-            },
-            "forester.hover.latex.enabled": {
-               "type": "boolean",
-               "default": true,
-               "description": "Render LaTeX previews on hover for #{...}, ##{...}, and \\tex{...}{...}."
-            },
-            "forester.inlayHints.tagClosures.enabled": {
-               "type": "boolean",
-               "default": true,
-               "description": "Show an inlay hint (for example `ul`) after a closing brace `}` to indicate which command opened the block."
-            },
-            "forester.inlayHints.tagClosures.tags": {
-               "type": "array",
-               "items": {
-                  "type": "string"
-               },
-               "default": [
-                  "ol",
-                  "ul",
-                  "li",
-                  "p",
-                  "subtree",
-                  "##",
-                  "tex",
-                  "texmath",
-                  "solution"
-               ],
-               "description": "Allowlist of Forester tag labels that receive closure inlay hints. Use command names with or without a leading backslash (for example `ul` or `\\ul`) and `##` for display-math blocks."
-            },
-            "forester.languageTool.enable": {
-               "type": "boolean",
-               "default": true,
-               "description": "Enable LanguageTool grammar checking for Forester (.tree) files when the LanguageTool extension is installed."
-            },
-            "forester.languageTool.autoPopulateLtexConfig": {
-               "type": "boolean",
-               "default": true,
-               "description": "Automatically add Forester syntax noise (e.g., macro names, short tokens) to LTeX's dictionary and disabled rules in workspace settings. This helps suppress false positives without manual configuration."
-            },
-            "forester.languageTool.javaOpts": {
-               "type": "string",
-               "default": "",
-               "description": "Extra JAVA_OPTS passed to the LanguageTool server (e.g. '--add-opens java.base/java.util=ALL-UNNAMED'). If left empty, safe defaults for Java 17+ are applied automatically."
-            },
-            "forester.languageTool.language": {
-               "type": "string",
-               "default": "en",
-               "description": "LanguageTool language code for Forester files. Use 'en' for English (recommended), or locale codes like 'en-US', 'en-GB', 'de', 'fr' if you have the corresponding language pack installed."
-            },
-            "forester.taxonCustomization": {
-               "type": "object",
-               "default": {},
-               "description": "Custom emoji and abbreviation settings for taxons. Use '$default' as a key to set the default emoji for unknown taxons. Example: { \"$default\": { \"emoji\": \"📄\" }, \"proposition\": { \"emoji\": \"📐\", \"abbreviation\": \"prop\" } }",
-               "additionalProperties": {
-                  "type": "object",
-                  "properties": {
-                     "emoji": {
-                        "type": "string",
-                        "description": "Custom emoji for this taxon"
-                     },
-                     "abbreviation": {
-                        "type": "string",
-                        "description": "Custom abbreviation for this taxon (used in table of contents)"
-                     }
-                  }
-               }
-            },
-            "forester.create.openNewTreeMode": {
-               "type": "string",
-               "default": "background",
-               "enum": [
-                  "off",
-                  "background",
-                  "side",
-                  "active"
-               ],
-               "enumDescriptions": [
-                  "Do not open the new tree",
-                  "Open the new tree in the background (default)",
-                  "Open the new tree to the side",
-                  "Open the new tree as the active editor"
-               ],
-               "description": "Controls how newly created trees are opened in the editor."
-            },
-            "forester.formatter.ignoredCommands": {
-               "type": "array",
-               "items": {
-                  "type": "string"
-               },
-               "default": [],
-               "description": "List of commands whose content should not be reformatted. Content inside these blocks is preserved exactly as written. Use 'Forester: Scan Macros' command to auto-detect macros."
-            },
-            "forester.formatter.autoScanMacros": {
-               "type": "boolean",
-               "default": true,
-               "description": "Automatically scan workspace for macro definitions and add them to ignored commands."
-            },
-            "forester.graphView.excludedNodes": {
-               "type": "array",
-               "items": {
-                  "type": "string"
-               },
-               "default": [
-                  "basic-macros"
-               ],
-               "description": "Tree IDs to omit from the Forest Graph view. Edges to/from excluded nodes are also hidden. Useful for suppressing macro-only trees (like 'basic-macros') that would otherwise appear as a hub connected to almost every other tree."
-            }
-         }
+      {
+        "command": "forester.checkAllTreeFiles",
+        "title": "Check All Tree Files (Grammar)",
+        "category": "Forester",
+        "icon": "$(checklist)"
       },
-      "configurationDefaults": {
-         "[forester]": {
-            "editor.wordWrap": "on",
-            "editor.tabSize": 2,
-            "editor.wordBasedSuggestions": "off",
-            "editor.formatOnSave": false,
-            "editor.defaultFormatter": "kniermann.forester-lang-support"
-         }
+      {
+        "command": "forester.speedFix",
+        "title": "SpeedFix - Rapid Spelling/Grammar Fixes",
+        "category": "Forester",
+        "icon": "$(zap)"
       },
-      "languages": [
-         {
-            "id": "forester",
-            "extensions": [
-               ".tree"
-            ],
-            "icon": {
-               "light": "./resources/icons/tree-file2.svg",
-               "dark": "./resources/icons/tree-file2.svg"
-            },
-            "configuration": "./resources/language/language-configuration.json"
-         }
-      ],
-      "grammars": [
-         {
-            "language": "forester",
-            "scopeName": "source.forester",
-            "path": "./resources/language/forester.tmGrammar.json",
-            "embeddedLanguages": {
-               "embedded.latex": "latex"
-            }
-         }
-      ],
-      "menus": {
-         "explorer/context": [
-            {
-               "command": "forester.new",
-               "when": "explorerResourceIsFolder",
-               "group": "navigation"
-            },
-            {
-               "command": "forester.newFromTemplate",
-               "when": "explorerResourceIsFolder",
-               "group": "navigation"
-            }
-         ],
-         "view/title": [
-            {
-               "command": "forester.refreshTreeView",
-               "when": "view == foresterTreeView",
-               "group": "navigation"
-            },
-            {
-               "command": "forester.collapseAllTreeView",
-               "when": "view == foresterTreeView",
-               "group": "navigation"
-            }
-         ],
-         "editor/context": [
-            {
-               "command": "forester.renameTree",
-               "when": "resourceExtname == .tree",
-               "group": "1_modification"
-            }
-         ]
+      {
+        "command": "forester.autoHideSyntaxNoise",
+        "title": "Auto-Hide Forester Syntax Noise",
+        "category": "Forester",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "forester.formatAllTrees",
+        "title": "Format All Tree Files",
+        "category": "Forester",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "forester.configureLinkAliases",
+        "title": "Configure Link Aliases",
+        "category": "Forester",
+        "icon": "$(symbol-reference)"
+      },
+      {
+        "command": "forester.createLinkAliasConfig",
+        "title": "Create Link Aliases Config File",
+        "category": "Forester",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "forester.addLinkPattern",
+        "title": "Add Link Alias Pattern",
+        "category": "Forester",
+        "icon": "$(add)"
+      },
+      {
+        "command": "forester.removeLinkPattern",
+        "title": "Remove Link Alias Pattern",
+        "category": "Forester",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "forester.newTree",
+        "title": "New Tree",
+        "category": "Forester",
+        "icon": "$(diff-added)"
+      },
+      {
+        "command": "forester.newFromTemplate",
+        "title": "New Tree from Template",
+        "category": "Forester",
+        "icon": "$(file-add)"
+      },
+      {
+        "command": "forester.transcludeNewTree",
+        "title": "Transclude New Tree",
+        "category": "Forester",
+        "icon": "$(diff-added)"
+      },
+      {
+        "command": "forester.showForestStructureView",
+        "title": "Show Forest Structure View",
+        "category": "Forester",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "forester.refreshTreeView",
+        "title": "Refresh",
+        "category": "Forester",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "forester.collapseAllTreeView",
+        "title": "Collapse All",
+        "category": "Forester",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "forester.renameTree",
+        "title": "Rename Tree",
+        "category": "Forester",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "forester.setDefaultPrefix",
+        "title": "Set Default Prefix",
+        "category": "Forester",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "forester.setDefaultTemplate",
+        "title": "Set Default Template",
+        "category": "Forester",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "forester.changeOpenBehaviour",
+        "title": "Change Forester Open Behaviour",
+        "category": "Forester",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "forester.showGraphView",
+        "title": "Show Forest Graph View",
+        "category": "Forester",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "forester.runDatalogQuery",
+        "title": "Run Datalog Query",
+        "category": "Forester",
+        "icon": "$(play)"
+      },
+      {
+        "command": "forester.restartLanguageServer",
+        "title": "Restart Language Server",
+        "category": "Forester",
+        "icon": "$(debug-restart)"
       }
-   },
-   "scripts": {
-      "vscode:prepublish": "pnpm run package-ext",
-      "compile": "pnpm run check-types && node esbuild.js",
-      "check-types": "tsc",
-      "watch": "npm-run-all -p watch:*",
-      "watch:esbuild": "node esbuild.js --watch",
-      "watch:tsc": "tsc --noEmit --watch --preserveWatchOutput",
-      "watch:grammar": "langium generate --watch",
-      "langium:generate": "langium generate",
-      "build": "pnpm run compile",
-      "lint": "eslint src --ext ts,mts",
-      "lint:fix": "eslint src --ext ts,mts --fix",
-      "test:formatter": "pnpm dlx tsx src/formatter.test.ts",
-      "test:langium-formatter": "pnpm dlx esbuild src/langium-formatter.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-formatter-test.mjs && node out/langium-formatter-test.mjs",
-      "test:langium-hover": "pnpm dlx esbuild src/langium-hover.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-hover-test.mjs && node out/langium-hover-test.mjs",
-      "test:langium-grammar": "pnpm dlx esbuild src/langium-grammar.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-grammar-test.mjs && node out/langium-grammar-test.mjs",
-      "test:latex-hover": "pnpm dlx tsx src/latex-hover-core.test.ts",
-      "test:tag-closure-inlay": "pnpm dlx tsx src/tag-closure-inlay-core.test.ts",
-      "test:subtree-auto-id": "pnpm dlx tsx src/subtree-auto-id.test.ts",
-      "test:language-server": "pnpm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
-      "package-ext": "pnpm run check-types && node esbuild.js --production",
-      "package": "pnpm run package-ext && vsce package",
-      "install-local": "pnpm run package && code --install-extension forester-lang-support-*.vsix",
-      "package-install": "pnpm run package && code --install-extension forester-lang-support-*.vsix"
-   },
-   "devDependencies": {
-      "@types/node": "^18.19.130",
-      "@types/vscode": "^1.86.0",
-      "@typescript-eslint/eslint-plugin": "^6.19.1",
-      "@typescript-eslint/parser": "^6.19.1",
-      "esbuild": "^0.27.2",
-      "eslint": "^8.56.0",
-      "eslint-plugin-security": "^3.0.1",
-      "eslint-plugin-sonarjs": "^0.25.1",
-      "eslint-plugin-unicorn": "^53.0.0",
-      "langium-cli": "^4.2.0",
-      "npm-run-all": "^4.1.5",
-      "tsx": "^4.21.0",
-      "typescript": "^5.3.3"
-   },
-   "dependencies": {
-      "@vscode/codicons": "^0.0.41",
-      "langium": "^4.2.1",
-      "smol-toml": "^1.5.2",
-      "ts-pattern": "^5.9.0",
-      "vscode-languageclient": "^9.0.1"
-   }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "foresterTreeView",
+          "name": "Forester Structure",
+          "icon": "$(symbol-namespace)",
+          "contextualTitle": "Forester Structure",
+          "when": "workspaceHasForesterFiles",
+          "visibility": "hidden"
+        },
+        {
+          "id": "foresterTransclusionView",
+          "name": "Forester Transclusions",
+          "icon": "$(type-hierarchy)",
+          "contextualTitle": "Forester Transclusions",
+          "when": "workspaceHasForesterFiles",
+          "visibility": "hidden"
+        },
+        {
+          "id": "foresterBacklinksView",
+          "name": "Forester Backlinks",
+          "icon": "$(references)",
+          "contextualTitle": "Forester Backlinks",
+          "when": "workspaceHasForesterFiles",
+          "visibility": "hidden"
+        },
+        {
+          "id": "foresterContributorsView",
+          "name": "Forester Contributors",
+          "icon": "$(account)",
+          "contextualTitle": "Forester Contributors",
+          "when": "workspaceHasForesterFiles",
+          "visibility": "hidden"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "forester.renameTree",
+        "key": "ctrl+r",
+        "mac": "cmd+r",
+        "when": "editorTextFocus && resourceExtname == .tree"
+      },
+      {
+        "command": "forester.speedFix",
+        "key": "ctrl+shift+.",
+        "mac": "cmd+shift+.",
+        "when": "workspaceHasForesterFiles"
+      }
+    ],
+    "configuration": {
+      "title": "Forester",
+      "properties": {
+        "forester.config": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Specifies the forester config file (defaults to `forest.toml`). This should usually be edited per workspace, instead of globally."
+        },
+        "forester.path": {
+          "type": "string",
+          "default": "forester",
+          "description": "Specifies the path to forester. Note that VSCode usually does not inherit the shell PATH variable."
+        },
+        "forester.defaultPrefix": {
+          "type": "string",
+          "default": "",
+          "description": "Default prefix for new trees (e.g., 'jms', 'ssl'). Will be prompted if not set."
+        },
+        "forester.defaultTemplate": {
+          "type": "string",
+          "default": "",
+          "description": "Default template for new trees (e.g., 'daily', 'paper'). Will be prompted if not set. Use '(No template)' to skip template selection."
+        },
+        "forester.create.author": {
+          "type": "string",
+          "default": "",
+          "description": "Default author for new trees (e.g., 'sophie-libkind'). Omitted if not set."
+        },
+        "forester.completion.showID": {
+          "type": "boolean",
+          "default": false,
+          "description": "Controls whether the tree ID is shown in completions."
+        },
+        "forester.subtree.autoId.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, new \\subtree blocks get the next canonical 4-character lowercase base36 ID (^[0-9a-z]{4}$), ignoring arbitrary text IDs."
+        },
+        "forester.subtree.autoId.template": {
+          "type": "string",
+          "default": "\\subtree[<id>]{\n  \\title{$1}\n}$0",
+          "markdownDescription": "Template used by subtree completion. Use `<id>` for the generated canonical 4-character base36 subtree ID and snippet placeholders like `$1`/`$0`."
+        },
+        "forester.create.random": {
+          "type": "boolean",
+          "default": false,
+          "description": "Controls whether the tree ID is generated randomly or sequentially."
+        },
+        "forester.decorations.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline title hints next to transclude/import/export commands."
+        },
+        "forester.hover.latex.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render LaTeX previews on hover for #{...}, ##{...}, and \\tex{...}{...}."
+        },
+        "forester.inlayHints.tagClosures.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show an inlay hint (for example `ul`) after a closing brace `}` to indicate which command opened the block."
+        },
+        "forester.inlayHints.tagClosures.tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "ol",
+            "ul",
+            "li",
+            "p",
+            "subtree",
+            "##",
+            "tex",
+            "texmath",
+            "solution"
+          ],
+          "description": "Allowlist of Forester tag labels that receive closure inlay hints. Use command names with or without a leading backslash (for example `ul` or `\\ul`) and `##` for display-math blocks."
+        },
+        "forester.languageTool.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable LanguageTool grammar checking for Forester (.tree) files when the LanguageTool extension is installed."
+        },
+        "forester.languageTool.autoPopulateLtexConfig": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically add Forester syntax noise (e.g., macro names, short tokens) to LTeX's dictionary and disabled rules in workspace settings. This helps suppress false positives without manual configuration."
+        },
+        "forester.languageTool.javaOpts": {
+          "type": "string",
+          "default": "",
+          "description": "Extra JAVA_OPTS passed to the LanguageTool server (e.g. '--add-opens java.base/java.util=ALL-UNNAMED'). If left empty, safe defaults for Java 17+ are applied automatically."
+        },
+        "forester.languageTool.language": {
+          "type": "string",
+          "default": "en",
+          "description": "LanguageTool language code for Forester files. Use 'en' for English (recommended), or locale codes like 'en-US', 'en-GB', 'de', 'fr' if you have the corresponding language pack installed."
+        },
+        "forester.taxonCustomization": {
+          "type": "object",
+          "default": {},
+          "description": "Custom emoji and abbreviation settings for taxons. Use '$default' as a key to set the default emoji for unknown taxons. Example: { \"$default\": { \"emoji\": \"📄\" }, \"proposition\": { \"emoji\": \"📐\", \"abbreviation\": \"prop\" } }",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "emoji": {
+                "type": "string",
+                "description": "Custom emoji for this taxon"
+              },
+              "abbreviation": {
+                "type": "string",
+                "description": "Custom abbreviation for this taxon (used in table of contents)"
+              }
+            }
+          }
+        },
+        "forester.create.openNewTreeMode": {
+          "type": "string",
+          "default": "background",
+          "enum": [
+            "off",
+            "background",
+            "side",
+            "active"
+          ],
+          "enumDescriptions": [
+            "Do not open the new tree",
+            "Open the new tree in the background (default)",
+            "Open the new tree to the side",
+            "Open the new tree as the active editor"
+          ],
+          "description": "Controls how newly created trees are opened in the editor."
+        },
+        "forester.formatter.ignoredCommands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of commands whose content should not be reformatted. Content inside these blocks is preserved exactly as written. Use 'Forester: Scan Macros' command to auto-detect macros."
+        },
+        "forester.formatter.autoScanMacros": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan workspace for macro definitions and add them to ignored commands."
+        },
+        "forester.graphView.excludedNodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "basic-macros"
+          ],
+          "description": "Tree IDs to omit from the Forest Graph view. Edges to/from excluded nodes are also hidden. Useful for suppressing macro-only trees (like 'basic-macros') that would otherwise appear as a hub connected to almost every other tree."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "[forester]": {
+        "editor.wordWrap": "on",
+        "editor.tabSize": 2,
+        "editor.wordBasedSuggestions": "off",
+        "editor.formatOnSave": false,
+        "editor.defaultFormatter": "kniermann.forester-lang-support"
+      }
+    },
+    "languages": [
+      {
+        "id": "forester",
+        "extensions": [
+          ".tree"
+        ],
+        "icon": {
+          "light": "./resources/icons/tree-file2.svg",
+          "dark": "./resources/icons/tree-file2.svg"
+        },
+        "configuration": "./resources/language/language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "forester",
+        "scopeName": "source.forester",
+        "path": "./resources/language/forester.tmGrammar.json",
+        "embeddedLanguages": {
+          "embedded.latex": "latex"
+        }
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "forester.new",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation"
+        },
+        {
+          "command": "forester.newFromTemplate",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "forester.refreshTreeView",
+          "when": "view == foresterTreeView",
+          "group": "navigation"
+        },
+        {
+          "command": "forester.collapseAllTreeView",
+          "when": "view == foresterTreeView",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "forester.renameTree",
+          "when": "resourceExtname == .tree",
+          "group": "1_modification"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "prepare": "husky",
+    "vscode:prepublish": "pnpm run package-ext",
+    "compile": "pnpm run check-types && node esbuild.js",
+    "check-types": "tsc",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --preserveWatchOutput",
+    "watch:grammar": "langium generate --watch",
+    "langium:generate": "langium generate",
+    "build": "pnpm run compile",
+    "lint": "eslint src --ext ts,mts",
+    "lint:fix": "eslint src --ext ts,mts --fix",
+    "test:formatter": "pnpm dlx tsx src/formatter.test.ts",
+    "test:langium-formatter": "pnpm dlx esbuild src/langium-formatter.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-formatter-test.mjs && node out/langium-formatter-test.mjs",
+    "test:langium-hover": "pnpm dlx esbuild src/langium-hover.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-hover-test.mjs && node out/langium-hover-test.mjs",
+    "test:langium-grammar": "pnpm dlx esbuild src/langium-grammar.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-grammar-test.mjs && node out/langium-grammar-test.mjs",
+    "test:latex-hover": "pnpm dlx tsx src/latex-hover-core.test.ts",
+    "test:tag-closure-inlay": "pnpm dlx tsx src/tag-closure-inlay-core.test.ts",
+    "test:subtree-auto-id": "pnpm dlx tsx src/subtree-auto-id.test.ts",
+    "test:language-server": "pnpm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
+    "package-ext": "pnpm run check-types && node esbuild.js --production",
+    "package": "pnpm run package-ext && vsce package",
+    "install-local": "pnpm run package && code --install-extension forester-lang-support-*.vsix",
+    "package-install": "pnpm run package && code --install-extension forester-lang-support-*.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.130",
+    "@types/vscode": "^1.86.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
+    "esbuild": "^0.27.2",
+    "eslint": "^8.56.0",
+    "eslint-plugin-security": "^3.0.1",
+    "eslint-plugin-sonarjs": "^0.25.1",
+    "eslint-plugin-unicorn": "^53.0.0",
+    "husky": "^9.1.7",
+    "langium-cli": "^4.2.0",
+    "npm-run-all": "^4.1.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.41",
+    "langium": "^4.2.1",
+    "smol-toml": "^1.5.2",
+    "ts-pattern": "^5.9.0",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "9.0.1"
+  }
 }

@@ -39,14 +39,33 @@ async function main() {
         logLevel: "info",
     });
 
+    // ── Langium hover standalone bundle (ESM, dynamically imported) ───────────
+    // hover-standalone.ts uses the Langium parser to locate math/tex snippets
+    // at a cursor offset, replacing the hand-rolled parser in latex-hover-core.ts.
+    const hoverCtx = await esbuild.context({
+        entryPoints: ["src/language/hover-standalone.ts"],
+        bundle: true,
+        format: "esm",
+        minify: production,
+        sourcemap: !production,
+        sourcesContent: false,
+        platform: "node",
+        outfile: "out/language/hover-standalone.mjs",
+        external: ["vscode"],
+        logLevel: "info",
+    });
+
     if (watch) {
         await ctx.watch();
         await langiumCtx.watch();
+        await hoverCtx.watch();
     } else {
         await ctx.rebuild();
         await ctx.dispose();
         await langiumCtx.rebuild();
         await langiumCtx.dispose();
+        await hoverCtx.rebuild();
+        await hoverCtx.dispose();
     }
 }
 

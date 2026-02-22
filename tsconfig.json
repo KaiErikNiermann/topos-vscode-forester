@@ -18,7 +18,7 @@
 		// src/language/ has its own tsconfig (ESM module resolution for Langium)
 		// It is bundled separately by esbuild as the language server entry point.
 		"src/language",
-		// Langium formatter tests use .mts (ESM) and import from src/language/;
+		// Langium formatter/hover tests use .mts (ESM) and import from src/language/;
 		// they are built by esbuild and type-checked transitively from the
 		// language tsconfig rather than the extension tsconfig.
 		"src/langium-formatter.test.mts"

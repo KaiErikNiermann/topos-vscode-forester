@@ -468,9 +468,17 @@ export class ForestGraphView {
         ev.stopPropagation();
         vscode.postMessage({ type: 'openFile', sourcePath: d.sourcePath });
       })
-      .on('mouseover', showTooltip)
+      .on('mouseover', (ev, d) => {
+        currentHighlight = d.id;
+        applyVisibility();
+        showTooltip(ev, d);
+      })
       .on('mousemove', moveTooltip)
-      .on('mouseout',  hideTooltip);
+      .on('mouseout',  (ev, d) => {
+        currentHighlight = editorHighlight; // restore persistent highlight (or null)
+        applyVisibility();
+        hideTooltip();
+      });
 
     nodeSel.append('text')
       .attr('dx', d => nodeRadius(d) + 3)
@@ -525,12 +533,16 @@ export class ForestGraphView {
     let searchQuery = '';
     document.getElementById('search').addEventListener('input', ev => {
       searchQuery = ev.target.value.toLowerCase().trim();
-      currentHighlight = null; // clear neighbourhood on user search
+      editorHighlight = null;
+      currentHighlight = null;
       applyVisibility();
     });
 
     // ── Visibility / highlight ────────────────────────────────────────────────
-    let currentHighlight = null; // treeId currently highlighted
+    // editorHighlight: set by active-editor sync, persists between hovers
+    // currentHighlight: editorHighlight OR the node currently under the cursor
+    let editorHighlight = null;
+    let currentHighlight = null;
 
     function resolveId(ref) {
       return typeof ref === 'object' ? ref.id : ref;
@@ -605,8 +617,9 @@ export class ForestGraphView {
       tooltip.style.display = 'none';
     }
 
-    // Clear highlight when clicking on empty canvas
+    // Clear persistent highlight when clicking on empty canvas
     svg.on('click', () => {
+      editorHighlight = null;
       currentHighlight = null;
       applyVisibility();
     });
@@ -615,7 +628,8 @@ export class ForestGraphView {
     window.addEventListener('message', ev => {
       const msg = ev.data;
       if (msg.type === 'highlight') {
-        currentHighlight = msg.treeId;
+        editorHighlight = msg.treeId;
+        currentHighlight = msg.treeId; // also apply immediately if not hovering
         applyVisibility();
       }
     });

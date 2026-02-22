@@ -259,7 +259,7 @@ export function normalizeCodeBlock(codeBlock: string, baseIndent: string, indent
 
 /**
  * Normalize multi-line math indentation.
- * Handles both ## ... ## and ##{ ... } formats.
+ * Handles ##{...} format.
  */
 export function normalizeMultilineMath(mathBlock: string, currentIndent: string, indentUnit: string): string {
     // Split the math block into lines
@@ -270,17 +270,12 @@ export function normalizeMultilineMath(mathBlock: string, currentIndent: string,
         return mathBlock;
     }
 
-    // First line includes ## or ##{ and potentially content
+    // First line includes ##{ and potentially content
     const firstLine = lines[0];
     const lastLine = lines[lines.length - 1];
 
     // Check if this is brace-delimited: ##{...}
-    const isBraceDelimited = firstLine.startsWith("##{");
-    
-    // Check if this is a multi-line block (has content after opening ## or ##{)
-    const openPattern = isBraceDelimited ? /^##\{\s*(.*)/ : /^##\s*(.*)/;
-    const openMatch = firstLine.match(openPattern);
-    if (!openMatch) {
+    if (!firstLine.startsWith("##{")) {
         return mathBlock; // Not a valid math block
     }
 
@@ -300,7 +295,7 @@ export function normalizeMultilineMath(mathBlock: string, currentIndent: string,
     const result: string[] = [];
     const contentIndent = currentIndent + indentUnit;
 
-    // First line - ## or ##{ with any inline content
+    // First line - ##{ with any inline content
     result.push(firstLine.trimEnd());
 
     // Middle lines - normalize indentation
@@ -314,23 +309,13 @@ export function normalizeMultilineMath(mathBlock: string, currentIndent: string,
         }
     }
 
-    // Last line - closing ## or }
-    if (isBraceDelimited) {
-        // For ##{...}, the last line should be just "}"
-        if (lastLine.trim() === "}") {
-            result.push(currentIndent + "}");
-        } else {
-            // Last line has content before the closing brace
-            const stripped = lastLine.slice(minIndent);
-            result.push(contentIndent + stripped.trimEnd());
-        }
+    // Last line - closing }
+    if (lastLine.trim() === "}") {
+        result.push(currentIndent + "}");
     } else {
-        // For ##...##, the last line should be just "##"
-        if (lastLine.trim() === "##") {
-            result.push(currentIndent + "##");
-        } else {
-            result.push(lastLine.trimEnd());
-        }
+        // Last line has content before the closing brace
+        const stripped = lastLine.slice(minIndent);
+        result.push(contentIndent + stripped.trimEnd());
     }
 
     return result.join("\n");
@@ -417,35 +402,16 @@ export function tokenize(text: string, options: FormatOptions = {}): Token[] {
             continue;
         }
 
-        // Display math: ##...## or ##{...}
-        if (text.slice(i, i + 2) === "##") {
-            let math = "##";
-            i += 2;
-            
-            // Check if this is brace-delimited: ##{...}
-            if (text[i] === "{") {
-                math += "{";
-                i++;
-                let braceDepth = 1;
-                while (i < text.length && braceDepth > 0) {
-                    if (text[i] === "{") {
-                        braceDepth++;
-                    } else if (text[i] === "}") {
-                        braceDepth--;
-                    }
-                    math += text[i];
-                    i++;
-                }
-                tokens.push({ type: "math_display", value: math });
-                continue;
-            }
-            
-            // Otherwise look for closing ##
-            while (i < text.length) {
-                if (text.slice(i, i + 2) === "##") {
-                    math += "##";
-                    i += 2;
-                    break;
+        // Display math: ##{...}
+        if (text.slice(i, i + 3) === "##{") {
+            let math = "##{";
+            i += 3;
+            let braceDepth = 1;
+            while (i < text.length && braceDepth > 0) {
+                if (text[i] === "{") {
+                    braceDepth++;
+                } else if (text[i] === "}") {
+                    braceDepth--;
                 }
                 math += text[i];
                 i++;
@@ -454,33 +420,16 @@ export function tokenize(text: string, options: FormatOptions = {}): Token[] {
             continue;
         }
 
-        // Inline math #...# or #{...}
-        if (text[i] === "#") {
-            // Brace-delimited inline math: #{...}
-            if (text[i + 1] === "{") {
-                let math = "#{";
-                i += 2;
-                let braceDepth = 1;
-                while (i < text.length && braceDepth > 0) {
-                    const ch = text[i];
-                    math += ch;
-                    if (ch === "{") { braceDepth++; }
-                    else if (ch === "}") { braceDepth--; }
-                    i++;
-                }
-                tokens.push({ type: "math_inline", value: math });
-                continue;
-            }
-
-            // Hash-delimited inline math: #...#
-            let math = "#";
-            i++;
-            while (i < text.length && text[i] !== "#" && text[i] !== "\n") {
-                math += text[i];
-                i++;
-            }
-            if (text[i] === "#") {
-                math += "#";
+        // Inline math: #{...}
+        if (text.slice(i, i + 2) === "#{") {
+            let math = "#{";
+            i += 2;
+            let braceDepth = 1;
+            while (i < text.length && braceDepth > 0) {
+                const ch = text[i];
+                math += ch;
+                if (ch === "{") { braceDepth++; }
+                else if (ch === "}") { braceDepth--; }
                 i++;
             }
             tokens.push({ type: "math_inline", value: math });
@@ -646,13 +595,22 @@ export function tokenize(text: string, options: FormatOptions = {}): Token[] {
         }
 
         // Regular text - consume until special character
+        // Note: # is only special when followed by { (for math), so we check for #{
+        // rather than stopping at any #
         let textContent = "";
-        while (
-            i < text.length &&
-            !/[\\\{\}\[\]\(\)#%\n\t ]/.test(text[i]) &&
-            text.slice(i, i + 3) !== "```"
-        ) {
-            textContent += text[i];
+        while (i < text.length && text.slice(i, i + 3) !== "```") {
+            const ch = text[i];
+            // Stop at known special characters (but not #)
+            if (/[\\\{\}\[\]\(\)%\n\t ]/.test(ch)) {
+                break;
+            }
+            // Stop at # only if it starts a math expression (followed by { or #{)
+            if (ch === "#") {
+                if (text[i + 1] === "{" || text.slice(i, i + 3) === "##{") {
+                    break;
+                }
+            }
+            textContent += ch;
             i++;
         }
 
@@ -905,7 +863,8 @@ export function format(text: string, options: FormatOptions = {}): string {
                     result += currentIndent();
                 }
                 result += "[";
-                depth++;
+                // Note: brackets do NOT affect indentation depth - only braces do
+                // This is important for markdown-style links like [text](url) in content
                 pushContext("bracket");
                 lineStart = false;
                 lastWasNewline = false;
@@ -913,7 +872,7 @@ export function format(text: string, options: FormatOptions = {}): string {
                 consecutiveNewlines = 0;
             })
             .with({ type: "bracket_close" }, () => {
-                depth = Math.max(0, depth - 1);
+                // Note: brackets do NOT affect indentation depth
                 popContext();
                 if (result.endsWith(" ")) {
                     result = result.slice(0, -1);

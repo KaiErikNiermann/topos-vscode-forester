@@ -8,13 +8,13 @@
 
 import * as vscode from "vscode";
 import * as util from "util";
-import * as child_process from "child_process";
+import * as childProcess from "child_process";
 import { getRoot } from "./utils";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 
-const execFile = util.promisify(child_process.execFile);
+const execFile = util.promisify(childProcess.execFile);
 
 // See lib/render/Render_json.ml in forester
 export interface ForesterTree {
@@ -65,9 +65,11 @@ export function initStatusBar(context: vscode.ExtensionContext) {
  * Update the status bar based on current forest status
  */
 function updateStatusBar(status: typeof forestStatus) {
-   forestStatus = status
+   forestStatus = status;
 
-   if (!statusBarItem) return;
+   if (!statusBarItem) {
+      return;
+   }
 
    if (forestStatus.updating) {
       statusBarItem.text = "$(sync~spin) Forest updating...";
@@ -89,7 +91,9 @@ export async function getTree(treeId: string): Promise<ForesterTree | null> {
    // if we can find it in our most recent successful query just return (keeps things fast)
    if (mostRecentQueryResult) {
       let tree = mostRecentQueryResult.find((entry) => entry.uri === treeId);
-      if (tree) return tree
+      if (tree) {
+         return tree;
+      }
    }
 
    const forest = await getForest();
@@ -99,20 +103,24 @@ export async function getTree(treeId: string): Promise<ForesterTree | null> {
 // await to return a forest array, handles all the caching logic
 export async function getForest({ forceReload, fastReturnStale }: { forceReload?: boolean, fastReturnStale?: boolean } = {}): Promise<Forest> {
    // If there's no query in progress (or we don't care that the data might be stale) and we have some then return it (unless we're forcing a reload). A reload is forced whenever a file changes by forestUpdatedOnDisk.
-   if ((!queryInProgressPromise || fastReturnStale) && mostRecentQueryResult && !forceReload) return mostRecentQueryResult
+   if ((!queryInProgressPromise || fastReturnStale) && mostRecentQueryResult && !forceReload) {
+      return mostRecentQueryResult;
+   }
 
    // If we have a query in progress then return the promise which will resolve to result
-   if (queryInProgressPromise && !forceReload) return queryInProgressPromise
+   if (queryInProgressPromise && !forceReload) {
+      return queryInProgressPromise;
+   }
 
    // Show starting notification (only for initial load)
    if (isInitialLoad) {
       vscode.window.showInformationMessage("🌲 Forester: Building forest cache...");
    }
 
-   queryInProgressPromise = queryForest()
+   queryInProgressPromise = queryForest();
 
    // setting the global promise and then awaiting means that if there are calls to getForest in the meantime they will await the same promise
-   const result = mostRecentQueryResult = await queryInProgressPromise
+   const result = mostRecentQueryResult = await queryInProgressPromise;
 
    forestChangeCallbacks.forEach(callback => {
       try {
@@ -128,9 +136,9 @@ export async function getForest({ forceReload, fastReturnStale }: { forceReload?
       isInitialLoad = false;
    }
 
-   queryInProgressPromise = null
+   queryInProgressPromise = null;
 
-   return mostRecentQueryResult || []
+   return mostRecentQueryResult || [];
 }
 
 // handles actually calling forester
@@ -141,63 +149,67 @@ async function queryForest(): Promise<Forest> {
    const path = config.get("path") as string ?? "forester";
    const configfile = config.get("config") as string;
 
-   const args = ["query", "all", ...(configfile ? [configfile] : [])]
-   let forester = child_process.spawn(path, args, { cwd, detached: false, stdio: "pipe", windowsHide: true });
+   const args = ["query", "all", ...(configfile ? [configfile] : [])];
+   let forester = childProcess.spawn(path, args, { cwd, detached: false, stdio: "pipe", windowsHide: true });
 
-   let timeoutToken
-   let stderr = ""
-   let stdout = ""
-   forester.stderr.on("data", (chunk) => { stderr += chunk });
-   forester.stdout.on("data", (chunk) => { stdout += chunk });
+   let timeoutToken;
+   let stderr = "";
+   let stdout = "";
+   forester.stderr.on("data", (chunk) => { stderr += chunk; });
+   forester.stdout.on("data", (chunk) => { stdout += chunk; });
 
    updateStatusBar({ updating: true });
 
    const [success, dataOrErrorMessage] = await new Promise<[boolean, { string: Omit<ForesterTree, 'uri'> } | Forest | string]>((resolve) => {
       timeoutToken = setTimeout(() => {
-         resolve([false, 'Forester timed out after 30s'])
-         forester.kill()
-      }, 30000)
+         resolve([false, 'Forester timed out after 30s']);
+         forester.kill();
+      }, 30000);
 
       forester.once('error', (error) => {
          vscode.window.showWarningMessage(`Forester: Critical error - ${error.message}`);
-         resolve([false, error.message])
-      })
+         resolve([false, error.message]);
+      });
 
       forester.once('close', (code, signal) => {
          if (signal !== null || code !== 0) {
-            resolve([false, `Forester: process exited with code ${code} and signal ${signal}.`])
+            resolve([false, `Forester: process exited with code ${code} and signal ${signal}.`]);
          } else {
             try {
-               const result = JSON.parse(stdout)
-               resolve([true, result])
+               const result = JSON.parse(stdout);
+               resolve([true, result]);
             } catch (e) {
-               resolve([false, "Forester didn't return a valid JSON response:\n" + stdout])
+               resolve([false, "Forester didn't return a valid JSON response:\n" + stdout]);
             }
          }
-      })
-   })
+      });
+   });;
 
-   clearTimeout(timeoutToken)
+   clearTimeout(timeoutToken);
 
    if (success) {
       updateStatusBar({ valid: true });
       if (Array.isArray(dataOrErrorMessage)) {
-         return dataOrErrorMessage as Forest // new query format
+         return dataOrErrorMessage as Forest; // new query format
       } else {
-         return Object.entries(dataOrErrorMessage).map(([id, entry]) => ({ uri: id, ...entry })) // old query format
+         return Object.entries(dataOrErrorMessage).map(([id, entry]) => ({ uri: id, ...entry })); // old query format
       }
    } else {
-      const errorMessage = dataOrErrorMessage + (stdout ? '\n\n' + stdout : '') + (stderr ? '\n\n' + stderr : '')
+      const errorMessage = dataOrErrorMessage + (stdout ? '\n\n' + stdout : '') + (stderr ? '\n\n' + stderr : '');
       updateStatusBar({ valid: false, error: errorMessage as string });
 
-      console.log(errorMessage)
+      console.log(errorMessage);;
 
       // if we can't get data via query try and fall back to most recent in-memory success
-      if (mostRecentQueryResult) return mostRecentQueryResult
+      if (mostRecentQueryResult) {
+         return mostRecentQueryResult;
+      }
 
       // if that doesn't work then see if we can get directly from the most recent successful build
-      const buildData = await getForestFromBuild()
-      if (buildData) return buildData
+      const buildData = await getForestFromBuild();
+      if (buildData) {
+         return buildData;
+      }
 
       // if that doesn't work then we have no usable forest
       return [];
@@ -217,10 +229,12 @@ export function initForestMonitoring(context: vscode.ExtensionContext) {
       // if the query takes 4s, and we call this a bunch of times in that time
       // then the first one will create the promise, and then rest will await it
       // and then when it's done whoever awaited first will re-do it
-      if (queryInProgressPromise) await queryInProgressPromise
+      if (queryInProgressPromise) {
+         await queryInProgressPromise;
+      }
 
-      await getForest({ forceReload: true })
-   }
+      await getForest({ forceReload: true });
+   };
 
    // Watch for .tree file changes using workspace events (more reliable than createFileSystemWatcher)
    fileEventDisposables.push(
@@ -258,7 +272,7 @@ export function initForestMonitoring(context: vscode.ExtensionContext) {
    context.subscriptions.push(...fileEventDisposables);
 
    // Trigger initial load
-   getForest({ forceReload: true })
+   getForest({ forceReload: true });
 }
 
 
@@ -306,7 +320,9 @@ export async function getForestFromBuild(): Promise<Forest | null> {
       const root = getRoot();
       const outputPath = join(root.fsPath, "output", "forest.json");
 
-      if (!existsSync(outputPath)) return null
+      if (!existsSync(outputPath)) {
+         return null;
+      }
 
       const content = await readFile(outputPath, "utf-8");
       const data = JSON.parse(content) as Forest;
@@ -355,7 +371,7 @@ export async function command(command: string[]) {
       }
       return stdout;
    } catch (e: any) {
-      const errorMessage = e.toString() + (e.stdout ? '\n\n' + e.stdout : '') + (e.stderr ? '\n\n' + e.stderr : '')
+      const errorMessage = e.toString() + (e.stdout ? '\n\n' + e.stdout : '') + (e.stderr ? '\n\n' + e.stderr : '');
 
       vscode.window.showErrorMessage(errorMessage);
    }

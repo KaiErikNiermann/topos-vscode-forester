@@ -18,6 +18,12 @@ export interface ForestConfig {
       prefixes?: string[];
       url?: string;
       home?: string;
+      latex?: {
+         document_class?: string;
+         document_class_options?: string[];
+         compile_command?: string[];
+         dvisvgm_command?: string[];
+      };
 
       /** Import trees from external forests */
       foreign?: Array<{
@@ -280,4 +286,3 @@ export function getCustomTaxonConfig(): { [key: string]: { emoji?: string; abbre
 
    return normalizedConfig;
 }
-

@@ -1149,9 +1149,6 @@ test("User's full document excerpt - codeblocks in subtree", () => {
   }
 }`;
    const result = format(input, defaultOptions);
-   console.log("=== DEBUG: User's document formatted ===");
-   console.log(result);
-   console.log("=== END DEBUG ===");
    
    // Check that codeblock closing braces are properly indented
    assertContains(result, "  \\codeblock{lean}{", "First codeblock opening should be at subtree indent");
@@ -1204,8 +1201,37 @@ test("Exact user case - closing brace at column 0", () => {
    assertEqual(result, twice, "Should be idempotent");
 });
 
+test("User's exact edge case - subtree with title containing link and codeblock", () => {
+   const input = `\\subtree{
+  \\title{[Lean representation](https://github.com/leanprover-community/mathlib4/blob/0fecc98248f62972b3fc32f83e1966c657fbb658/Mathlib/Combinatorics/Quiver/Basic.lean#L35-L47)}
+    \\p{
+      The lean representation of this construct is given as follows:
+    }
+    \\codeblock{lean}{
+      universe v v₁ v₂ u u₁ u₂
+
+      class Quiver (V : Type u) where
+        Hom : V → V → Sort v
+    }
+  }`;
+
+   const result = format(input, defaultOptions);
+   
+   // Use actual newline split
+   const realLines = result.split("\n");
+   const lastNonEmpty = realLines.filter(l => l.trim() !== "").pop() || "";
+   
+   if (lastNonEmpty !== "}") {
+      throw new Error(`Subtree closing brace should be at column 0, got: ${JSON.stringify(lastNonEmpty)}`);
+   }
+   
+   // Check idempotency
+   const twice = format(result, defaultOptions);
+   assertEqual(result, twice, "Should be idempotent");
+});
+
 // Summary
-console.log("\n=== Test Results ===");
+console.log("\\n=== Test Results ===");
 console.log(`Passed: ${testsPassed}`);
 console.log(`Failed: ${testsFailed}`);
 console.log(`Total: ${testsPassed + testsFailed}`);

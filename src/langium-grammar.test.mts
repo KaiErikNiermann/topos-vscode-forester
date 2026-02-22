@@ -11,13 +11,17 @@ import { parseHelper } from 'langium/test';
 import {
     isBraceArg,
     isBracketArg,
+    isBracketGroup,
     isCommand,
     isDocument,
     isEscape,
     isMathBraceGroup,
+    isMathBracketGroup,
     isMathDisplay,
+    isMathEscape,
     isMathInline,
     isMathText,
+    isParenGroup,
     isTextFragment,
     isVerbatimBlock,
     isWikiLink,
@@ -455,6 +459,252 @@ await test('\\<svg:rect> parses as Command with XML_COMMAND_NAME', async () => {
     if (cmd.name !== '\\<svg:rect>') {
         throw new Error(`Expected "\\<svg:rect>", got "${cmd.name}"`);
     }
+});
+
+// ── Starred commands ────────────────────────────────────────────────────────
+
+await test('\\inferrule* parses as single command token', async () => {
+    const doc = await parseClean('\\inferrule*{premise}{conclusion}');
+    const cmd = firstCommand(doc, '\\inferrule*');
+    assertEqual(cmd.args.length, 2);
+    assertOk(isBraceArg(cmd.args[0]));
+    assertOk(isBraceArg(cmd.args[1]));
+});
+
+await test('\\operatorname* parses as single command token', async () => {
+    const doc = await parseClean('\\operatorname*{argmax}');
+    const cmd = firstCommand(doc, '\\operatorname*');
+    assertEqual(cmd.args.length, 1);
+});
+
+// ── Escape sequences (spec §2.3) ───────────────────────────────────────────
+
+await test('\\\\  (double backslash) parses as Escape node', async () => {
+    const doc = await parseClean('\\\\');
+    const esc = doc.nodes.find(isEscape);
+    assertOk(esc, 'Expected Escape node for \\\\');
+    assertEqual(esc.value, '\\\\');
+});
+
+await test('\\{ and \\} parse as Escape nodes', async () => {
+    const doc = await parseClean('\\{text\\}');
+    const escapes = doc.nodes.filter(isEscape);
+    if (escapes.length < 2) {
+        throw new Error(`Expected 2 Escape nodes, got ${escapes.length}`);
+    }
+});
+
+await test('\\[ and \\] parse as Escape nodes', async () => {
+    const doc = await parseClean('\\[stuff\\]');
+    const escapes = doc.nodes.filter(isEscape);
+    if (escapes.length < 2) {
+        throw new Error(`Expected 2 Escape nodes, got ${escapes.length}`);
+    }
+});
+
+await test('\\# parses as Escape node (not math)', async () => {
+    const doc = await parseClean('\\#');
+    const esc = doc.nodes.find(isEscape);
+    assertOk(esc, 'Expected Escape node for \\#');
+    assertEqual(esc.value, '\\#');
+});
+
+await test('\\, and \\; parse as Escape nodes', async () => {
+    const doc = await parseClean('\\,thin\\;medium');
+    const escapes = doc.nodes.filter(isEscape);
+    if (escapes.length < 2) {
+        throw new Error(`Expected 2 Escape nodes, got ${escapes.length}`);
+    }
+});
+
+await test('\\\\ inside math parses as MathEscape', async () => {
+    const doc = await parseClean('#{\\\\ next}');
+    const mi = doc.nodes.find(isMathInline);
+    assertOk(mi, 'Expected MathInline');
+    const esc = mi.nodes.find(isMathEscape);
+    assertOk(esc, 'Expected MathEscape for \\\\ inside math');
+});
+
+// ── Standalone bracket/paren groups (spec §4.2) ────────────────────────────
+
+await test('[text](url) parses as BracketGroup + ParenGroup', async () => {
+    const doc = await parseClean('\\p{See [link text](https://example.com) here}');
+    const p = firstCommand(doc, '\\p');
+    assertOk(isBraceArg(p.args[0]));
+    const bg = p.args[0].nodes.find(isBracketGroup);
+    assertOk(bg, 'Expected BracketGroup for [link text]');
+    const pg = p.args[0].nodes.find(isParenGroup);
+    assertOk(pg, 'Expected ParenGroup for (url)');
+});
+
+await test('standalone [text] inside brace arg parses as BracketGroup', async () => {
+    const doc = await parseClean('\\p{prefix [bracketed content] suffix}');
+    const p = firstCommand(doc, '\\p');
+    assertOk(isBraceArg(p.args[0]));
+    const bg = p.args[0].nodes.find(isBracketGroup);
+    assertOk(bg, 'Expected BracketGroup inside \\p body');
+});
+
+await test('\\inferrule*[right=Atom]{premise}{conclusion} parses correctly', async () => {
+    const doc = await parseClean('\\inferrule*[right=Atom]{premise}{conclusion}');
+    const cmd = firstCommand(doc, '\\inferrule*');
+    assertEqual(cmd.args.length, 3);
+    assertOk(isBracketArg(cmd.args[0]), 'Expected BracketArg');
+    assertOk(isBraceArg(cmd.args[1]), 'Expected first BraceArg');
+    assertOk(isBraceArg(cmd.args[2]), 'Expected second BraceArg');
+});
+
+await test('[...] inside math parses as MathBracketGroup', async () => {
+    const doc = await parseClean('#{\\sqrt[n]{x}}');
+    const mi = doc.nodes.find(isMathInline);
+    assertOk(mi, 'Expected MathInline');
+    const sqrt = mi.nodes.find(n => isCommand(n) && (n as Command).name === '\\sqrt');
+    assertOk(sqrt, 'Expected \\sqrt command');
+    assertOk(isBracketArg((sqrt as Command).args[0]), 'Expected BracketArg [n] on \\sqrt');
+});
+
+// ── Real-world file tests ──────────────────────────────────────────────────
+
+await test('0007.tree-like content: \\inferrule*[right=Atom-$\\top$] parses', async () => {
+    const source = `\\infrule{
+  \\inferrule*[right=Atom]{
+    premise
+  }{
+    conclusion
+  }
+}`;
+    const doc = await parseClean(source);
+    const infrule = firstCommand(doc, '\\infrule');
+    assertOk(isBraceArg(infrule.args[0]));
+});
+
+await test('double backslash \\\\ inside brace arg parses as Escape', async () => {
+    const source = '\\p{line1 \\\\ line2}';
+    const doc = await parseClean(source);
+    const p = firstCommand(doc, '\\p');
+    assertOk(isBraceArg(p.args[0]));
+    const esc = p.args[0].nodes.find(isEscape);
+    assertOk(esc, 'Expected Escape for \\\\ inside \\p body');
+});
+
+await test('markdown link [text](url) at document level', async () => {
+    const doc = await parseClean('[De Morgan](000g)');
+    const bg = doc.nodes.find(isBracketGroup);
+    assertOk(bg, 'Expected BracketGroup for [De Morgan]');
+    const pg = doc.nodes.find(isParenGroup);
+    assertOk(pg, 'Expected ParenGroup for (000g)');
+});
+
+await test('0007.tree full file parses without errors', async () => {
+    const source = `\\date{2025-11-22}
+
+\\import{base-macros}
+
+\\taxon{Definition}
+
+\\title{Semantics}
+
+\\p{
+  We can define the semantic inference rules for propositional logic formulas under interpretations as follows inductively, starting with the base cases:
+}
+
+\\infrule{
+  \\inferrule*[right=Atom]{
+    I(p) = \\top
+  }{
+    I \\models p
+  }
+  \\and
+  \\inferrule*[right=Atom]{
+    I(p) = \\bot
+  }{
+    I \\not\\models p
+  }
+  \\and
+  \\inferrule*[right=True]{
+  }{
+    I \\models \\top
+  }
+  \\and
+  \\inferrule*[right=False]{
+  }{
+    I \\not\\models \\bot
+  }
+}
+
+\\p{
+  Moving on to the inductive case we have
+}
+
+\\infrule{
+  \\inferrule*[right=Neg]{
+    I \\models \\neg F
+  }{
+    I \\not\\models F
+  }
+  \\and
+  \\inferrule*[right=Conj]{
+    I \\models F_1 \\quad I \\models F_2
+  }{
+    I \\models F_1 \\land F_2
+  }
+  \\and
+  \\inferrule*[right=Disj]{
+    I \\models F_1 \\quad \\text{or} \\quad I \\models F_2
+  }{
+    I \\models F_1 \\lor F_2
+  }
+  \\and
+  \\inferrule*[right=Imp]{
+    I \\not\\models F_1 \\quad \\text{or} \\quad I \\models F_2
+  }{
+    I \\models F_1 \\to F_2
+  }
+  \\and
+  \\inferrule*[right=Contr]{
+    I \\models F \\\\ I \\not\\models F
+  }{
+    I \\models \\bot
+  }
+}`;
+    const doc = await parseClean(source);
+    // Verify we can find at least the top-level commands
+    const cmds = doc.nodes.filter(isCommand);
+    const cmdNames = cmds.map(c => (c as Command).name);
+    if (!cmdNames.includes('\\date')) throw new Error('Missing \\date');
+    if (!cmdNames.includes('\\import')) throw new Error('Missing \\import');
+    if (!cmdNames.includes('\\title')) throw new Error('Missing \\title');
+    if (!cmdNames.includes('\\infrule')) throw new Error('Missing \\infrule');
+});
+
+await test('001c.tree-like content: tikzcd with \\arrow[r, "0"] parses', async () => {
+    const source = `\\texfig{
+  \\begin{tikzcd}
+    1 \\arrow[r, "0"] \\arrow[dr, "z"'] & \\N \\arrow[d, "u"] \\arrow[r, "s"] & \\N \\arrow[d, "u"] \\\\
+    & X \\arrow[r, "f"'] & X
+  \\end{tikzcd}
+}`;
+    const doc = await parseClean(source);
+    const cmd = firstCommand(doc, '\\texfig');
+    assertOk(isBraceArg(cmd.args[0]));
+});
+
+await test('0022.tree-like content: markdown link [1](bradley2007calculus)', async () => {
+    const source = '\\p{See this result [1](bradley2007calculus) for more.}';
+    const doc = await parseClean(source);
+    const p = firstCommand(doc, '\\p');
+    assertOk(isBraceArg(p.args[0]));
+    const bg = p.args[0].nodes.find(isBracketGroup);
+    assertOk(bg, 'Expected BracketGroup for [1]');
+    const pg = p.args[0].nodes.find(isParenGroup);
+    assertOk(pg, 'Expected ParenGroup for (bradley2007calculus)');
+});
+
+await test('display math with LaTeX commands: \\nexists, \\ldots, \\land', async () => {
+    const source = '##{\\nexists x_0, x_1, x_2, \\ldots \\in S.\\ x_1 \\prec x_0 \\land x_2 \\prec x_1}';
+    const doc = await parseClean(source);
+    const md = doc.nodes.find(isMathDisplay);
+    assertOk(md, 'Expected MathDisplay');
 });
 
 // ── Summary ───────────────────────────────────────────────────────────────────

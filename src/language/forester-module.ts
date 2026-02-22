@@ -40,7 +40,7 @@ export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = 
         SemanticTokenProvider: (services) => new ForesterSemanticTokenProvider(services),
         DefinitionProvider: (services) => new ForesterDefinitionProvider(services),
         CodeLensProvider: (services) => new ForesterCodeLensProvider(services),
-        CodeActionProvider: (_services) => new ForesterCodeActionProvider(),
+        CodeActionProvider: (services) => new ForesterCodeActionProvider(services),
     },
 };
 

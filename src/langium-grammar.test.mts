@@ -964,6 +964,58 @@ await test('peek range: document with no prose falls back to title range', async
     }
 });
 
+// ── Code action: namespace qualify prerequisites (Task 3) ─────────────────────
+// findNamespaceCandidates relies on the AST structure of \namespace{prefix}{body}
+// where body contains \def\name pairs.  These tests verify the parse structure.
+
+await test('namespace: \\namespace{prefix}{\\def\\foo{}} parses with two BraceArgs', async () => {
+    const source = '\\namespace{myprefix}{\\def\\foo{}}';
+    const doc = await parseClean(source);
+    const nsCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\namespace');
+    assertOk(nsCmd, 'Expected \\namespace command at top level');
+    if (!isCommand(nsCmd)) throw new Error('Not a Command');
+    const braceArgs = nsCmd.args.filter(isBraceArg);
+    assertEqual(braceArgs.length, 2, 'Expected 2 BraceArgs on \\namespace');
+
+    // First BraceArg: prefix name
+    const prefixFrag = braceArgs[0].nodes.find(isTextFragment);
+    assertOk(prefixFrag, 'Expected TextFragment inside prefix arg');
+    assertEqual(prefixFrag.value.trim(), 'myprefix', 'Prefix should be "myprefix"');
+
+    // Second BraceArg: body should contain \\def and \\foo as sibling Commands
+    const bodyNodes = braceArgs[1].nodes;
+    const defCmd = bodyNodes.find(n => isCommand(n) && (n as Command).name === '\\def');
+    assertOk(defCmd, 'Expected \\def Command inside namespace body');
+    const fooCmd = bodyNodes.find(n => isCommand(n) && (n as Command).name === '\\foo');
+    assertOk(fooCmd, 'Expected \\foo Command inside namespace body');
+
+    // \\def must immediately precede \\foo
+    const defIdx = bodyNodes.indexOf(defCmd);
+    const fooIdx = bodyNodes.indexOf(fooCmd);
+    if (fooIdx !== defIdx + 1) {
+        throw new Error(
+            `Expected \\foo to immediately follow \\def (indices ${defIdx}, ${fooIdx})`,
+        );
+    }
+});
+
+await test('namespace: body without \\def has no binding pair', async () => {
+    // \namespace{ns}{\foo{}} — \foo is called but not defined here
+    const source = '\\namespace{ns}{\\foo{}}';
+    const doc = await parseClean(source);
+    const nsCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\namespace');
+    assertOk(nsCmd, 'Expected \\namespace command');
+    if (!isCommand(nsCmd)) throw new Error('Not a Command');
+    const bodyArg = nsCmd.args.filter(isBraceArg)[1];
+    assertOk(bodyArg, 'Expected body BraceArg');
+
+    // No \def inside — body has only \foo (a call, not a binding)
+    const defCmd = bodyArg.nodes.find(n => isCommand(n) && (n as Command).name === '\\def');
+    if (defCmd !== undefined) {
+        throw new Error('Should not have \\def in body that only calls \\foo');
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

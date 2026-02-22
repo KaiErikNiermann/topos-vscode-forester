@@ -1,0 +1,14 @@
+{
+    "$schema": "https://langium.org/schema/v4.0/langium-config.schema.json",
+    "projectName": "Forester",
+    "languages": [
+        {
+            "id": "forester",
+            "grammar": "src/language/forester.langium",
+            "fileExtensions": [".tree"],
+            "output": {
+                "path": "src/language/generated"
+            }
+        }
+    ]
+}

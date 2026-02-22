@@ -14,9 +14,14 @@ import {
 
 /**
  * A document formatter for Forester (.tree) files.
- * 
- * This file contains the VS Code integration (providers, commands).
- * The core formatting logic is in formatter-core.ts.
+ *
+ * The VSCode integration (providers, commands) lives here.
+ * Core formatting logic is in formatter-core.ts (synchronous, CJS-compatible).
+ *
+ * Task 21 note: src/language/format-standalone.ts provides a Langium-backed
+ * async formatDocument() that tests (task 22) use directly.  The full
+ * production switch from formatter-core.ts to the Langium LSP formatter
+ * happens in task 31 (wire Langium language server into extension.ts).
  */
 
 export class ForesterDocumentFormattingEditProvider implements vscode.DocumentFormattingEditProvider {

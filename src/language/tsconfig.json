@@ -1,0 +1,14 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": ".",
+        "outDir": "../../out/language",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "declaration": false
+    },
+    "include": [
+        "**/*.ts"
+    ],
+    "exclude": []
+}

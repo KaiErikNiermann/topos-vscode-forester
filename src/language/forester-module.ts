@@ -1,42 +1,53 @@
-import type { LangiumServices, LangiumSharedServices, Module, PartialLangiumServices } from 'langium/lsp';
-import { createDefaultModule, createDefaultSharedModule, DefaultSharedModuleContext } from 'langium/lsp';
+/**
+ * Langium dependency-injection module for the Forester language.
+ * Wires custom services (formatter, hover provider) into the Langium container.
+ */
+import type { LangiumSharedCoreServices, Module } from 'langium';
+import { inject } from 'langium';
+import type { DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, PartialLangiumServices } from 'langium/lsp';
+import { createDefaultModule, createDefaultSharedModule } from 'langium/lsp';
+import { ForesterFormatter } from './forester-formatter.js';
 import { ForesterGeneratedModule, ForesterGeneratedSharedModule } from './generated/module.js';
 
 /**
- * Union type of all services provided by the Forester language module.
- * Additional services (formatter, hover provider, etc.) will be added here
- * as they are migrated from hand-rolled implementations (tasks 15-27).
+ * Forester-specific services added on top of the default Langium LSP services.
+ * Hover provider will be added in tasks 23-26.
  */
-export type ForesterAddedServices = {
-    // Reserved for future Forester-specific services
-};
+export type ForesterAddedServices = Record<string, never>;
 
-/**
- * The combined type of all services provided by this module.
- */
+/** Combined service type for the Forester language. */
 export type ForesterServices = LangiumServices & ForesterAddedServices;
 
 /**
- * Dependency-injection module for Forester-specific services.
- * Register custom formatter and hover providers here once implemented
- * (see tasks 15, 20, 23-26).
+ * DI module registering Forester-specific overrides.
+ *
+ * Task 15-20: ForesterFormatter registered as lsp.Formatter.
+ * Task 23-26: HoverProvider will be added here once implemented.
  */
-export const ForesterModule: Module<ForesterServices, PartialLangiumServices & ForesterAddedServices> = {
-    // lsp: {
-    //   Formatter: (services) => new ForesterFormatter(services),
-    //   HoverProvider: (services) => new ForesterHoverProvider(services),
-    // }
+export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = {
+    lsp: {
+        Formatter: () => new ForesterFormatter(),
+    },
 };
 
 /**
  * Create the full set of Langium services for the Forester language.
- * Called from main.ts (language server) and from extension.ts (embedding).
+ * Called from main.ts (language server entry point).
  */
 export function createForesterServices(context: DefaultSharedModuleContext): {
     shared: LangiumSharedServices;
     Forester: ForesterServices;
 } {
-    const shared = createDefaultSharedModule(context, ForesterGeneratedSharedModule);
-    const Forester = createDefaultModule({ shared }, ForesterGeneratedModule, ForesterModule);
+    const shared = inject(
+        createDefaultSharedModule(context),
+        ForesterGeneratedSharedModule,
+    ) as LangiumSharedServices;
+
+    const Forester = inject(
+        createDefaultModule({ shared }),
+        ForesterGeneratedModule,
+        ForesterModule,
+    ) as ForesterServices;
+
     return { shared, Forester };
 }

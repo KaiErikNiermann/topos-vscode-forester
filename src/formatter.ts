@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import { getIgnoredCommandsSync, getSubtreeMacrosSync } from "./formatter-config";
 import {
@@ -12,84 +13,95 @@ import {
    CODE_CONTENT_COMMANDS
 } from "./formatter-core";
 
-/**
- * A document formatter for Forester (.tree) files.
- *
- * The VSCode integration (providers, commands) lives here.
- * Core formatting logic is in formatter-core.ts (synchronous, CJS-compatible).
- *
- * Task 21 note: src/language/format-standalone.ts provides a Langium-backed
- * async formatDocument() that tests (task 22) use directly.  The full
- * production switch from formatter-core.ts to the Langium LSP formatter
- * happens in task 31 (wire Langium language server into extension.ts).
- */
+// ── Langium formatter integration (task 2) ───────────────────────────────────
+//
+// format-standalone.mjs is a self-contained ESM bundle (built by esbuild from
+// src/language/format-standalone.ts).  Because langium is ESM-only we cannot
+// statically import it from the CJS extension host; instead we use a dynamic
+// import() via `new Function` so esbuild does not try to inline or CJS-ify it.
+//
+// The module is loaded lazily on first use and then cached for the lifetime of
+// the extension host process.
+
+type LangiumFormatFn = (
+   text: string,
+   config?: Partial<{ ignoredCommands: Set<string>; subtreeMacros: Set<string> }>,
+   tabSize?: number,
+   insertSpaces?: boolean
+) => Promise<string>;
+
+let _langiumFormatFn: LangiumFormatFn | undefined;
+
+async function getLangiumFormat(): Promise<LangiumFormatFn> {
+   if (!_langiumFormatFn) {
+      // Use `new Function` so esbuild does not convert this import() to require()
+      const dynamicImport = new Function('p', 'return import(p)') as
+         (p: string) => Promise<{ formatDocument: LangiumFormatFn }>;
+      const bundlePath = path.join(__dirname, 'language', 'format-standalone.mjs');
+      const mod = await dynamicImport(bundlePath);
+      _langiumFormatFn = mod.formatDocument;
+   }
+   return _langiumFormatFn;
+}
+
+// ── Providers ────────────────────────────────────────────────────────────────
 
 export class ForesterDocumentFormattingEditProvider implements vscode.DocumentFormattingEditProvider {
-   provideDocumentFormattingEdits(
+   async provideDocumentFormattingEdits(
       document: vscode.TextDocument,
       options: vscode.FormattingOptions,
       _token: vscode.CancellationToken
-   ): vscode.TextEdit[] {
+   ): Promise<vscode.TextEdit[]> {
       const text = document.getText();
       const ignoredCommands = getIgnoredCommandsSync();
       const subtreeMacros = getSubtreeMacrosSync();
-      const formatted = format(text, {
-         tabSize: options.tabSize,
-         insertSpaces: options.insertSpaces,
-         ignoredCommands,
-         subtreeMacros
-      });
 
-      if (text === formatted) {
+      try {
+         const langiumFormat = await getLangiumFormat();
+         const formatted = await langiumFormat(text, { ignoredCommands, subtreeMacros }, options.tabSize, options.insertSpaces);
+
+         if (text === formatted) return [];
+
+         const fullRange = new vscode.Range(
+            document.positionAt(0),
+            document.positionAt(text.length)
+         );
+         return [vscode.TextEdit.replace(fullRange, formatted)];
+      } catch (err) {
+         console.error('[forester] Langium formatter error:', err);
          return [];
       }
-
-      const fullRange = new vscode.Range(
-         document.positionAt(0),
-         document.positionAt(text.length)
-      );
-
-      return [vscode.TextEdit.replace(fullRange, formatted)];
    }
 }
 
 export class ForesterDocumentRangeFormattingEditProvider implements vscode.DocumentRangeFormattingEditProvider {
-   provideDocumentRangeFormattingEdits(
+   async provideDocumentRangeFormattingEdits(
       document: vscode.TextDocument,
-      range: vscode.Range,
+      _range: vscode.Range,
       options: vscode.FormattingOptions,
       _token: vscode.CancellationToken
-   ): vscode.TextEdit[] {
-      // For range formatting, we need to be careful about context
-      // For simplicity, we'll format the whole document and return only the changes in the range
-      // This ensures proper indentation based on context
-
+   ): Promise<vscode.TextEdit[]> {
+      // Range formatting: format the whole document (Langium works on the full
+      // parse tree) and replace the entire file — same strategy as before.
       const text = document.getText();
       const ignoredCommands = getIgnoredCommandsSync();
       const subtreeMacros = getSubtreeMacrosSync();
-      const formatted = format(text, {
-         tabSize: options.tabSize,
-         insertSpaces: options.insertSpaces,
-         ignoredCommands,
-         subtreeMacros
-      });
 
-      if (text === formatted) {
+      try {
+         const langiumFormat = await getLangiumFormat();
+         const formatted = await langiumFormat(text, { ignoredCommands, subtreeMacros }, options.tabSize, options.insertSpaces);
+
+         if (text === formatted) return [];
+
+         const fullRange = new vscode.Range(
+            document.positionAt(0),
+            document.positionAt(text.length)
+         );
+         return [vscode.TextEdit.replace(fullRange, formatted)];
+      } catch (err) {
+         console.error('[forester] Langium formatter error:', err);
          return [];
       }
-
-      // Get the formatted text for the selected range
-      const startOffset = document.offsetAt(range.start);
-      const endOffset = document.offsetAt(range.end);
-
-      // Find corresponding positions in formatted text
-      // This is a simplified approach - we replace the whole document
-      const fullRange = new vscode.Range(
-         document.positionAt(0),
-         document.positionAt(text.length)
-      );
-
-      return [vscode.TextEdit.replace(fullRange, formatted)];
    }
 }
 

@@ -52,6 +52,30 @@
             "icon": "$(file-code)"
          },
          {
+            "command": "forester.configureLinkAliases",
+            "title": "Configure Link Aliases",
+            "category": "Forester",
+            "icon": "$(symbol-reference)"
+         },
+         {
+            "command": "forester.createLinkAliasConfig",
+            "title": "Create Link Aliases Config File",
+            "category": "Forester",
+            "icon": "$(new-file)"
+         },
+         {
+            "command": "forester.addLinkPattern",
+            "title": "Add Link Alias Pattern",
+            "category": "Forester",
+            "icon": "$(add)"
+         },
+         {
+            "command": "forester.removeLinkPattern",
+            "title": "Remove Link Alias Pattern",
+            "category": "Forester",
+            "icon": "$(remove)"
+         },
+         {
             "command": "forester.newTree",
             "title": "New Tree",
             "category": "Forester",
@@ -172,6 +196,16 @@
                "default": false,
                "description": "Controls whether the tree ID is shown in completions."
             },
+            "forester.subtree.autoId.enabled": {
+               "type": "boolean",
+               "default": false,
+               "description": "When enabled, new \\subtree blocks get the next canonical 4-character lowercase base36 ID (^[0-9a-z]{4}$), ignoring arbitrary text IDs."
+            },
+            "forester.subtree.autoId.template": {
+               "type": "string",
+               "default": "\\subtree[<id>]{\n  \\title{$1}\n}$0",
+               "markdownDescription": "Template used by subtree completion. Use `<id>` for the generated canonical 4-character base36 subtree ID and snippet placeholders like `$1`/`$0`."
+            },
             "forester.create.random": {
                "type": "boolean",
                "default": false,
@@ -181,6 +215,34 @@
                "type": "boolean",
                "default": true,
                "description": "Show inline title hints next to transclude/import/export commands."
+            },
+            "forester.hover.latex.enabled": {
+               "type": "boolean",
+               "default": true,
+               "description": "Render LaTeX previews on hover for #{...}, ##{...}, and \\tex{...}{...}."
+            },
+            "forester.inlayHints.tagClosures.enabled": {
+               "type": "boolean",
+               "default": true,
+               "description": "Show an inlay hint (for example `ul`) after a closing brace `}` to indicate which command opened the block."
+            },
+            "forester.inlayHints.tagClosures.tags": {
+               "type": "array",
+               "items": {
+                  "type": "string"
+               },
+               "default": [
+                  "ol",
+                  "ul",
+                  "li",
+                  "p",
+                  "subtree",
+                  "##",
+                  "tex",
+                  "texmath",
+                  "solution"
+               ],
+               "description": "Allowlist of Forester tag labels that receive closure inlay hints. Use command names with or without a leading backslash (for example `ul` or `\\ul`) and `##` for display-math blocks."
             },
             "forester.languageTool.enable": {
                "type": "boolean",
@@ -258,7 +320,7 @@
             "editor.tabSize": 2,
             "editor.wordBasedSuggestions": "off",
             "editor.formatOnSave": false,
-            "editor.defaultFormatter": "JarredFilmer.topos-vscode-forester"
+            "editor.defaultFormatter": "jarredfilmer.topos-vscode-forester"
          }
       },
       "languages": [
@@ -319,14 +381,21 @@
       }
    },
    "scripts": {
-      "vscode:prepublish": "npm run compile",
-      "compile": "tsc -p ./",
-      "build": "tsc -p ./",
-      "watch": "tsc -watch -p ./",
+      "vscode:prepublish": "npm run package-ext",
+      "compile": "npm run check-types && node esbuild.js",
+      "check-types": "tsc --noEmit",
+      "watch": "npm-run-all -p watch:*",
+      "watch:esbuild": "node esbuild.js --watch",
+      "watch:tsc": "tsc --noEmit --watch --preserveWatchOutput",
+      "build": "npm run compile",
       "lint": "eslint src --ext ts",
       "test:formatter": "npx tsx src/formatter.test.ts",
+      "test:latex-hover": "npx tsx src/latex-hover-core.test.ts",
+      "test:tag-closure-inlay": "npx tsx src/tag-closure-inlay-core.test.ts",
+      "test:subtree-auto-id": "npx tsx src/subtree-auto-id.test.ts",
       "test:language-server": "npm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
-      "package": "vsce package",
+      "package-ext": "npm run check-types && node esbuild.js --production",
+      "package": "npm run package-ext && vsce package",
       "install-local": "npm run package && code --install-extension topos-vscode-forester-*.vsix",
       "package-install": "npm run package && code --install-extension topos-vscode-forester-*.vsix"
    },
@@ -335,12 +404,16 @@
       "@types/vscode": "^1.86.0",
       "@typescript-eslint/eslint-plugin": "^6.19.1",
       "@typescript-eslint/parser": "^6.19.1",
+      "esbuild": "^0.27.2",
       "eslint": "^8.56.0",
+      "langium-cli": "^4.2.0",
+      "npm-run-all": "^4.1.5",
       "tsx": "^4.21.0",
       "typescript": "^5.3.3"
    },
    "dependencies": {
       "@vscode/codicons": "^0.0.41",
+      "langium": "^4.2.1",
       "smol-toml": "^1.5.2",
       "ts-pattern": "^5.9.0",
       "vscode-languageclient": "^9.0.1"

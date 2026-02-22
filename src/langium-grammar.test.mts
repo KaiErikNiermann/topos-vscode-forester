@@ -912,6 +912,58 @@ await test('\\transclude without cycle: no cycle warning', async () => {
     }
 });
 
+// ── Definition provider: peek range prerequisites (Task 11) ──────────────────
+// computePeekRange relies on \title commands and TextFragments having CstNode
+// ranges attached by the Langium parser.  The tests below verify those
+// preconditions so that a malfunctioning parse would be caught here.
+
+await test('peek range: \\title has CstNode range starting at line 0', async () => {
+    const doc = await parseClean('\\title{My Tree}');
+    const titleCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\title');
+    assertOk(titleCmd, 'Expected \\title command at top level');
+    assertOk(titleCmd.$cstNode, 'Expected CstNode on \\title command');
+    assertEqual(titleCmd.$cstNode.range.start.line, 0, '\\title should start on line 0');
+    assertEqual(titleCmd.$cstNode.range.end.line, 0, '\\title should end on line 0 (single line)');
+});
+
+await test('peek range: prose TextFragment on line after \\title has CstNode range', async () => {
+    // This mirrors a typical .tree file where preamble commands precede body text.
+    const source = '\\title{My Tree}\nSome prose text here.';
+    const doc = await parseClean(source);
+    // Find the first non-whitespace TextFragment at document level
+    const prose = doc.nodes.find(
+        n => isTextFragment(n) && n.value.trim().length > 0,
+    );
+    assertOk(prose, 'Expected non-empty TextFragment at document level');
+    assertOk(prose.$cstNode, 'Expected CstNode on TextFragment');
+    // Text starts on line 1 (after the \title line)
+    if (prose.$cstNode.range.start.line < 1) {
+        throw new Error(
+            `Expected prose to start on line ≥ 1, got line ${prose.$cstNode.range.start.line}`,
+        );
+    }
+});
+
+await test('peek range: document with no prose falls back to title range', async () => {
+    // A preamble-only document: no direct text children, just commands.
+    const source = '\\title{Only a Title}\n\\taxon{theorem}';
+    const doc = await parseClean(source);
+    const titleCmd = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\title');
+    assertOk(titleCmd, 'Expected \\title command');
+    assertOk(titleCmd.$cstNode, 'Expected CstNode on \\title command');
+    // The only non-whitespace TextFragment would be inside the \title BraceArg,
+    // NOT a direct child of Document (its $container is BraceArg, not Document).
+    const directProse = doc.nodes.find(
+        n => isTextFragment(n) && n.value.trim().length > 0,
+    );
+    // Should be undefined — all text is nested inside command args
+    if (directProse !== undefined) {
+        throw new Error(
+            `Expected no direct prose in preamble-only document, got TextFragment: ${JSON.stringify(directProse.value)}`,
+        );
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

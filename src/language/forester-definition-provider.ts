@@ -20,6 +20,7 @@ import { LocationLink } from 'vscode-languageserver';
 import {
     isCommand,
     isBraceArg,
+    isDocument,
     isTextFragment,
     type Command,
 } from './generated/ast.js';
@@ -82,6 +83,10 @@ export class ForesterDefinitionProvider implements DefinitionProvider {
     /**
      * Search all loaded workspace documents for a .tree file matching the given
      * tree-id (filename without extension).
+     *
+     * The returned LocationLink uses a targetRange that spans the \title command
+     * through the first prose paragraph, so the VSCode peek panel shows meaningful
+     * content rather than just line 0.
      */
     private resolveTreeId(treeId: string, sourceRange: SimpleRange): LocationLink[] | undefined {
         const targetFilename = `${treeId}.tree`;
@@ -89,11 +94,54 @@ export class ForesterDefinitionProvider implements DefinitionProvider {
             const uriPath = doc.uri.path;
             const basename = uriPath.slice(uriPath.lastIndexOf('/') + 1);
             if (basename === targetFilename) {
-                const zero = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
-                return [LocationLink.create(doc.uri.toString(), zero, zero, sourceRange)];
+                const { targetRange, selectionRange } = this.computePeekRange(doc);
+                return [LocationLink.create(doc.uri.toString(), targetRange, selectionRange, sourceRange)];
             }
         }
         return undefined;
+    }
+
+    /**
+     * Compute the peek panel range for a target .tree document.
+     *
+     * targetRange    – visible region in the peek panel: from line 0 to the end
+     *                  of the first prose paragraph (or the title line, whichever
+     *                  is later), capped at MAX_PEEK_LINES.
+     * selectionRange – the \title{…} command range, which VSCode highlights as
+     *                  the "definition" inside the peek panel.
+     */
+    private computePeekRange(doc: LangiumDocument): { targetRange: SimpleRange; selectionRange: SimpleRange } {
+        const MAX_PEEK_LINES = 30;
+        const zero: SimpleRange = { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+
+        const root = doc.parseResult.value;
+        if (!isDocument(root)) {
+            return { targetRange: zero, selectionRange: zero };
+        }
+
+        let titleRange: SimpleRange | undefined;
+        let firstProseEnd: { line: number; character: number } | undefined;
+
+        for (const node of root.nodes) {
+            if (!titleRange && isCommand(node) && node.name === '\\title') {
+                const cst = node.$cstNode;
+                if (cst) titleRange = cst.range;
+            }
+            if (!firstProseEnd && isTextFragment(node) && node.value.trim().length > 0) {
+                const cst = node.$cstNode;
+                if (cst) firstProseEnd = cst.range.end;
+            }
+            if (titleRange && firstProseEnd) break;
+        }
+
+        const selectionRange = titleRange ?? zero;
+
+        const rawEnd = firstProseEnd ?? titleRange?.end ?? { line: 0, character: 0 };
+        const endLine = Math.min(rawEnd.line, MAX_PEEK_LINES);
+        const cappedEnd = rawEnd.line > MAX_PEEK_LINES ? { line: endLine, character: 0 } : rawEnd;
+        const targetRange: SimpleRange = { start: { line: 0, character: 0 }, end: cappedEnd };
+
+        return { targetRange, selectionRange };
     }
 
     /**

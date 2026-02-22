@@ -41,17 +41,22 @@ entry Document:
     nodes+=Node*;
 
 // Top-level structural nodes
+// Per spec §4.2, groups [ ] ( ) are first-class nodes (not just command args).
+// This allows [text](url) markdown links, standalone [groups], and (groups)
+// to appear at any node position without error.
 Node:
-    Command | VerbatimBlock | MathDisplay | MathInline | WikiLink | TextFragment | Escape;
+    Command | VerbatimBlock | MathDisplay | MathInline | WikiLink
+    | BracketGroup | ParenGroup | TextFragment | Escape;
 
 // ============================================================================
 // TASK 5 — Terminal rules
 // ============================================================================
 
 // Backslash command: \name
-//   name chars: A-Z a-z 0-9  -  /  ?
+//   name chars: A-Z a-z 0-9  -  /  ?  *
+//   The * allows starred LaTeX commands like \inferrule*, \operatorname*
 //   (mirrors the regex in formatter-core.ts tokenize())
-terminal COMMAND_NAME: /\\[A-Za-z0-9\-\/\?]+/;
+terminal COMMAND_NAME: /\\[A-Za-z0-9\-\/\?\*]+/;
 
 // XML-style element command: \<tag> or \<prefix:tag>
 //   e.g. \<html:div>, \<svg:rect>
@@ -63,9 +68,10 @@ terminal XML_COMMAND_NAME: /\\<[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?>
 //   Must be ordered before the '[' keyword (longer match wins).
 terminal WIKI_LINK: /\[\[[^\]\n]*\]\]/;
 
-// Escaped percent  \%  — treat as literal text, not a comment start
-// (the tokenizer special-cases this before the comment rule)
-terminal ESCAPED_PERCENT: /\\%/;
+// Escape sequences per spec §2.3: \\ \{ \} \[ \] \# \% \  \, \" \` \_ \; \|
+// These produce their literal character. Covers all special-char escapes.
+// Must be ordered before COMMAND_NAME (Langium: longer/earlier match wins).
+terminal ESCAPE: /\\[\\{}\[\]#%, "`;_|]/;
 
 // Math delimiters — ##{ must be checked before #{ by Langium terminal ordering
 terminal HASH_DISPLAY: /##{/;
@@ -136,6 +142,19 @@ ParenArg:
     '(' nodes+=Node* ')';
 
 // ============================================================================
+// Standalone groups (spec §4.2: group := '[' nodes ']' | '(' nodes ')')
+// These allow [text](url) markdown links and standalone groups at any position.
+// Brace groups { } are already implicit via BraceArg in command args;
+// standalone bare { } groups at node level are less common but could be added later.
+// ============================================================================
+
+BracketGroup:
+    '[' nodes+=Node* ']';
+
+ParenGroup:
+    '(' nodes+=Node* ')';
+
+// ============================================================================
 // TASK 8 — Verbatim blocks
 //   ``` fences → captured as a single VERBATIM_BLOCK terminal above.
 //   \startverb{…} / \stopverb → parsed as ordinary Commands; the formatter
@@ -161,13 +180,26 @@ MathInline:
 MathDisplay:
     HASH_DISPLAY nodes+=MathNode* '}';
 
-// Nodes inside math: nested commands, more math, explicit brace groups, text
+// Nodes inside math: nested commands, more math, explicit brace/bracket/paren groups,
+// escapes (e.g. \\ line break), and text
 MathNode:
-    Command | MathInline | MathDisplay | MathBraceGroup | MathText;
+    Command | MathInline | MathDisplay | MathBraceGroup
+    | MathBracketGroup | MathParenGroup | MathEscape | MathText;
 
 // Explicit { } group inside math (e.g. for TeX grouping)
 MathBraceGroup:
     '{' nodes+=MathNode* '}';
+
+// Bracket and paren groups inside math (e.g. \binom[...], subscripts, tikzcd \arrow[...])
+MathBracketGroup:
+    '[' nodes+=MathNode* ']';
+
+MathParenGroup:
+    '(' nodes+=MathNode* ')';
+
+// Escape sequence inside math (e.g. \\ for line break, \{ for literal brace)
+MathEscape:
+    value=ESCAPE;
 
 // Raw text content inside math (LaTeX tokens, digits, operators, …)
 MathText:
@@ -177,9 +209,9 @@ MathText:
 // Escaped percent and plain text fragments
 // ============================================================================
 
-// \% — escaped percent sign (not a comment)
+// Escape sequence (spec §2.3): backslash + special char → literal char
 Escape:
-    value=ESCAPED_PERCENT;
+    value=ESCAPE;
 
 // Plain text run
 TextFragment:

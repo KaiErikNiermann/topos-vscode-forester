@@ -2,8 +2,8 @@
   "name": "forester-lang-support",
   "displayName": "Forester Language Support",
   "description": "Enhanced VSCode support for forester",
-  "repository": "github:kniermann/forester-lang-support",
-  "publisher": "kniermann",
+  "repository": "github:KaiErikNiermann/topos-vscode-forester",
+  "publisher": "KaiErikNiermann",
   "version": "0.3.0",
   "packageManager": "pnpm@10.14.0",
   "engines": {
@@ -372,7 +372,7 @@
         "editor.tabSize": 2,
         "editor.wordBasedSuggestions": "off",
         "editor.formatOnSave": false,
-        "editor.defaultFormatter": "kniermann.forester-lang-support"
+        "editor.defaultFormatter": "KaiErikNiermann.forester-lang-support"
       }
     },
     "languages": [

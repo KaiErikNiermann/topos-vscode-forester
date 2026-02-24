@@ -130,7 +130,7 @@ File: ${filePath}
 Issue: ${details}
 
 This isn't supposed to happen: please contact the extension maintainer with this code snippet to fix the formatter.
-GitHub: https://github.com/kniermann/forester-lang-support/issues
+GitHub: https://github.com/KaiErikNiermann/topos-vscode-forester/issues
 
 --- ORIGINAL CONTENT ---
 ${originalContent.slice(0, 2000)}${originalContent.length > 2000 ? "\n... (truncated)" : ""}

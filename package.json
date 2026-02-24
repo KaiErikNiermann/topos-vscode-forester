@@ -1,6 +1,6 @@
 {
-  "name": "forester-lang-support",
-  "displayName": "Forester Language Support",
+  "name": "forest-keeper",
+  "displayName": "Forester Language Integration",
   "description": "Enhanced VSCode support for forester",
   "repository": "github:KaiErikNiermann/topos-vscode-forester",
   "publisher": "KaiErikNiermann",
@@ -372,7 +372,7 @@
         "editor.tabSize": 2,
         "editor.wordBasedSuggestions": "off",
         "editor.formatOnSave": false,
-        "editor.defaultFormatter": "KaiErikNiermann.forester-lang-support"
+        "editor.defaultFormatter": "KaiErikNiermann.forest-keeper"
       }
     },
     "languages": [
@@ -454,9 +454,9 @@
     "test:subtree-auto-id": "pnpm dlx tsx src/subtree-auto-id.test.ts",
     "test:language-server": "pnpm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
     "package-ext": "pnpm run check-types && node esbuild.js --production",
-    "package": "pnpm run package-ext && vsce package",
-    "install-local": "pnpm run package && code --install-extension forester-lang-support-*.vsix",
-    "package-install": "pnpm run package && code --install-extension forester-lang-support-*.vsix"
+    "package": "pnpm run package-ext && vsce package --no-dependencies",
+    "install-local": "pnpm run package && code --install-extension forest-keeper-*.vsix",
+    "package-install": "pnpm run package && code --install-extension forest-keeper-*.vsix"
   },
   "devDependencies": {
     "@types/node": "^18.19.130",

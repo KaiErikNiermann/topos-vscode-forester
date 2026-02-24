@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="resources/banner.svg" alt="Forester" height="160">
+  <img src="https://raw.githubusercontent.com/KaiErikNiermann/topos-vscode-forester/main/resources/banner.png" alt="Forester" height="160">
 </p>
 
 <p align="center">
@@ -21,11 +21,11 @@
 - **Tag closure inlay hints** — shows the opening command name after its closing brace (e.g., `} ul`). Configurable allowlist of tags.
 - **Subtree auto-ID** — new `\subtree{...}` blocks get the next canonical 4-character lowercase base36 ID automatically (opt-in).
 
-![navigate links](demo/link.gif)
+![navigate links](https://raw.githubusercontent.com/KaiErikNiermann/topos-vscode-forester/main/demo/link.gif)
 
-![auto completion](demo/image.png)
+![auto completion](https://raw.githubusercontent.com/KaiErikNiermann/topos-vscode-forester/main/demo/image.png)
 
-![inline hints](demo/hint.png)
+![inline hints](https://raw.githubusercontent.com/KaiErikNiermann/topos-vscode-forester/main/demo/hint.png)
 
 ---
 
@@ -48,7 +48,7 @@
 - **`Forester: Rename Tree`** — rename the active tree's title and/or taxon. Also triggers when hovering over a link.
 - **`Forester: Set Default Prefix / Template / Open Behaviour`** — configure creation defaults without touching settings JSON.
 
-![new tree](demo/new-tree.png)
+![new tree](https://raw.githubusercontent.com/KaiErikNiermann/topos-vscode-forester/main/demo/new-tree.png)
 
 ---
 
@@ -63,7 +63,7 @@ Four views are registered in the Explorer sidebar under the **Forester** panel:
 | **Forester Backlinks** | All trees that transclude, import, export, or reference the active file. |
 | **Forester Contributors** | Direct contributors (`\author{…}` in the current tree) and indirect contributors (authors of transitively transcluded trees). Clicking opens the person's `.tree` file. |
 
-![forest structure view](demo/toc.png)
+![forest structure view](https://raw.githubusercontent.com/KaiErikNiermann/topos-vscode-forester/main/demo/toc.png)
 
 ---
 

@@ -10,7 +10,7 @@
     "vscode": "^1.86.0"
   },
   "markdown": "github",
-  "icon": "resources/ForesterTopos.png",
+  "icon": "resources/icon.png",
   "categories": [
     "Programming Languages"
   ],

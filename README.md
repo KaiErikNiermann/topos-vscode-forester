@@ -1,6 +1,11 @@
-# forester-lang-support
+<p align="center">
+  <img src="resources/banner.svg" alt="Forester" height="160">
+</p>
 
-VSCode support for [Forester](https://www.jonmsterling.com/jms-005P.xml), a tool for tending forests of evergreen notes. Forked from [topos-vscode-forester](https://github.com/filmerjarred/topos-vscode-forester) (Jarred Filmer / Topos Institute), which was itself forked from [vscode-forester](https://github.com/Trebor-Huang/vscode-forester) (Trebor-Huang).
+<p align="center">
+  VSCode support for <a href="https://www.jonmsterling.com/jms-005P.xml">Forester</a>, a tool for scientific notes.<br>
+  Forked from <a href="https://github.com/filmerjarred/topos-vscode-forester">topos-vscode-forester</a> (Jarred Filmer / Topos Institute), which was itself forked from <a href="https://github.com/Trebor-Huang/vscode-forester">vscode-forester</a> (Trebor-Huang).
+</p>
 
 ---
 
@@ -93,10 +98,12 @@ A full Langium-based language server runs in a background process and provides:
 Integrates with the [LanguageTool VSCode extension](https://marketplace.visualstudio.com/items?itemName=adamvoss.vscode-languagetool) to provide grammar and spell checking, with Forester-aware filtering to suppress false positives on commands, IDs, and syntax.
 
 **Setup:**
+
 1. Install `adamvoss.vscode-languagetool` and a language pack (e.g. `adamvoss.vscode-languagetool-en`).
 2. **Disable** the base LanguageTool extension — the Forester extension takes over its language server with filtering applied.
 
 **Commands:**
+
 - **`Forester: Check All Tree Files (Grammar)`** — run a full grammar check across the workspace.
 - **`Forester: SpeedFix`** — rapid keyboard-driven workflow for spelling and grammar corrections.
 - **`Forester: Auto-Hide Forester Syntax Noise`** — suppress common false-positive patterns in workspace LTeX settings.
@@ -110,18 +117,11 @@ Integrates with the [LanguageTool VSCode extension](https://marketplace.visualst
 ### Datalog Queries
 
 `\datalog{...}` blocks in `.tree` files get a **CodeLens** button:
+
 - **(▶ Run datalog query)** — evaluates the query against the forest index and shows results in the output panel.
 - **(⬡ Datalog rules)** — shown for rule-only blocks (no `:-` head).
 
 Supported predicates: `has-taxon`, `has-tag`, `is-reference`, `is-person`, `is-article`.
-
----
-
-### Forest Status Bar
-
-A status bar item shows whether the forest is in a valid state (parsed successfully by `forester`).
-
-![status bar](demo/status.png)
 
 ---
 

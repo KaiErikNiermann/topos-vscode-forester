@@ -61,7 +61,7 @@ const BUILTIN_ARITY: ReadonlyMap<string, { braceArgs: number; signature: string 
     // ── Two brace-arg commands ─────────────────────────────────────────────
     ['\\link',        { braceArgs: 2, signature: '\\link{uri}{text}' }],
     ['\\tex',         { braceArgs: 2, signature: '\\tex{preamble}{body}' }],
-    ['\\texfig',      { braceArgs: 2, signature: '\\texfig{preamble}{body}' }],
+    ['\\texfig',      { braceArgs: 1, signature: '\\texfig{body}' }],
     ['\\ltexfig',     { braceArgs: 2, signature: '\\ltexfig{preamble}{body}' }],
     ['\\meta',        { braceArgs: 2, signature: '\\meta{key}{value}' }],
     ['\\patch',       { braceArgs: 2, signature: '\\patch{object}{methods}' }],
@@ -551,6 +551,7 @@ export class ForesterChecks {
      */
     private collectWorkspaceMethods(): Set<string> {
         const methods = new Set<string>();
+        if (!this.documents) return methods;
         const OBJECT_CMDS: ReadonlySet<string> = new Set(['\\object', '\\patch']);
 
         for (const doc of this.documents.all) {

@@ -12,3 +12,4 @@ test-forest/
 # Track project-level hook scripts and settings
 !.claude/hooks/
 !.claude/settings.json
+.forester-formatter.json

@@ -61,11 +61,8 @@ const BUILTIN_ARITY: ReadonlyMap<string, { braceArgs: number; signature: string 
     // ── Two brace-arg commands ─────────────────────────────────────────────
     ['\\link',        { braceArgs: 2, signature: '\\link{uri}{text}' }],
     ['\\tex',         { braceArgs: 2, signature: '\\tex{preamble}{body}' }],
-    ['\\texfig',      { braceArgs: 1, signature: '\\texfig{body}' }],
-    ['\\ltexfig',     { braceArgs: 2, signature: '\\ltexfig{preamble}{body}' }],
     ['\\meta',        { braceArgs: 2, signature: '\\meta{key}{value}' }],
     ['\\patch',       { braceArgs: 2, signature: '\\patch{object}{methods}' }],
-    ['\\codeblock',   { braceArgs: 2, signature: '\\codeblock{lang}{code}' }],
 ]);
 
 // ISO 8601 date: YYYY-MM-DD with basic month/day range validation
@@ -86,11 +83,11 @@ const ALL_BUILTIN_COMMANDS: ReadonlySet<string> = new Set([
     '\\transclude', '\\import', '\\export', '\\ref', '\\link',
     // Block-level layout
     '\\p', '\\ul', '\\ol', '\\li', '\\blockquote', '\\subtree', '\\scope',
-    '\\figure', '\\query', '\\texfig', '\\ltexfig',
+    '\\figure', '\\query',
     // Inline
     '\\em', '\\strong', '\\code',
     // Code / verbatim
-    '\\codeblock', '\\pre', '\\startverb', '\\stopverb',
+    '\\pre', '\\startverb', '\\stopverb',
     // Math / TeX
     '\\tex',
     // Macro / binding system

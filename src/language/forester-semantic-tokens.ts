@@ -34,11 +34,11 @@ const BUILTIN_COMMANDS: ReadonlySet<string> = new Set([
     'transclude', 'import', 'export', 'ref', 'link',
     // Block-level layout
     'p', 'ul', 'ol', 'li', 'blockquote', 'subtree', 'scope', 'figure',
-    'query', 'texfig', 'ltexfig',
+    'query',
     // Inline
     'em', 'strong', 'code',
     // Code / verbatim
-    'codeblock', 'pre', 'startverb', 'stopverb',
+    'pre', 'startverb', 'stopverb',
     // Math / TeX
     'tex',
     // Macro / binding system

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import { hasForestConfig } from "./utils";
 
 /**
  * Scans workspace for Forester macro definitions and manages the formatter configuration.
@@ -86,6 +87,11 @@ export async function readCachedMacros(): Promise<MacroScanResult> {
 async function writeCachedMacros(macros: string[], subtreeMacros: string[]): Promise<void> {
    const cachePath = getCacheFilePath();
    if (!cachePath) {
+      return;
+   }
+
+   // Only write cache files in valid Forester projects
+   if (!await hasForestConfig()) {
       return;
    }
 
@@ -289,6 +295,11 @@ export async function scanWorkspaceForMacros(): Promise<MacroScanResult> {
       return { macros: [], subtreeMacros: [] };
    }
 
+   // Only scan in valid Forester projects with a forest.toml
+   if (!await hasForestConfig()) {
+      return { macros: [], subtreeMacros: [] };
+   }
+
    const allMacros: Set<string> = new Set();
    const subtreeMacros: Set<string> = new Set();
 
@@ -383,12 +394,17 @@ export async function scanMacrosCommand(): Promise<void> {
  * This should be called on extension activation.
  */
 export async function initFormatterConfig(): Promise<void> {
+   // Only initialize in valid Forester projects with a forest.toml
+   if (!await hasForestConfig()) {
+      return;
+   }
+
    const config = vscode.workspace.getConfiguration("forester.formatter");
    const autoScan: boolean = config.get("autoScanMacros", true);
-   
+
    if (autoScan) {
       const cachedMacros = await readCachedMacros();
-      
+
       // If no cache exists, do an initial scan
       if (cachedMacros.macros.length === 0 && cachedMacros.subtreeMacros.length === 0) {
          await scanWorkspaceForMacros();

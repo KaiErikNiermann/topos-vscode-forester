@@ -35,7 +35,7 @@ let mostRecentQueryResult: Forest | null = null;
 let isInitialLoad = true;
 
 // For tracking the build status of the forest
-let forestStatus: { valid?: boolean; updating?: boolean, error?: string };
+let forestStatus: { valid?: boolean; updating?: boolean, error?: string, step?: string };
 let statusBarItem: vscode.StatusBarItem | null = null;
 
 // File event handlers and callbacks
@@ -72,8 +72,10 @@ function updateStatusBar(status: typeof forestStatus) {
    }
 
    if (forestStatus.updating) {
-      statusBarItem.text = "$(sync~spin) Forest updating...";
-      statusBarItem.tooltip = "Forester is rebuilding";
+      statusBarItem.text = forestStatus.step
+         ? `$(sync~spin) ${forestStatus.step}`
+         : "$(sync~spin) Forest updating...";
+      statusBarItem.tooltip = forestStatus.step ?? "Forester is rebuilding";
       statusBarItem.backgroundColor = undefined;
    } else if (forestStatus.valid) {
       statusBarItem.text = "$(check) Forest valid";
@@ -112,9 +114,9 @@ export async function getForest({ forceReload, fastReturnStale }: { forceReload?
       return queryInProgressPromise;
    }
 
-   // Show starting notification (only for initial load)
+   // Show step progress in the status bar during initial load
    if (isInitialLoad) {
-      vscode.window.showInformationMessage("🌲 Forester: Building forest cache...");
+      updateStatusBar({ updating: true, step: '(1/2) Building forest cache...' });
    }
 
    queryInProgressPromise = queryForest();
@@ -130,10 +132,10 @@ export async function getForest({ forceReload, fastReturnStale }: { forceReload?
       }
    }
 
-   // Show completion notification (only for initial load)
    if (isInitialLoad) {
-      vscode.window.showInformationMessage(`✅ Forester: Loaded ${result.length} trees`);
-      isInitialLoad = false;
+      updateStatusBar({ updating: true, step: `(2/2) Loaded ${result.length} trees` });
+      // Brief pause so the user can see the final step before it transitions
+      setTimeout(() => { isInitialLoad = false; }, 1500);
    }
 
    queryInProgressPromise = null;

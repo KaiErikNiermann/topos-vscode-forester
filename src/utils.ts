@@ -53,6 +53,22 @@ export function getRoot(): vscode.Uri {
    }
 }
 
+/**
+ * Check whether a forest.toml (or configured config file) exists in the workspace root.
+ */
+export async function hasForestConfig(): Promise<boolean> {
+   try {
+      const root = getRoot();
+      const config = vscode.workspace.getConfiguration("forester");
+      const configFile = config.get<string>("config") || "forest.toml";
+      const configPath = join(root.fsPath, configFile);
+      await access(configPath, constants.R_OK);
+      return true;
+   } catch {
+      return false;
+   }
+}
+
 export async function getForestConfig(): Promise<ForestConfig | null> {
    const root = getRoot();
 

@@ -19,6 +19,7 @@ import { ForesterCodeLensProvider } from './forester-codelens-provider.js';
 import { ForesterCodeActionProvider } from './forester-code-actions.js';
 import { ForesterLspFormatter } from './forester-lsp-formatter.js';
 import { ForesterLspHoverProvider } from './forester-lsp-hover.js';
+import { ForesterLspInlayHintProvider } from './forester-lsp-inlay-hints.js';
 
 /**
  * Forester-specific services added on top of the default Langium LSP services.
@@ -42,6 +43,7 @@ export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = 
         CodeActionProvider: (services) => new ForesterCodeActionProvider(services),
         Formatter: () => new ForesterLspFormatter(),
         HoverProvider: (services) => new ForesterLspHoverProvider(services),
+        InlayHintProvider: () => new ForesterLspInlayHintProvider(),
     },
 };
 

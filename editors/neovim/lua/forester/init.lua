@@ -16,6 +16,9 @@ function M.setup(opts)
 
   -- Register nvim-cmp source if available
   require("forester.cmp").setup()
+
+  -- Set up statusline and file watching
+  require("forester.statusline").setup()
 end
 
 return M

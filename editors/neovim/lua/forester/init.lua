@@ -13,6 +13,9 @@ function M.setup(opts)
   if config.current.decorations.enabled then
     require("forester.decorations").setup()
   end
+
+  -- Register nvim-cmp source if available
+  require("forester.cmp").setup()
 end
 
 return M

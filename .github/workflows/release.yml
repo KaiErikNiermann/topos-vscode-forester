@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: "20"
           cache: pnpm
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -32,6 +33,11 @@ jobs:
         with:
           files: "*.vsix"
           generate_release_notes: true
+          body: |
+            ## Neovim
+
+            Install via your plugin manager pointing at this repository's `editors/neovim` directory.
+            The language server is available as `forester-language-server` on npm or via the `bin/` wrapper in this repo.
 
       - name: Publish to VS Code Marketplace
         if: env.VSCE_PAT != ''
@@ -44,3 +50,11 @@ jobs:
         run: npx ovsx publish *.vsix -p $OVSX_PAT
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+      - name: Publish language server to npm
+        if: env.NPM_TOKEN != ''
+        run: |
+          node esbuild.js
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

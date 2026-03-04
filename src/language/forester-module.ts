@@ -2,10 +2,9 @@
  * Langium dependency-injection module for the Forester language.
  * Wires custom services into the Langium container.
  *
- * Formatting is handled by the handrolled formatter-core.ts via the VSCode
- * DocumentFormattingEditProvider (formatter.ts), NOT by the Langium LSP.
- * The Langium AbstractFormatter (forester-formatter.ts) is intentionally
- * NOT registered here — it has word-splitting issues with TEXT tokens.
+ * Formatting is delegated to the handrolled formatter-core.ts via the
+ * ForesterLspFormatter adapter, which exposes it as a standard LSP
+ * textDocument/formatting handler for all editor clients.
  */
 import type { Module } from 'langium';
 import { inject } from 'langium';
@@ -18,10 +17,10 @@ import { ForesterSemanticTokenProvider } from './forester-semantic-tokens.js';
 import { ForesterDefinitionProvider } from './forester-definition-provider.js';
 import { ForesterCodeLensProvider } from './forester-codelens-provider.js';
 import { ForesterCodeActionProvider } from './forester-code-actions.js';
+import { ForesterLspFormatter } from './forester-lsp-formatter.js';
 
 /**
  * Forester-specific services added on top of the default Langium LSP services.
- * Hover provider will be added in tasks 23-26.
  */
 export type ForesterAddedServices = Record<string, never>;
 
@@ -30,7 +29,6 @@ export type ForesterServices = LangiumServices & ForesterAddedServices;
 
 /**
  * DI module registering Forester-specific overrides.
- * Formatting is NOT registered here — handled by formatter-core.ts instead.
  */
 export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = {
     validation: {
@@ -41,6 +39,7 @@ export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = 
         DefinitionProvider: (services) => new ForesterDefinitionProvider(services),
         CodeLensProvider: (services) => new ForesterCodeLensProvider(services),
         CodeActionProvider: (services) => new ForesterCodeActionProvider(services),
+        Formatter: () => new ForesterLspFormatter(),
     },
 };
 

@@ -12,7 +12,7 @@ function M.find_server()
   -- Check if node is available and the bundled server exists
   if vim.fn.executable("node") == 1 then
     -- Look relative to the plugin root for the bundled server
-    local plugin_root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h:h:h:h")
+    local plugin_root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h:h:h")
     local server_path = plugin_root .. "/../../out/language/main.js"
     local resolved = vim.fn.resolve(server_path)
     if vim.fn.filereadable(resolved) == 1 then

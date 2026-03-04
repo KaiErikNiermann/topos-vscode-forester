@@ -30,7 +30,7 @@ local TAXON_ABBREV = {
 ---@param taxon string|nil
 ---@return string
 local function taxon_abbrev(taxon)
-  if not taxon then return "" end
+  if not taxon or taxon == vim.NIL then return "" end
   return TAXON_ABBREV[taxon:lower()] or taxon:sub(1, 3):lower()
 end
 
@@ -80,10 +80,10 @@ end
 ---@return string|nil
 local function format_title(tree_id)
   local info = forest_cache[tree_id]
-  if not info or not info.title then return nil end
+  if not info or not info.title or info.title == vim.NIL then return nil end
   if info.title == tree_id then return nil end
 
-  if info.taxon then
+  if info.taxon and info.taxon ~= vim.NIL then
     local abbr = taxon_abbrev(info.taxon)
     return abbr .. ": " .. info.title
   end

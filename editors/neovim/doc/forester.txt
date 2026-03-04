@@ -1,0 +1,117 @@
+*forester.txt*  Neovim plugin for the Forester language
+
+                         FORESTER.NVIM
+                   Language support for Forester
+
+==============================================================================
+CONTENTS                                                    *forester-contents*
+
+  1. Introduction ......................... |forester-introduction|
+  2. Setup ................................ |forester-setup|
+  3. Commands ............................. |forester-commands|
+  4. Configuration ........................ |forester-configuration|
+  5. Statusline ........................... |forester-statusline|
+  6. Completion ........................... |forester-completion|
+
+==============================================================================
+1. INTRODUCTION                                         *forester-introduction*
+
+forester.nvim provides language support for Forester (.tree) files in Neovim.
+It includes an LSP client (via a Langium-based language server), tree-sitter
+integration, tree management commands, and editor conveniences.
+
+Prerequisites:
+  - Neovim >= 0.10
+  - Node.js >= 18
+  - `forester` CLI on $PATH
+  - `forest.toml` in project root
+
+==============================================================================
+2. SETUP                                                       *forester-setup*
+
+                                                              *forester.setup()*
+require("forester").setup({opts})
+
+  Call this in your Neovim config to initialize the plugin. All options are
+  optional. See |forester-configuration| for available fields.
+
+  Example: >lua
+    require("forester").setup({
+      forester_path = "forester",
+      lsp = { enabled = true },
+      decorations = { enabled = true },
+    })
+<
+
+==============================================================================
+3. COMMANDS                                                 *forester-commands*
+
+                                                               *:ForesterNew*
+:ForesterNew
+  Create a new tree file. Prompts for a prefix (from `forest.toml` prefixes)
+  and a title. Supports taxon abbreviations (e.g., "thm: My Theorem").
+
+                                                            *:ForesterRename*
+:ForesterRename
+  Edit the title and taxon of the current .tree file. Pre-fills with the
+  existing title and taxon.
+
+                                                      *:ForesterTranscludeNew*
+:ForesterTranscludeNew
+  Create a new tree and insert `\transclude{tree-id}` at the cursor position
+  in the current buffer. Opens the new tree in a split.
+
+                                                         *:ForesterSubtreeId*
+:ForesterSubtreeId
+  Insert a `\subtree[id]{ ... }` block at the cursor with an automatically
+  generated base36 ID that avoids collisions with existing tree filenames
+  and subtree references.
+
+==============================================================================
+4. CONFIGURATION                                       *forester-configuration*
+
+                                                          *ForesterConfig*
+Fields passed to `require("forester").setup()`:
+
+  forester_path    (string)   Path to forester CLI. Default: "forester"
+  lsp.enabled      (boolean)  Enable language server. Default: true
+  lsp.cmd          (string[]) Custom server command. Default: auto-detected
+  lsp.root_markers (string[]) Project root markers. Default: {"forest.toml"}
+  decorations.enabled (boolean) Show transclude decorations. Default: true
+  completion.show_id  (boolean) Show tree IDs in completions. Default: false
+
+==============================================================================
+5. STATUSLINE                                             *forester-statusline*
+
+                                              *forester.statusline.component()*
+require("forester.statusline").component()
+
+  Returns a string for use in statusline plugins. Values:
+    "Forest OK"  — forest is valid
+    "Forest ERR" — forester query failed
+    "Forest ..." — checking in progress
+    ""           — no forest detected
+
+  Lualine example: >lua
+    require("lualine").setup({
+      sections = {
+        lualine_x = { require("forester.statusline").component },
+      },
+    })
+<
+
+==============================================================================
+6. COMPLETION                                             *forester-completion*
+
+The plugin registers an nvim-cmp source named "forester" that provides tree
+ID completions inside link patterns (`\transclude{`, `\import{`, `\ref{`,
+`[[`, `](`, and custom patterns from `.forester-links.json`).
+
+Add it to your cmp sources: >lua
+  require("cmp").setup({
+    sources = { { name = "forester" } },
+  })
+<
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:

@@ -19,6 +19,7 @@ function M.setup(opts)
 
   -- Set up statusline and file watching
   require("forester.statusline").setup()
+
 end
 
 return M

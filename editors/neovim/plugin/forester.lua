@@ -20,3 +20,5 @@ end, { desc = "Create a new tree and transclude it at cursor" })
 vim.api.nvim_create_user_command("ForesterSubtreeId", function()
   require("forester.subtree_auto_id").insert_subtree()
 end, { desc = "Insert a \\subtree[] block with auto-generated base36 ID" })
+
+

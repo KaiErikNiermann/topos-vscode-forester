@@ -8,6 +8,11 @@ function M.setup(opts)
 
   -- Set up the language server
   require("forester.lsp").setup(config.current)
+
+  -- Set up transclude decorations
+  if config.current.decorations.enabled then
+    require("forester.decorations").setup()
+  end
 end
 
 return M

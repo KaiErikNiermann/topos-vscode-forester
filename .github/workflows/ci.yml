@@ -130,3 +130,23 @@ jobs:
             --globals vim \
             --no-unused-args \
             --max-line-length 120
+
+  neovim-tests:
+    name: Neovim Headless Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        nvim-version: [stable, nightly]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.nvim-version }}
+
+      - name: Run sanity tests
+        run: |
+          nvim --headless -u editors/neovim/tests/minimal_init.lua \
+            -l editors/neovim/tests/sanity_spec.lua

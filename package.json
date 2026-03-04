@@ -19,6 +19,9 @@
     "workspaceContains:forest.toml"
   ],
   "main": "./out/extension.js",
+  "bin": {
+    "forester-language-server": "./bin/forester-language-server"
+  },
   "contributes": {
     "commands": [
       {

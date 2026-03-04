@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+// Standalone entry point for the Forester language server.
+// Usage: forester-language-server --stdio
+//
+// This script launches the Langium-based LSP server over stdio,
+// making it usable with any LSP client (Neovim, Helix, Emacs, etc.).
+
+const path = require('path');
+
+// Resolve the bundled language server relative to this script.
+const serverPath = path.resolve(__dirname, '..', 'out', 'language', 'main.js');
+
+// Ensure --stdio is passed so the server uses stdin/stdout transport.
+if (!process.argv.includes('--stdio')) {
+    process.argv.push('--stdio');
+}
+
+require(serverPath);

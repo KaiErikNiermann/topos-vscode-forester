@@ -105,7 +105,6 @@ function M.update(buf)
   if not cache_valid then return end
 
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-  local pattern = "\\(transclude|import|export){([^}]+)}"
 
   for i, line in ipairs(lines) do
     -- Use vim.regex for the pattern since Lua patterns don't support alternation

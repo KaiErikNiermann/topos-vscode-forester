@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+echo "▶ pre-push: Neovim plugin lint..."
+if command -v luacheck >/dev/null 2>&1; then
+  luacheck editors/neovim/lua/ editors/neovim/plugin/ \
+    --globals vim \
+    --no-unused-args \
+    --max-line-length 120
+else
+  echo "  luacheck not found, skipping (install with: sudo apt install lua-check)"
+fi

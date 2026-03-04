@@ -143,7 +143,7 @@ function source:complete(params, callback)
   local line = params.context.cursor_before_line
   local col = params.context.cursor.col
 
-  local partial, start_col = find_link_context(line, col)
+  local partial = find_link_context(line, col)
   if not partial then
     callback({ items = {}, isIncomplete = false })
     return
@@ -163,15 +163,10 @@ function source:complete(params, callback)
   local items = {}
 
   for tree_id, info in pairs(forest_cache) do
-    local label = tree_id
     local detail = info.title or ""
 
-    if show_id and info.title then
-      label = tree_id .. " — " .. info.title
-    end
-
     table.insert(items, {
-      label = tree_id,
+      label = show_id and info.title and (tree_id .. " — " .. info.title) or tree_id,
       detail = detail,
       filterText = tree_id .. " " .. (info.title or ""),
       sortText = tree_id,

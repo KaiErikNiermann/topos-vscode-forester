@@ -23,6 +23,8 @@
 		// language tsconfig rather than the extension tsconfig.
 		"src/langium-formatter.test.mts",
 		"src/langium-hover.test.mts",
-		"src/langium-grammar.test.mts"
+		"src/langium-grammar.test.mts",
+		// Corpus test is ESM and built by esbuild separately
+		"tests"
 	]
 }

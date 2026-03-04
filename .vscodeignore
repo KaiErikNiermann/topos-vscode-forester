@@ -10,3 +10,7 @@ vsc-extension-quickstart.md
 **/*.ts
 **/.vscode-test.*
 test-forest/**
+tests/**
+editors/**
+bin/**
+pnpm-workspace.yaml

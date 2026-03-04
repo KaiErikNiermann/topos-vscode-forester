@@ -452,6 +452,7 @@
     "test:langium-formatter": "pnpm dlx esbuild src/langium-formatter.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-formatter-test.mjs && node out/langium-formatter-test.mjs",
     "test:langium-hover": "pnpm dlx esbuild src/langium-hover.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-hover-test.mjs && node out/langium-hover-test.mjs",
     "test:langium-grammar": "pnpm dlx esbuild src/langium-grammar.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-grammar-test.mjs && node out/langium-grammar-test.mjs",
+    "test:corpus": "pnpm dlx esbuild tests/corpus-langium.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/corpus-langium-test.mjs && node out/corpus-langium-test.mjs",
     "test:latex-hover": "pnpm dlx tsx src/latex-hover-core.test.ts",
     "test:tag-closure-inlay": "pnpm dlx tsx src/tag-closure-inlay-core.test.ts",
     "test:subtree-auto-id": "pnpm dlx tsx src/subtree-auto-id.test.ts",

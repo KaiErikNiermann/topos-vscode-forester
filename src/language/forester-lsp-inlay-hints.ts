@@ -10,7 +10,7 @@ import { InlayHintKind } from 'vscode-languageserver';
 import type { CancellationToken } from 'vscode-languageserver';
 import type { LangiumDocument } from 'langium';
 import type { InlayHintProvider } from 'langium/lsp';
-import { collectTagClosureHints, DEFAULT_TAG_CLOSURE_HINT_TAGS } from '../tag-closure-inlay-core.js';
+import { collectTagClosureHints, DEFAULT_TAG_CLOSURE_HINT_TAGS, formatSubtreeTooltip } from '../tag-closure-inlay-core.js';
 
 export class ForesterLspInlayHintProvider implements InlayHintProvider {
 
@@ -40,6 +40,9 @@ export class ForesterLspInlayHintProvider implements InlayHintProvider {
                 label: ` ${hint.label}`,
                 kind: InlayHintKind.Parameter,
                 paddingLeft: true,
+                tooltip: hint.subtreeMetadata
+                    ? formatSubtreeTooltip(hint.subtreeMetadata)
+                    : undefined,
             });
         }
 

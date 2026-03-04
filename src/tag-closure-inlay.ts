@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-import { collectTagClosureHints, DEFAULT_TAG_CLOSURE_HINT_TAGS } from "./tag-closure-inlay-core";
+import { collectTagClosureHints, DEFAULT_TAG_CLOSURE_HINT_TAGS, formatSubtreeTooltip } from "./tag-closure-inlay-core";
 
 const TAG_CLOSURE_HINT_SETTING = "inlayHints.tagClosures.enabled";
 const TAG_CLOSURE_HINT_TAGS_SETTING = "inlayHints.tagClosures.tags";
@@ -50,7 +50,9 @@ export class ForesterTagClosureInlayHintsProvider implements vscode.InlayHintsPr
             const position = document.positionAt(entry.offset + 1);
             const hint = new vscode.InlayHint(position, entry.label, vscode.InlayHintKind.Type);
             hint.paddingLeft = true;
-            hint.tooltip = `Closes \\${entry.label}{...}`;
+            hint.tooltip = entry.subtreeMetadata
+               ? formatSubtreeTooltip(entry.subtreeMetadata)
+               : `Closes \\${entry.label}{...}`;
             return hint;
          });
    }

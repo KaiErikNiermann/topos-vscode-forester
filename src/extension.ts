@@ -14,7 +14,6 @@ import { initLanguageToolBridge, checkAllTreeFilesCommand } from "./languageTool
 import { registerSpeedFixCommand } from "./speedfix";
 import { SubtreeAutoIdFeature } from "./subtree-auto-id";
 import { ForesterLatexHoverService } from "./latex-hover";
-import { ForesterTagClosureInlayHintsProvider } from "./tag-closure-inlay";
 import {
    initLinkAliasConfig,
    buildAutocompleteRegex,
@@ -623,22 +622,8 @@ export async function activate(context: vscode.ExtensionContext) {
    );
    context.subscriptions.push(latexHoverProvider);
 
-   const tagClosureInlayHintsProvider = new ForesterTagClosureInlayHintsProvider();
-   context.subscriptions.push(tagClosureInlayHintsProvider);
-
-   const tagClosureInlayHintsRegistration = vscode.languages.registerInlayHintsProvider(
-      { scheme: "file", language: "forester" },
-      tagClosureInlayHintsProvider,
-   );
-   context.subscriptions.push(tagClosureInlayHintsRegistration);
-
-   context.subscriptions.push(
-      vscode.workspace.onDidChangeConfiguration(e => {
-         if (e.affectsConfiguration("forester.inlayHints.tagClosures")) {
-            tagClosureInlayHintsProvider.refresh();
-         }
-      }),
-   );
+   // Tag closure inlay hints are provided by the Langium LSP server
+   // (see forester-lsp-inlay-hints.ts / forester-module.ts)
 
    // Register hover provider for transcludes with rename action
    const transcludeHoverProvider = vscode.languages.registerHoverProvider(

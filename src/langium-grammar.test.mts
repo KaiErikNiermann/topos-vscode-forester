@@ -731,13 +731,18 @@ await test('\\startverb…\\stopverb with mismatched delimiters: parser errors s
 });
 
 await test('parse errors outside \\startverb…\\stopverb are NOT suppressed', async () => {
-    // A mismatched delimiter NOT inside \startverb should still produce errors
+    // A mismatched delimiter NOT inside \startverb should still produce errors.
+    // With bracket-mismatch diagnostics, Chevrotain's generic parsing errors are
+    // replaced by our more precise bracket-mismatch diagnostics.
     const source = '\\p{text [unclosed}';
     const doc = await parse(source);
     const diagnostics = await Forester.validation.DocumentValidator.validateDocument(doc);
-    const parsingDiags = diagnostics.filter(d => (d.data as { code?: string })?.code === 'parsing-error');
-    if (parsingDiags.length === 0) {
-        throw new Error('Expected parsing diagnostics for mismatched delimiters outside \\startverb');
+    const errorDiags = diagnostics.filter(d => {
+        const code = (d.data as { code?: string })?.code;
+        return code === 'parsing-error' || code === 'bracket-mismatch';
+    });
+    if (errorDiags.length === 0) {
+        throw new Error('Expected error diagnostics for mismatched delimiters outside \\startverb');
     }
 });
 
@@ -1207,6 +1212,127 @@ await test('contributors: multiple \\author commands parse as separate Command n
     });
     if (!ids.includes('jms-0001') || !ids.includes('jms-0002')) {
         throw new Error(`Expected both author IDs, got: ${ids.join(', ')}`);
+    }
+});
+
+// ── Validator: precise bracket mismatch diagnostics ──────────────────────────
+
+await test('bracket mismatch: unclosed { produces diagnostic at opener with relatedInfo at EOF', async () => {
+    const source = '\\p{hello';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    if (bracketDiags.length === 0) {
+        throw new Error('Expected bracket-mismatch diagnostic for unclosed {');
+    }
+    const unclosed = bracketDiags.find(d => d.message.includes("Unclosed '{'"));
+    assertOk(unclosed, 'Expected "Unclosed \'{\'" diagnostic');
+    // Should point at the { character
+    if (!unclosed.relatedInformation || unclosed.relatedInformation.length === 0) {
+        throw new Error('Expected relatedInformation pointing at EOF');
+    }
+    if (!unclosed.relatedInformation[0].message.includes('end of file')) {
+        throw new Error(`Expected relatedInfo about EOF, got: ${unclosed.relatedInformation[0].message}`);
+    }
+});
+
+await test('bracket mismatch: unexpected } produces diagnostic at closer', async () => {
+    const source = 'text}';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    const unexpected = bracketDiags.find(d => d.message.includes("Unexpected '}'"));
+    assertOk(unexpected, 'Expected "Unexpected \'}\'" diagnostic');
+});
+
+await test('bracket mismatch: { closed by ] produces mismatch diagnostic with relatedInfo at opener', async () => {
+    const source = '\\p{text]';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    const mismatch = bracketDiags.find(d => d.message.includes('Mismatched delimiter'));
+    assertOk(mismatch, 'Expected "Mismatched delimiter" diagnostic');
+    if (!mismatch.relatedInformation || mismatch.relatedInformation.length === 0) {
+        throw new Error('Expected relatedInformation pointing at opener');
+    }
+    if (!mismatch.relatedInformation[0].message.includes("Opening '{'")) {
+        throw new Error(`Expected relatedInfo about opening bracket, got: ${mismatch.relatedInformation[0].message}`);
+    }
+});
+
+await test('bracket mismatch: properly balanced brackets produce no bracket diagnostics', async () => {
+    const source = '\\p{\\ul{\\li{text}}}';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    assertEmpty(bracketDiags, 'Expected no bracket-mismatch diagnostics for balanced brackets');
+});
+
+await test('bracket mismatch: escaped \\{ and \\} are not counted', async () => {
+    const source = '\\p{text \\{ and \\}}';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    assertEmpty(bracketDiags, 'Expected no bracket-mismatch diagnostics when brackets are escaped');
+});
+
+await test('bracket mismatch: \\startverb…\\stopverb contents are skipped', async () => {
+    const source = '\\p{\\startverb { [ ( \\stopverb}';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    assertEmpty(bracketDiags, 'Expected no bracket-mismatch diagnostics inside \\startverb…\\stopverb');
+});
+
+await test('bracket mismatch: % comments are skipped', async () => {
+    const source = '\\p{text\n% this { is a comment\n}';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    assertEmpty(bracketDiags, 'Expected no bracket-mismatch diagnostics for brackets in comments');
+});
+
+await test('bracket mismatch: nested brackets \\p{\\ul{\\li{text}}} work correctly', async () => {
+    const source = '\\p{\\ul{\\li{deep nesting}}}';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    assertEmpty(bracketDiags, 'Expected no bracket-mismatch diagnostics for deeply nested balanced brackets');
+});
+
+await test('bracket mismatch: math #{x + {y}} handles #{ opener correctly', async () => {
+    const source = '#{x + {y}}';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    assertEmpty(bracketDiags, 'Expected no bracket-mismatch diagnostics for math mode #{...}');
+});
+
+await test('bracket mismatch: multiple errors in one file are all reported', async () => {
+    const source = '} {';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    if (bracketDiags.length < 2) {
+        throw new Error(`Expected at least 2 bracket-mismatch diagnostics, got ${bracketDiags.length}`);
+    }
+    const hasUnexpected = bracketDiags.some(d => d.message.includes("Unexpected '}'"));
+    const hasUnclosed = bracketDiags.some(d => d.message.includes("Unclosed '{'"));
+    if (!hasUnexpected || !hasUnclosed) {
+        throw new Error(`Expected both unexpected } and unclosed { errors, got: ${bracketDiags.map(d => d.message).join('; ')}`);
+    }
+});
+
+await test('bracket mismatch: Chevrotain generic bracket errors are suppressed when bracket diagnostics exist', async () => {
+    const source = '\\p{unclosed';
+    const doc = await parse(source);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const parsingDiags = diags.filter(d => {
+        const code = (d.data as { code?: string })?.code;
+        return code === 'parsing-error' && /[{}()\[\]]/.test(d.message);
+    });
+    if (parsingDiags.length > 0) {
+        throw new Error(`Expected Chevrotain bracket errors to be suppressed, but found: ${parsingDiags.map(d => d.message).join('; ')}`);
     }
 });
 

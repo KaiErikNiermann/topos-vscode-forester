@@ -1,6 +1,13 @@
+export interface SubtreeMetadata {
+   id?: string
+   taxon?: string
+   title?: string
+}
+
 export interface TagClosureHint {
    offset: number
    label: string
+   subtreeMetadata?: SubtreeMetadata
 }
 
 export interface TagClosureHintOptions {
@@ -147,6 +154,100 @@ function normalizeEnabledTags(enabledTags?: readonly string[]): Set<string> {
    return new Set(normalized);
 }
 
+function extractSubtreeMetadata(
+   source: string,
+   bodyStart: number,
+   bodyEnd: number,
+   bracketContent?: string,
+): SubtreeMetadata {
+   const meta: SubtreeMetadata = {};
+   if (bracketContent !== undefined) {
+      meta.id = bracketContent;
+   }
+
+   let index = bodyStart;
+   while (index < bodyEnd) {
+      const char = source[index];
+
+      if (char === "%" && !isEscaped(source, index)) {
+         index = skipComment(source, index);
+         continue;
+      }
+
+      if (char === "#" && !isEscaped(source, index)) {
+         const braceIndex = char === "#" && source[index + 1] === "#" ? index + 2 : index + 1;
+         if (source[braceIndex] === "{") {
+            const closeIndex = scanBalanced(source, braceIndex, bodyEnd, "{", "}");
+            index = closeIndex === null ? bodyEnd : closeIndex + 1;
+            continue;
+         }
+      }
+
+      if (char !== "\\" || isEscaped(source, index)) {
+         index += 1;
+         continue;
+      }
+
+      const header = readCommandHeader(source, index, bodyEnd);
+      if (!header) {
+         index += 1;
+         continue;
+      }
+
+      let cursor = skipWhitespaceAndComments(source, header.endIndex + 1, bodyEnd);
+
+      // Skip bracket arguments
+      while (cursor < bodyEnd && source[cursor] === "[") {
+         const bracketEnd = scanBalanced(source, cursor, bodyEnd, "[", "]");
+         if (bracketEnd === null) { break; }
+         cursor = skipWhitespaceAndComments(source, bracketEnd + 1, bodyEnd);
+      }
+
+      // For taxon/title, extract the first brace argument text
+      if ((header.name === "taxon" || header.name === "title") && source[cursor] === "{") {
+         const closeIndex = scanBalanced(source, cursor, bodyEnd, "{", "}");
+         if (closeIndex !== null) {
+            const text = source.slice(cursor + 1, closeIndex).trim();
+            if (header.name === "taxon") {
+               meta.taxon = text;
+            } else {
+               meta.title = text;
+            }
+            cursor = closeIndex + 1;
+         }
+      } else {
+         // Skip over all brace arguments to stay at the immediate level
+         while (cursor < bodyEnd && source[cursor] === "{") {
+            const closeIndex = scanBalanced(source, cursor, bodyEnd, "{", "}");
+            if (closeIndex === null) { break; }
+            cursor = closeIndex + 1;
+            cursor = skipWhitespaceAndComments(source, cursor, bodyEnd);
+         }
+      }
+
+      index = cursor;
+   }
+
+   return meta;
+}
+
+export function formatSubtreeTooltip(meta: SubtreeMetadata): string {
+   const parts: string[] = [];
+   if (meta.id !== undefined) {
+      parts.push(`id=${meta.id}`);
+   }
+   if (meta.taxon !== undefined) {
+      parts.push(`taxon=${meta.taxon}`);
+   }
+   if (meta.title !== undefined) {
+      parts.push(`title=${meta.title}`);
+   }
+   if (parts.length === 0) {
+      return "Closes \\subtree{...}";
+   }
+   return `subtree ${parts.join(" | ")}`;
+}
+
 export function collectTagClosureHints(source: string, options: TagClosureHintOptions = {}): TagClosureHint[] {
    const enabledTags = normalizeEnabledTags(options.enabledTags);
    const hints: TagClosureHint[] = [];
@@ -202,11 +303,13 @@ export function collectTagClosureHints(source: string, options: TagClosureHintOp
          }
 
          let cursor = skipWhitespaceAndComments(source, header.endIndex + 1, endIndex);
+         const bracketRanges: Array<{ open: number, close: number }> = [];
          while (cursor < endIndex && source[cursor] === "[") {
             const bracketEnd = scanBalanced(source, cursor, endIndex, "[", "]");
             if (bracketEnd === null) {
                break;
             }
+            bracketRanges.push({ open: cursor, close: bracketEnd });
             cursor = skipWhitespaceAndComments(source, bracketEnd + 1, endIndex);
          }
 
@@ -239,7 +342,17 @@ export function collectTagClosureHints(source: string, options: TagClosureHintOp
             }
 
             if (enabledTags.has(header.name)) {
-               hints.push({ offset: argumentRanges[0].close, label: header.name });
+               const hint: TagClosureHint = { offset: argumentRanges[0].close, label: header.name };
+               if (header.name === "subtree") {
+                  const bracketContent = bracketRanges.length > 0
+                     ? source.slice(bracketRanges[0].open + 1, bracketRanges[0].close)
+                     : undefined;
+                  const body = argumentRanges[0];
+                  hint.subtreeMetadata = extractSubtreeMetadata(
+                     source, body.open + 1, body.close, bracketContent,
+                  );
+               }
+               hints.push(hint);
             }
          }
 

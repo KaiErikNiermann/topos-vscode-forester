@@ -1,0 +1,7 @@
+{
+  "name": "forester-nvim",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Neovim plugin for Forester language support",
+  "license": "MIT"
+}

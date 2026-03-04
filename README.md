@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/KaiErikNiermann/topos-vscode-forester/main/resources/banner.png" alt="Forester" height="160">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/titlecard-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="assets/titlecard-light.png" />
+    <img alt="Forester" src="assets/titlecard-light.png" height="72" />
+  </picture>
 </p>
 
 <p align="center">

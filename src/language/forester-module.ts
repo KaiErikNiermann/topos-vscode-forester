@@ -18,7 +18,6 @@ import { ForesterDefinitionProvider } from './forester-definition-provider.js';
 import { ForesterCodeLensProvider } from './forester-codelens-provider.js';
 import { ForesterCodeActionProvider } from './forester-code-actions.js';
 import { ForesterLspFormatter } from './forester-lsp-formatter.js';
-import { ForesterLspHoverProvider } from './forester-lsp-hover.js';
 import { ForesterLspInlayHintProvider } from './forester-lsp-inlay-hints.js';
 
 /**
@@ -42,7 +41,6 @@ export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = 
         CodeLensProvider: (services) => new ForesterCodeLensProvider(services),
         CodeActionProvider: (services) => new ForesterCodeActionProvider(services),
         Formatter: () => new ForesterLspFormatter(),
-        HoverProvider: (services) => new ForesterLspHoverProvider(services),
         InlayHintProvider: () => new ForesterLspInlayHintProvider(),
     },
 };

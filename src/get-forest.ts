@@ -13,6 +13,7 @@ import { getRoot } from "./utils";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
+import { publishForesterDiagnostics } from "./forester-diagnostics";
 
 const execFile = util.promisify(childProcess.execFile);
 
@@ -191,6 +192,7 @@ async function queryForest(): Promise<Forest> {
 
    if (success) {
       updateStatusBar({ valid: true });
+      publishForesterDiagnostics(stdout, true);
       if (Array.isArray(dataOrErrorMessage)) {
          return dataOrErrorMessage as Forest; // new query format
       } else {
@@ -199,6 +201,8 @@ async function queryForest(): Promise<Forest> {
    } else {
       const errorMessage = dataOrErrorMessage + (stdout ? '\n\n' + stdout : '') + (stderr ? '\n\n' + stderr : '');
       updateStatusBar({ valid: false, error: errorMessage as string });
+      // Parse stdout for structured diagnostics (Asai TTY format)
+      publishForesterDiagnostics(stdout, false);
 
       console.log(errorMessage);;
 

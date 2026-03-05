@@ -456,6 +456,7 @@
     "test:latex-hover": "pnpm dlx tsx src/latex-hover-core.test.ts",
     "test:tag-closure-inlay": "pnpm dlx tsx src/tag-closure-inlay-core.test.ts",
     "test:subtree-auto-id": "pnpm dlx tsx src/subtree-auto-id.test.ts",
+    "test:diagnostics": "pnpm dlx tsx src/forester-diagnostics.test.ts",
     "test:language-server": "pnpm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
     "package-ext": "pnpm run check-types && node esbuild.js --production",
     "package": "pnpm run package-ext && vsce package --no-dependencies",

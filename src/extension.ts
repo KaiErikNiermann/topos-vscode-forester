@@ -29,6 +29,7 @@ import { TransclusionTreeProvider } from "./transclusion-tree-view";
 import { BacklinksTreeProvider } from "./backlinks-view";
 import { ContributorsTreeProvider } from "./contributors-view";
 import { evalDatalogQuery } from "./datalog-query-runner";
+import { initForesterDiagnostics } from "./forester-diagnostics";
 
 const textDecoder = new TextDecoder("utf-8");
 
@@ -493,6 +494,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
    // Initialize status bar
    initStatusBar(context);
+
+   // Initialize forester build diagnostics (LaTeX errors, etc.)
+   initForesterDiagnostics(context);
 
    // Initialize link alias configuration (file watching for .forester-links.json)
    initLinkAliasConfig(context);

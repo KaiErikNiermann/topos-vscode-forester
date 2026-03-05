@@ -209,6 +209,79 @@ test("Block without file path is skipped", () => {
     assertEqual(diags.length, 0, "No file path → skip");
 });
 
+// ── Normalization tests ──
+
+function normalizeForMatch(s: string): string {
+    return s
+        .replace(/\s+(?=[{[\]})])/g, "")
+        .replace(/(?<=[{[\](])\s+/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+test("normalizeForMatch removes forester-inserted spaces", () => {
+    // Forester adds spaces before { and [
+    const foresterOutput = "\\begin {tikzcd}[cramped, column sep=tiny]";
+    const treeSource =     "\\begin{tikzcd}[cramped, column sep=tiny]";
+    assertEqual(normalizeForMatch(foresterOutput), normalizeForMatch(treeSource));
+});
+
+test("normalizeForMatch handles \\arrow with brackets", () => {
+    const foresterOutput = '\\arrow ["5", dashed, from=1-2, to=1-2]';
+    const treeSource =     '\\arrow["5", dashed, from=1-2, to=1-2]';
+    assertEqual(normalizeForMatch(foresterOutput), normalizeForMatch(treeSource));
+});
+
+test("normalizeForMatch collapses multiline to single line", () => {
+    const multiline = "\\begin{tikzcd}\n    A \\arrow[r] & B\n  \\end{tikzcd}";
+    const result = normalizeForMatch(multiline);
+    assertEqual(result.includes("\n"), false, "Should not contain newlines");
+    assertEqual(result.includes("\\begin{tikzcd}"), true);
+    assertEqual(result.includes("\\end{tikzcd}"), true);
+});
+
+// ── Hash extraction tests ──
+
+function extractHashesFromOutput(output: string): string[] {
+    const hashes: string[] = [];
+    const blocks = output.split(/(?=\s*￫\s)/);
+    for (const block of blocks) {
+        const hashMatch = block.match(/Building\s+\S*?\/([0-9a-f]{32})\.svg/);
+        if (hashMatch) { hashes.push(hashMatch[1]); }
+    }
+    return hashes;
+}
+
+test("Extract hash from Building log line", () => {
+    const output = ` ￫ info[log]
+ ￮
+ ￮ Building ./build/resources/31dbb42201f1cf39c88a29472ff3bc2f.svg
+
+ ￫ error[external_error]
+ ￭ /path/to/file.tree
+ 2 | \\tex{
+   ^ error message
+ ￮ `;
+    const hashes = extractHashesFromOutput(output);
+    assertEqual(hashes.length, 1);
+    assertEqual(hashes[0], "31dbb42201f1cf39c88a29472ff3bc2f");
+});
+
+test("Extract multiple hashes from output", () => {
+    const output = ` ￫ info[log]
+ ￮
+ ￮ Building ./build/resources/aaaa0000aaaa0000aaaa0000aaaa0000.svg
+
+ ￫ info[log]
+ ￮
+ ￮ Building ./build/resources/bbbb1111bbbb1111bbbb1111bbbb1111.svg
+`;
+    const hashes = extractHashesFromOutput(output);
+    assertEqual(hashes.length, 2);
+    assertEqual(hashes[0], "aaaa0000aaaa0000aaaa0000aaaa0000");
+    assertEqual(hashes[1], "bbbb1111bbbb1111bbbb1111bbbb1111");
+});
+
 // ── Summary ──
 console.log(`\n=== Test Results ===`);
 console.log(`Passed: ${passed}`);

@@ -156,17 +156,17 @@ export function findBracketMismatches(text: string, uri: string): Diagnostic[] {
     }
 
     while (i < text.length) {
-        // Skip % line comments
+        // Skip escaped characters: \{ \} \[ \] \% \( \)
+        if (text[i] === '\\' && i + 1 < text.length && '{}[]%()'.includes(text[i + 1])) {
+            advance(); advance();
+            continue;
+        }
+
+        // Skip % line comments (only unescaped %, since \% is handled above)
         if (text[i] === '%') {
             while (i < text.length && text[i] !== '\n') {
                 advance();
             }
-            continue;
-        }
-
-        // Skip escaped delimiters: \{ \} \[ \]
-        if (text[i] === '\\' && i + 1 < text.length && (text[i + 1] === '{' || text[i + 1] === '}' || text[i + 1] === '[' || text[i + 1] === ']')) {
-            advance(); advance();
             continue;
         }
 

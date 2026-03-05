@@ -20,7 +20,8 @@ export const BLOCK_COMMANDS: readonly string[] = [
 ];
 
 // Commands whose content should be preserved exactly (like \tex{preamble}{content})
-export const TEX_CONTENT_COMMANDS: readonly string[] = ["tex"];
+// \texfig and \ltexfig contain LaTeX/TikZ that must not be reformatted
+export const TEX_CONTENT_COMMANDS: readonly string[] = ["tex", "texfig", "ltexfig"];
 
 // Commands where the last brace argument contains code/content that should be preserved
 // but the command itself should be properly formatted (indented, on its own line)
@@ -119,8 +120,8 @@ export function extractIgnoredBlockContent(text: string, startPos: number): { co
     let consumedBrace = false;
 
     while (i < text.length) {
-        // Skip whitespace
-        const ws = skipWhitespace(text, i);
+        // Skip whitespace (including newlines) between arguments
+        const ws = skipWhitespace(text, i, /[\s]/);
         content += ws.whitespace;
         i = ws.endPos;
 
@@ -736,6 +737,7 @@ export function format(text: string, options: FormatOptions = {}): string {
                 lastWasNewline = t.value.endsWith("\n");
                 lastWasCommand = false;
                 consecutiveNewlines = 0;
+                pendingBlockCommand = null;
             })
             .with({ type: "ignored_block" }, (t) => {
                 // Preserve other ignored blocks exactly as-is
@@ -747,6 +749,7 @@ export function format(text: string, options: FormatOptions = {}): string {
                 lastWasNewline = t.value.endsWith("\n");
                 lastWasCommand = false;
                 consecutiveNewlines = 0;
+                pendingBlockCommand = null;
             })
             .with({ type: "comment" }, (t) => {
                 if (!lineStart) {

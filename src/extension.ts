@@ -735,6 +735,56 @@ export async function activate(context: vscode.ExtensionContext) {
 
    const completionProvider = await registerCompletionProvider();
    context.subscriptions.push(completionProvider);
+
+   // Taxon completion: scans workspace for existing taxons + hardcoded defaults
+   const DEFAULT_TAXONS = [
+      "Definition", "Theorem", "Lemma", "Proposition", "Corollary",
+      "Example", "Remark", "Note", "Proof", "Construction",
+      "Conjecture", "Exercise", "Problem", "Solution", "Reference", "Person", "Institution",
+   ];
+
+   const taxonCompletionProvider = vscode.languages.registerCompletionItemProvider(
+      { scheme: "file", language: "forester" },
+      {
+         async provideCompletionItems(doc, pos) {
+            const lineText = doc.getText(
+               new vscode.Range(new vscode.Position(pos.line, 0), pos),
+            );
+            // Only trigger inside \taxon{...}
+            const match = /\\taxon\{([^}]*)$/.exec(lineText);
+            if (!match) { return []; }
+
+            const typedSoFar = match[1];
+            const replaceRange = new vscode.Range(
+               new vscode.Position(pos.line, pos.character - typedSoFar.length),
+               pos,
+            );
+
+            // Collect taxons from workspace forest
+            const forest = await getForest({ fastReturnStale: true });
+            const seen = new Set<string>();
+            for (const t of DEFAULT_TAXONS) { seen.add(t); }
+            for (const tree of forest) {
+               if (tree.taxon) { seen.add(tree.taxon); }
+            }
+
+            // Sort: defaults first (in order), then workspace-discovered (alphabetical)
+            const defaultSet = new Set(DEFAULT_TAXONS);
+            const extra = [...seen].filter(t => !defaultSet.has(t)).sort();
+            const ordered = [...DEFAULT_TAXONS, ...extra];
+
+            return ordered.map((taxon, i) => {
+               const item = new vscode.CompletionItem(taxon, vscode.CompletionItemKind.EnumMember);
+               item.range = replaceRange;
+               item.detail = defaultSet.has(taxon) ? "Built-in taxon" : "Workspace taxon";
+               item.sortText = String(i).padStart(4, "0");
+               return item;
+            });
+         },
+      },
+      "{", // trigger on opening brace after \taxon
+   );
+   context.subscriptions.push(taxonCompletionProvider);
 }
 
 // This method is called when your extension is deactivated

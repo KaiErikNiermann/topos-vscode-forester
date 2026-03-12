@@ -108,10 +108,9 @@ export class TranscludeDecorationProvider {
 
       // Match various transclude patterns:
       // \transclude{id}
-      // \transclude{id} % comment
       // \import{id}
       // \export{id}
-      const transcludePattern = /\\(transclude|import|export)\{([^}]+)\}(?:\s*%[^\n]*)*/g;
+      const transcludePattern = /\\(transclude|import|export)\{([^}]+)\}/g;
 
       let match;
       while ((match = transcludePattern.exec(text)) !== null) {
@@ -119,8 +118,10 @@ export class TranscludeDecorationProvider {
          const startPos = editor.document.positionAt(match.index);
          const endPos = editor.document.positionAt(match.index + match[0].length);
 
-         // Skip if there's already a comment with title
-         if (match[0].includes('%')) {
+         // Skip if there's a same-line trailing comment (user-provided title)
+         const line = editor.document.lineAt(startPos.line).text;
+         const afterMatch = line.slice(endPos.character);
+         if (afterMatch.includes('%')) {
             continue;
          }
 

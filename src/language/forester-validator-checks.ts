@@ -65,8 +65,8 @@ const BUILTIN_ARITY: ReadonlyMap<string, { braceArgs: number; signature: string 
     ['\\patch',       { braceArgs: 2, signature: '\\patch{object}{methods}' }],
 ]);
 
-// ISO 8601 date: YYYY-MM-DD with basic month/day range validation
-const ISO_DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+// ISO 8601 date: YYYY-MM-DD with optional Thh:mm:ssZ timestamp
+const ISO_DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?(Z|[+-]([01]\d|2[0-3]):[0-5]\d)?)?$/;
 
 // Commands whose brace arg is a cross-file tree reference
 const CROSS_REF_COMMANDS: ReadonlySet<string> = new Set([

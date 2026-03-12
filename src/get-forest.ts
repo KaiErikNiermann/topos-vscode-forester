@@ -135,8 +135,11 @@ export async function getForest({ forceReload, fastReturnStale }: { forceReload?
 
    if (isInitialLoad) {
       updateStatusBar({ updating: true, step: `(2/2) Loaded ${result.length} trees` });
-      // Brief pause so the user can see the final step before it transitions
-      setTimeout(() => { isInitialLoad = false; }, 1500);
+      // Brief pause so the user can see the final count before transitioning to "valid"
+      setTimeout(() => {
+         isInitialLoad = false;
+         updateStatusBar({ valid: true });
+      }, 1500);
    }
 
    queryInProgressPromise = null;

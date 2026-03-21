@@ -4,7 +4,7 @@
   "description": "Enhanced VSCode support for forester",
   "repository": "github:KaiErikNiermann/topos-vscode-forester",
   "publisher": "KaiErikNiermann",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "packageManager": "pnpm@10.14.0",
   "engines": {
     "vscode": "^1.86.0"
@@ -460,7 +460,7 @@
     "test:language-server": "pnpm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",
     "package-ext": "pnpm run check-types && node esbuild.js --production",
     "package": "pnpm run package-ext && vsce package --no-dependencies",
-    "install-local": "pnpm run package && code --install-extension forest-keeper-*.vsix",
+    "install-local": "rm *.vsix && pnpm run package && code --install-extension forest-keeper-*.vsix",
     "package-install": "pnpm run package && code --install-extension forest-keeper-*.vsix"
   },
   "devDependencies": {
@@ -468,6 +468,7 @@
     "@types/vscode": "^1.86.0",
     "@typescript-eslint/eslint-plugin": "^6.19.1",
     "@typescript-eslint/parser": "^6.19.1",
+    "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.2",
     "eslint": "^8.56.0",
     "eslint-plugin-security": "^3.0.1",

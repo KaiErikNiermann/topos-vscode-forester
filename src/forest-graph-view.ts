@@ -44,6 +44,8 @@ export class ForestGraphView {
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private readonly _disposables: vscode.Disposable[] = [];
+    private _initialized = false;
+    private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -75,6 +77,7 @@ export class ForestGraphView {
 
     public dispose(): void {
         ForestGraphView.currentPanel = undefined;
+        if (this._debounceTimer) {clearTimeout(this._debounceTimer);}
         this._panel.dispose();
         for (const d of this._disposables) {d.dispose();}
         this._disposables.length = 0;
@@ -104,7 +107,10 @@ export class ForestGraphView {
         );
 
         this._disposables.push(
-            onForestChange(() => void this._update()),
+            onForestChange(() => {
+                if (this._debounceTimer) {clearTimeout(this._debounceTimer);}
+                this._debounceTimer = setTimeout(() => void this._update(), 300);
+            }),
             vscode.window.onDidChangeActiveTextEditor(() => this._sendHighlight()),
         );
     }
@@ -118,9 +124,14 @@ export class ForestGraphView {
 
     private async _update(): Promise<void> {
         const data = await this._buildGraphData();
-        this._panel.webview.html = this._getHtml(data);
-        // Give the WebView a moment to load before sending the initial highlight.
-        setTimeout(() => this._sendHighlight(), 300);
+        if (!this._initialized) {
+            this._panel.webview.html = this._getHtml(data);
+            this._initialized = true;
+            setTimeout(() => this._sendHighlight(), 300);
+        } else {
+            this._panel.webview.postMessage({ type: 'updateData', data });
+            setTimeout(() => this._sendHighlight(), 100);
+        }
     }
 
     // ── Graph data ────────────────────────────────────────────────────────────
@@ -156,14 +167,20 @@ export class ForestGraphView {
             { re: /\[\[([^\]]+)\]\]/g,         type: 'ref' },
         ];
 
+        // Read all files in parallel
+        const fileContents = await Promise.all(
+            filteredForest.map(async (tree) => {
+                try {
+                    return { tree, content: await fs.promises.readFile(tree.sourcePath, 'utf-8') };
+                } catch {
+                    return { tree, content: null };
+                }
+            }),
+        );
+
         const edges: GraphEdge[] = [];
-        for (const tree of filteredForest) {
-            let content: string;
-            try {
-                content = fs.readFileSync(tree.sourcePath, 'utf-8');
-            } catch {
-                continue;
-            }
+        for (const { tree, content } of fileContents) {
+            if (!content) {continue;}
             for (const line of content.split('\n')) {
                 if (line.trimStart().startsWith('%')) {continue;} // skip comments
                 for (const { re, type } of EDGE_PATTERNS) {
@@ -365,25 +382,35 @@ export class ForestGraphView {
   (function () {
     'use strict';
     const vscode = acquireVsCodeApi();
-    const data = ${graphJson};
 
-    // ── Pre-compute in-degree (before D3 resolves edge references) ───────────
-    const inDegree = Object.create(null);
-    for (const e of data.edges) {
-      inDegree[e.target] = (inDegree[e.target] || 0) + 1;
-    }
+    // ── Mutable state ─────────────────────────────────────────────────────────
+    let data = ${graphJson};
+    let inDegree = Object.create(null);
+    const adj = new Map();
+    let clusterByNode = new Map();
+    let clusterCenters = new Map();
+    let clusterKeys = [];
+    const hiddenTaxons = new Set();
+    let searchQuery = '';
+    let editorHighlight = null;
+    let currentHighlight = null;
+    let sim = null;
+    let linkSel = null;
+    let nodeSel = null;
+    let currentTaxonSet = [];
 
-    // ── Dimensions ───────────────────────────────────────────────────────────
+    // ── Dimensions ────────────────────────────────────────────────────────────
     const W = () => window.innerWidth;
     const H = () => window.innerHeight;
 
-    // ── SVG + zoom container ─────────────────────────────────────────────────
+    // ── SVG + zoom container ──────────────────────────────────────────────────
     const svg = d3.select('#graph');
     const g   = svg.append('g');
+    let currentZoom = d3.zoomIdentity;
 
     const zoom = d3.zoom()
       .scaleExtent([0.03, 10])
-      .on('zoom', ev => g.attr('transform', ev.transform));
+      .on('zoom', ev => { g.attr('transform', ev.transform); currentZoom = ev.transform; });
     svg.call(zoom);
 
     document.getElementById('reset-btn').addEventListener('click', () => {
@@ -393,18 +420,24 @@ export class ForestGraphView {
         .translate(-W() / 2, -H() / 2));
     });
 
-    // ── Colour scale (taxon → colour, stable across all cluster modes) ────────
-    const taxonSet = [...new Set(data.nodes.map(n => n.taxon || '(untaxoned)'))].sort();
-    const colorOf  = d3.scaleOrdinal(d3.schemeTableau10).domain(taxonSet);
+    // ── Colour scale (grows monotonically to keep colours stable across updates)
+    const colorOf = d3.scaleOrdinal(d3.schemeTableau10);
+    const knownTaxons = [];
 
-    // ── Undirected adjacency list (all edge types, built before sim mutates edges)
-    const adj = new Map(data.nodes.map(n => [n.id, new Set()]));
-    for (const e of data.edges) {
-      adj.get(e.source)?.add(e.target);
-      adj.get(e.target)?.add(e.source);
+    function updateColorDomain(taxonSet) {
+      for (const t of taxonSet) {
+        if (!knownTaxons.includes(t)) knownTaxons.push(t);
+      }
+      knownTaxons.sort();
+      colorOf.domain(knownTaxons);
     }
 
-    // ── Community detection via label propagation (20 iterations) ────────────
+    // ── Node radius ───────────────────────────────────────────────────────────
+    function nodeRadius(d) {
+      return 5 + Math.sqrt(inDegree[d.id] || 0) * 1.8;
+    }
+
+    // ── Community detection via label propagation (20 iterations) ─────────────
     function detectCommunities() {
       const labels = new Map(data.nodes.map(n => [n.id, n.id]));
       for (let iter = 0; iter < 20; iter++) {
@@ -429,11 +462,7 @@ export class ForestGraphView {
       return new Map([...labels].map(([k, v]) => [k, norm.get(v)]));
     }
 
-    // ── Mutable cluster state ─────────────────────────────────────────────────
-    let clusterByNode = new Map();
-    let clusterCenters = new Map();
-    let clusterKeys = [];
-
+    // ── Cluster helpers ───────────────────────────────────────────────────────
     function computeClusterCenters() {
       clusterKeys = [...new Set(clusterByNode.values())].sort((a, b) =>
         String(a).localeCompare(String(b)));
@@ -469,7 +498,7 @@ export class ForestGraphView {
 
     // Custom force: pull every node toward its cluster centre
     function forceCluster(alpha) {
-      if (clusterKeys.length < 2) return; // single cluster or no clustering — skip
+      if (clusterKeys.length < 2) return;
       const str = alpha * 0.26;
       for (const d of data.nodes) {
         const c = clusterCenters.get(clusterByNode.get(d.id));
@@ -479,261 +508,21 @@ export class ForestGraphView {
       }
     }
 
-    // Initialise with taxon clustering (before sim creation so edges are still strings)
-    clusterByNode = new Map(data.nodes.map(n => [n.id, n.taxon || '(untaxoned)']));
-    computeClusterCenters();
-    tagEdges();
-    seedNodes();
+    // ── SVG groups (persistent across updates) ────────────────────────────────
+    const linkG = g.append('g').attr('class', 'links');
+    const nodeG = g.append('g').attr('class', 'nodes');
 
-    // ── Node radius ───────────────────────────────────────────────────────────
-    function nodeRadius(d) {
-      return 5 + Math.sqrt(inDegree[d.id] || 0) * 1.8;
-    }
-
-    // ── Force simulation ─────────────────────────────────────────────────────
-    const sim = d3.forceSimulation(data.nodes)
-      .force('link', d3.forceLink(data.edges)
-        .id(d => d.id)
-        .distance(e => e._cross ? 280 : 55)
-        .strength(e => e._cross ? 0.05 : 0.6))
-      .force('charge', d3.forceManyBody()
-        .strength(d => -300 - (inDegree[d.id] || 0) * 20))
-      .force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04))
-      .force('collide', d3.forceCollide(d => nodeRadius(d) + 14))
-      .force('cluster', forceCluster);
-
-    // ── Drag behaviour ───────────────────────────────────────────────────────
+    // ── Drag behaviour (reads mutable sim at call-time) ───────────────────────
     const drag = d3.drag()
       .on('start', (ev, d) => {
-        if (!ev.active) sim.alphaTarget(0.3).restart();
+        if (!ev.active && sim) sim.alphaTarget(0.3).restart();
         d.fx = d.x; d.fy = d.y;
       })
       .on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
       .on('end',  (ev, d) => {
-        if (!ev.active) sim.alphaTarget(0);
+        if (!ev.active && sim) sim.alphaTarget(0);
         d.fx = null; d.fy = null;
       });
-
-    // ── Draw edges (cross-cluster first so they render behind intra-cluster) ──
-    const linkG = g.append('g').attr('class', 'links');
-    const linkSel = linkG.selectAll('line')
-      .data([...data.edges].sort((a, b) => (b._cross ? 0 : 1) - (a._cross ? 0 : 1)))
-      .join('line')
-        .attr('class', d => 'link ' + d.type + (d._cross ? ' cross-cluster' : ''))
-        .attr('stroke-width', d => d._cross ? 0.7 : 1.5)
-        .attr('marker-end', d => d._cross ? null : 'url(#arr-' + d.type + ')');
-
-    // ── Draw nodes ───────────────────────────────────────────────────────────
-    const nodeG = g.append('g').attr('class', 'nodes');
-    const nodeSel = nodeG.selectAll('g.node')
-      .data(data.nodes)
-      .join('g')
-        .attr('class', 'node')
-        .call(drag);
-
-    nodeSel.append('circle')
-      .attr('r',    d => nodeRadius(d))
-      .attr('fill', d => colorOf(d.taxon || '(untaxoned)'))
-      .on('click',     (ev, d) => {
-        ev.stopPropagation();
-        vscode.postMessage({ type: 'openFile', sourcePath: d.sourcePath });
-      })
-      .on('mouseover', (ev, d) => {
-        currentHighlight = d.id;
-        applyVisibility();
-        showTooltip(ev, d);
-      })
-      .on('mousemove', moveTooltip)
-      .on('mouseout',  () => {
-        currentHighlight = editorHighlight;
-        applyVisibility();
-        hideTooltip();
-      });
-
-    nodeSel.append('text')
-      .attr('dx', d => nodeRadius(d) + 3)
-      .attr('dy', '0.35em')
-      .text(d => d.title.length > 26 ? d.title.slice(0, 24) + '\u2026' : d.title);
-
-    // ── Tick ─────────────────────────────────────────────────────────────────
-    sim.on('tick', () => {
-      linkSel
-        .attr('x1', d => d.source.x)
-        .attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x)
-        .attr('y2', d => d.target.y);
-      nodeSel.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
-    });
-
-    // ── Stats ────────────────────────────────────────────────────────────────
-    document.getElementById('stats').textContent =
-      data.nodes.length + ' nodes \u00b7 ' + data.edges.length + ' edges';
-
-    // ── Apply clustering (called on dropdown change; linkSel/sim already exist) ─
-    function applyClustering(method) {
-      if (method === 'taxon') {
-        clusterByNode = new Map(data.nodes.map(n => [n.id, n.taxon || '(untaxoned)']));
-      } else if (method === 'community') {
-        const comm = detectCommunities();
-        clusterByNode = new Map([...comm].map(([k, v]) => [k, v]));
-      } else {
-        // 'none': single cluster — forceCluster is disabled when clusterKeys.length < 2
-        clusterByNode = new Map(data.nodes.map(n => [n.id, 0]));
-      }
-      computeClusterCenters();
-      tagEdges(); // edges are D3 node objects at this point
-      seedNodes();
-      sim.force('link')
-        .distance(e => e._cross ? 280 : 55)
-        .strength(e => e._cross ? 0.05 : 0.6);
-      // Refresh link visual classes
-      linkSel
-        .attr('class', d => 'link ' + d.type + (d._cross ? ' cross-cluster' : ''))
-        .attr('stroke-width', d => d._cross ? 0.7 : 1.5)
-        .attr('marker-end', d => d._cross ? null : 'url(#arr-' + d.type + ')');
-      sim.alpha(0.9).restart();
-    }
-
-    document.getElementById('cluster-method').addEventListener('change', ev => {
-      applyClustering(ev.target.value);
-    });
-
-    // ── Taxon legend (DOM API — avoids CSP blocking of innerHTML inline styles)
-    const hiddenTaxons = new Set();
-    const legendEl = document.getElementById('taxon-legend');
-
-    const taxonCounts = Object.create(null);
-    for (const n of data.nodes) {
-      const t = n.taxon || '(untaxoned)';
-      taxonCounts[t] = (taxonCounts[t] || 0) + 1;
-    }
-
-    for (const taxon of taxonSet) {
-      const item = document.createElement('div');
-      item.className = 'legend-item';
-
-      const swatch = document.createElement('div');
-      swatch.className = 'swatch';
-      swatch.style.background = colorOf(taxon); // set via JS — not blocked by style-src CSP
-
-      const label = document.createElement('span');
-      label.className = 'legend-label';
-      label.textContent = taxon;
-
-      const count = document.createElement('span');
-      count.className = 'legend-count';
-      count.textContent = String(taxonCounts[taxon] || 0);
-
-      item.appendChild(swatch);
-      item.appendChild(label);
-      item.appendChild(count);
-
-      item.addEventListener('click', () => {
-        if (hiddenTaxons.has(taxon)) {
-          hiddenTaxons.delete(taxon);
-          item.classList.remove('hidden');
-        } else {
-          hiddenTaxons.add(taxon);
-          item.classList.add('hidden');
-        }
-        applyVisibility();
-      });
-      legendEl.appendChild(item);
-    }
-
-    // ── Edge legend (DOM API for consistency) ─────────────────────────────────
-    const EDGE_ENTRIES = [
-      { color: '#4fc3f7', label: 'transclude' },
-      { color: '#81c784', label: 'import' },
-      { color: '#ffb74d', label: 'export' },
-      { color: '#ce93d8', label: 'ref' },
-    ];
-    const edgeLegendEl = document.getElementById('edge-legend');
-    for (const { color, label } of EDGE_ENTRIES) {
-      const item = document.createElement('div');
-      item.className = 'edge-item';
-      const line = document.createElement('div');
-      line.className = 'edge-line';
-      line.style.background = color;
-      const lbl = document.createElement('span');
-      lbl.textContent = label;
-      item.appendChild(line);
-      item.appendChild(lbl);
-      edgeLegendEl.appendChild(item);
-    }
-    // Cross-cluster indicator
-    const crossItem = document.createElement('div');
-    crossItem.className = 'edge-item';
-    crossItem.style.opacity = '0.45';
-    crossItem.style.marginTop = '3px';
-    const crossLine = document.createElement('div');
-    crossLine.className = 'edge-line';
-    crossLine.style.background = 'repeating-linear-gradient(90deg,#888 0,#888 4px,transparent 4px,transparent 8px)';
-    const crossLbl = document.createElement('span');
-    crossLbl.style.fontStyle = 'italic';
-    crossLbl.textContent = 'cross-cluster';
-    crossItem.appendChild(crossLine);
-    crossItem.appendChild(crossLbl);
-    edgeLegendEl.appendChild(crossItem);
-
-    // ── Search ────────────────────────────────────────────────────────────────
-    let searchQuery = '';
-    document.getElementById('search').addEventListener('input', ev => {
-      searchQuery = ev.target.value.toLowerCase().trim();
-      editorHighlight = null;
-      currentHighlight = null;
-      applyVisibility();
-    });
-
-    // ── Visibility / highlight ────────────────────────────────────────────────
-    // editorHighlight: set by active-editor sync, persists between hovers
-    // currentHighlight: editorHighlight OR the node currently under the cursor
-    let editorHighlight = null;
-    let currentHighlight = null;
-
-    function resolveId(ref) {
-      return typeof ref === 'object' ? ref.id : ref;
-    }
-
-    function getNeighbourhood(treeId) {
-      const hood = new Set([treeId]);
-      for (const e of data.edges) {
-        const src = resolveId(e.source);
-        const tgt = resolveId(e.target);
-        if (src === treeId) hood.add(tgt);
-        if (tgt === treeId) hood.add(src);
-      }
-      return hood;
-    }
-
-    function nodeVisible(d) {
-      if (hiddenTaxons.has(d.taxon || '(untaxoned)')) return false;
-      if (!searchQuery) return true;
-      return d.id.toLowerCase().includes(searchQuery) ||
-             d.title.toLowerCase().includes(searchQuery) ||
-             (d.taxon || '').toLowerCase().includes(searchQuery);
-    }
-
-    function applyVisibility() {
-      let visible;
-      if (currentHighlight) {
-        visible = getNeighbourhood(currentHighlight);
-      } else {
-        visible = new Set(data.nodes.filter(nodeVisible).map(n => n.id));
-      }
-
-      nodeSel.classed('dimmed', d => !visible.has(d.id));
-      linkSel.classed('dimmed', d => {
-        const src = resolveId(d.source);
-        const tgt = resolveId(d.target);
-        return !(visible.has(src) && visible.has(tgt));
-      });
-      // Promote visible cross-cluster links to full opacity while a node is highlighted
-      linkSel.classed('link-active', d => {
-        if (!d._cross || !currentHighlight) return false;
-        return visible.has(resolveId(d.source)) && visible.has(resolveId(d.target));
-      });
-    }
 
     // ── Tooltip ───────────────────────────────────────────────────────────────
     const tooltip = document.getElementById('tooltip');
@@ -764,6 +553,318 @@ export class ForestGraphView {
 
     function hideTooltip() { tooltip.style.display = 'none'; }
 
+    // ── Visibility / highlight ────────────────────────────────────────────────
+    function resolveId(ref) {
+      return typeof ref === 'object' ? ref.id : ref;
+    }
+
+    function getNeighbourhood(treeId) {
+      const hood = new Set([treeId]);
+      const nbrs = adj.get(treeId);
+      if (nbrs) for (const n of nbrs) hood.add(n);
+      return hood;
+    }
+
+    function nodeVisible(d) {
+      if (hiddenTaxons.has(d.taxon || '(untaxoned)')) return false;
+      if (!searchQuery) return true;
+      return d.id.toLowerCase().includes(searchQuery) ||
+             d.title.toLowerCase().includes(searchQuery) ||
+             (d.taxon || '').toLowerCase().includes(searchQuery);
+    }
+
+    function applyVisibility() {
+      if (!nodeSel || !linkSel) return;
+      let visible;
+      if (currentHighlight) {
+        visible = getNeighbourhood(currentHighlight);
+      } else {
+        visible = new Set(data.nodes.filter(nodeVisible).map(n => n.id));
+      }
+
+      nodeSel.classed('dimmed', d => !visible.has(d.id));
+      linkSel.classed('dimmed', d => {
+        const src = resolveId(d.source);
+        const tgt = resolveId(d.target);
+        return !(visible.has(src) && visible.has(tgt));
+      });
+      linkSel.classed('link-active', d => {
+        if (!d._cross || !currentHighlight) return false;
+        return visible.has(resolveId(d.source)) && visible.has(resolveId(d.target));
+      });
+    }
+
+    // ── Taxon legend (rebuilt on each renderGraph) ────────────────────────────
+    function rebuildTaxonLegend() {
+      const legendEl = document.getElementById('taxon-legend');
+      legendEl.textContent = '';
+
+      const taxonCounts = Object.create(null);
+      for (const n of data.nodes) {
+        const t = n.taxon || '(untaxoned)';
+        taxonCounts[t] = (taxonCounts[t] || 0) + 1;
+      }
+
+      for (const taxon of currentTaxonSet) {
+        const item = document.createElement('div');
+        item.className = 'legend-item' + (hiddenTaxons.has(taxon) ? ' hidden' : '');
+
+        const swatch = document.createElement('div');
+        swatch.className = 'swatch';
+        swatch.style.background = colorOf(taxon);
+
+        const label = document.createElement('span');
+        label.className = 'legend-label';
+        label.textContent = taxon;
+
+        const count = document.createElement('span');
+        count.className = 'legend-count';
+        count.textContent = String(taxonCounts[taxon] || 0);
+
+        item.appendChild(swatch);
+        item.appendChild(label);
+        item.appendChild(count);
+
+        item.addEventListener('click', () => {
+          if (hiddenTaxons.has(taxon)) {
+            hiddenTaxons.delete(taxon);
+            item.classList.remove('hidden');
+          } else {
+            hiddenTaxons.add(taxon);
+            item.classList.add('hidden');
+          }
+          applyVisibility();
+        });
+        legendEl.appendChild(item);
+      }
+    }
+
+    // ── Edge legend (static, built once) ──────────────────────────────────────
+    const EDGE_ENTRIES = [
+      { color: '#4fc3f7', label: 'transclude' },
+      { color: '#81c784', label: 'import' },
+      { color: '#ffb74d', label: 'export' },
+      { color: '#ce93d8', label: 'ref' },
+    ];
+    const edgeLegendEl = document.getElementById('edge-legend');
+    for (const { color, label } of EDGE_ENTRIES) {
+      const item = document.createElement('div');
+      item.className = 'edge-item';
+      const line = document.createElement('div');
+      line.className = 'edge-line';
+      line.style.background = color;
+      const lbl = document.createElement('span');
+      lbl.textContent = label;
+      item.appendChild(line);
+      item.appendChild(lbl);
+      edgeLegendEl.appendChild(item);
+    }
+    const crossItem = document.createElement('div');
+    crossItem.className = 'edge-item';
+    crossItem.style.opacity = '0.45';
+    crossItem.style.marginTop = '3px';
+    const crossLine = document.createElement('div');
+    crossLine.className = 'edge-line';
+    crossLine.style.background = 'repeating-linear-gradient(90deg,#888 0,#888 4px,transparent 4px,transparent 8px)';
+    const crossLbl = document.createElement('span');
+    crossLbl.style.fontStyle = 'italic';
+    crossLbl.textContent = 'cross-cluster';
+    crossItem.appendChild(crossLine);
+    crossItem.appendChild(crossLbl);
+    edgeLegendEl.appendChild(crossItem);
+
+    // ── renderGraph — (re)builds the force simulation and D3 selections ───────
+    //    Called on initial load and on each incremental updateData message.
+    //    When preserve=true, existing node positions and zoom are kept.
+    function renderGraph(newData, preserve) {
+      // Save positions from current nodes before teardown
+      const oldPos = new Map();
+      if (preserve) {
+        for (const n of data.nodes) {
+          if (n.x != null) oldPos.set(n.id, { x: n.x, y: n.y });
+        }
+      }
+
+      if (sim) sim.stop();
+
+      // Replace data
+      data = newData;
+
+      // Recompute in-degree
+      inDegree = Object.create(null);
+      for (const e of data.edges) {
+        inDegree[e.target] = (inDegree[e.target] || 0) + 1;
+      }
+
+      // Rebuild adjacency map
+      adj.clear();
+      for (const n of data.nodes) adj.set(n.id, new Set());
+      for (const e of data.edges) {
+        adj.get(e.source)?.add(e.target);
+        adj.get(e.target)?.add(e.source);
+      }
+
+      // Update colour domain (monotonically growing for stability)
+      currentTaxonSet = [...new Set(data.nodes.map(n => n.taxon || '(untaxoned)'))].sort();
+      updateColorDomain(currentTaxonSet);
+
+      // Compute clusters based on current dropdown selection
+      const method = document.getElementById('cluster-method').value;
+      if (method === 'taxon') {
+        clusterByNode = new Map(data.nodes.map(n => [n.id, n.taxon || '(untaxoned)']));
+      } else if (method === 'community') {
+        clusterByNode = new Map([...detectCommunities()].map(([k, v]) => [k, v]));
+      } else {
+        clusterByNode = new Map(data.nodes.map(n => [n.id, 0]));
+      }
+      computeClusterCenters();
+      tagEdges();
+
+      // Seed node positions: restore existing, cluster-seed new ones
+      for (const d of data.nodes) {
+        const old = oldPos.get(d.id);
+        if (old) {
+          d.x = old.x; d.y = old.y;
+        } else {
+          const c = clusterCenters.get(clusterByNode.get(d.id));
+          d.x = (c ? c.x : W() / 2) + (Math.random() - 0.5) * 50;
+          d.y = (c ? c.y : H() / 2) + (Math.random() - 0.5) * 50;
+        }
+        d.vx = 0; d.vy = 0;
+      }
+
+      // ── Rebuild D3 selections ───────────────────────────────────────────────
+      linkG.selectAll('*').remove();
+      nodeG.selectAll('*').remove();
+
+      const sortedEdges = [...data.edges].sort(
+        (a, b) => (b._cross ? 0 : 1) - (a._cross ? 0 : 1));
+
+      linkSel = linkG.selectAll('line')
+        .data(sortedEdges)
+        .join('line')
+          .attr('class', d => 'link ' + d.type + (d._cross ? ' cross-cluster' : ''))
+          .attr('stroke-width', d => d._cross ? 0.7 : 1.5)
+          .attr('marker-end', d => d._cross ? null : 'url(#arr-' + d.type + ')');
+
+      nodeSel = nodeG.selectAll('g.node')
+        .data(data.nodes)
+        .join('g')
+          .attr('class', 'node')
+          .call(drag);
+
+      nodeSel.append('circle')
+        .attr('r',    d => nodeRadius(d))
+        .attr('fill', d => colorOf(d.taxon || '(untaxoned)'))
+        .on('click',     (ev, d) => {
+          ev.stopPropagation();
+          vscode.postMessage({ type: 'openFile', sourcePath: d.sourcePath });
+        })
+        .on('mouseover', (ev, d) => {
+          currentHighlight = d.id;
+          applyVisibility();
+          showTooltip(ev, d);
+        })
+        .on('mousemove', moveTooltip)
+        .on('mouseout',  () => {
+          currentHighlight = editorHighlight;
+          applyVisibility();
+          hideTooltip();
+        });
+
+      nodeSel.append('text')
+        .attr('dx', d => nodeRadius(d) + 3)
+        .attr('dy', '0.35em')
+        .text(d => d.title.length > 26 ? d.title.slice(0, 24) + '\\u2026' : d.title);
+
+      // ── Force simulation ────────────────────────────────────────────────────
+      sim = d3.forceSimulation(data.nodes)
+        .force('link', d3.forceLink(data.edges)
+          .id(d => d.id)
+          .distance(e => e._cross ? 280 : 55)
+          .strength(e => e._cross ? 0.05 : 0.6))
+        .force('charge', d3.forceManyBody()
+          .strength(d => -300 - (inDegree[d.id] || 0) * 20)
+          .theta(1.2))
+        .force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04))
+        .force('collide', d3.forceCollide(d => nodeRadius(d) + 14))
+        .force('cluster', forceCluster);
+
+      // rAF-throttled tick: coalesce multiple sim ticks per display frame
+      let tickScheduled = false;
+      sim.on('tick', () => {
+        if (tickScheduled) return;
+        tickScheduled = true;
+        requestAnimationFrame(() => {
+          tickScheduled = false;
+          linkSel
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+          nodeSel.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+        });
+      });
+
+      // Gentle alpha on updates so existing layout is preserved; full alpha on first render
+      sim.alpha(preserve ? 0.3 : 1).restart();
+
+      // ── Rebuild legend & stats ──────────────────────────────────────────────
+      rebuildTaxonLegend();
+
+      document.getElementById('stats').textContent =
+        data.nodes.length + ' nodes \\u00b7 ' + data.edges.length + ' edges';
+
+      // Restore zoom transform on incremental updates
+      if (preserve && currentZoom !== d3.zoomIdentity) {
+        svg.call(zoom.transform, currentZoom);
+      }
+    }
+
+    // ── Apply clustering (dropdown change — lighter than full renderGraph) ────
+    function applyClustering(method) {
+      if (method === 'taxon') {
+        clusterByNode = new Map(data.nodes.map(n => [n.id, n.taxon || '(untaxoned)']));
+      } else if (method === 'community') {
+        const comm = detectCommunities();
+        clusterByNode = new Map([...comm].map(([k, v]) => [k, v]));
+      } else {
+        clusterByNode = new Map(data.nodes.map(n => [n.id, 0]));
+      }
+      computeClusterCenters();
+      tagEdges();
+      seedNodes();
+      if (sim) {
+        sim.force('link')
+          .distance(e => e._cross ? 280 : 55)
+          .strength(e => e._cross ? 0.05 : 0.6);
+      }
+      if (linkSel) {
+        linkSel
+          .attr('class', d => 'link ' + d.type + (d._cross ? ' cross-cluster' : ''))
+          .attr('stroke-width', d => d._cross ? 0.7 : 1.5)
+          .attr('marker-end', d => d._cross ? null : 'url(#arr-' + d.type + ')');
+      }
+      if (sim) sim.alpha(0.9).restart();
+    }
+
+    document.getElementById('cluster-method').addEventListener('change', ev => {
+      applyClustering(ev.target.value);
+    });
+
+    // ── Search (debounced) ────────────────────────────────────────────────────
+    let searchTimer;
+    document.getElementById('search').addEventListener('input', ev => {
+      const val = ev.target.value.toLowerCase().trim();
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        searchQuery = val;
+        editorHighlight = null;
+        currentHighlight = null;
+        applyVisibility();
+      }, 120);
+    });
+
     // Clear persistent highlight when clicking on empty canvas
     svg.on('click', () => {
       editorHighlight = null;
@@ -779,14 +880,24 @@ export class ForestGraphView {
         currentHighlight = msg.treeId;
         applyVisibility();
       }
+      if (msg.type === 'updateData') {
+        renderGraph(msg.data, true);
+      }
     });
 
     // ── Resize ────────────────────────────────────────────────────────────────
     window.addEventListener('resize', () => {
       computeClusterCenters();
-      sim.force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04));
-      sim.alpha(0.15).restart();
+      if (sim) {
+        sim.force('center', d3.forceCenter(W() / 2, H() / 2).strength(0.04));
+        sim.alpha(0.15).restart();
+      }
     });
+
+    // ── Initial render ────────────────────────────────────────────────────────
+    if (data.nodes.length > 0) {
+      renderGraph(data, false);
+    }
 
   }());
   </script>

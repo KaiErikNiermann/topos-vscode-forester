@@ -152,6 +152,26 @@ function isBindingSite(node: Command): boolean {
     return isCommand(prev) && LEXICAL_BINDING_COMMANDS.has(prev.name);
 }
 
+/**
+ * Return true if `node` sits on a line whose effective content begins with `%`.
+ *
+ * The Langium grammar declares `COMMENT` as a hidden terminal, so comment
+ * lines should normally never produce AST nodes.  However, certain
+ * tokenization edge-cases (e.g. `%` inside deeply nested brace groups) can
+ * let a command through.  This guard prevents false-positive diagnostics
+ * from firing on commented-out code.
+ */
+function isOnCommentLine(node: AstNode): boolean {
+    const cst = node.$cstNode;
+    if (!cst) return false;
+    const doc = AstUtils.getDocument(node);
+    const text = doc.textDocument.getText();
+    // Walk backwards from the node's start offset to find the beginning of its line
+    const lineStart = text.lastIndexOf('\n', cst.offset - 1) + 1;
+    const linePrefix = text.slice(lineStart, cst.offset);
+    return /^\s*%/.test(linePrefix);
+}
+
 /** Extract the raw text content from the first BraceArg of a Command. */
 function firstBraceArgText(node: Command): string {
     const braceArg = node.args.find(isBraceArg);
@@ -272,6 +292,7 @@ export class ForesterChecks {
         if (!this.documents || !CROSS_REF_COMMANDS.has(node.name)) {
             return;
         }
+        if (isOnCommentLine(node)) return;
 
         const treeId = firstBraceArgText(node);
         if (!treeId) {
@@ -311,6 +332,7 @@ export class ForesterChecks {
      */
     checkUnresolvedCommand(node: Command, accept: ValidationAcceptor): void {
         if (!this.documents) return;
+        if (isOnCommentLine(node)) return;
 
         // Skip XML-special command name forms
         if (node.name.startsWith('\\xmlns:') || node.name.startsWith('\\<')) return;
@@ -350,6 +372,7 @@ export class ForesterChecks {
      */
     checkMissingImport(node: Command, accept: ValidationAcceptor): void {
         if (!this.documents) return;
+        if (isOnCommentLine(node)) return;
         if (node.name.startsWith('\\xmlns:') || node.name.startsWith('\\<')) return;
         if (ALL_BUILTIN_COMMANDS.has(node.name)) return;
         if (isInTexMode(node)) return;
@@ -415,6 +438,7 @@ export class ForesterChecks {
      */
     checkTransclusionCycle(node: Command, accept: ValidationAcceptor): void {
         if (!this.documents || node.name !== '\\transclude') return;
+        if (isOnCommentLine(node)) return;
 
         const target = firstBraceArgText(node);
         if (!target) return;

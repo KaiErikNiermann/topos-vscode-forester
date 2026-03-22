@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/titlecard-dark.png" />
     <source media="(prefers-color-scheme: light)" srcset="assets/titlecard-light.png" />
-    <img alt="Forester" src="assets/titlecard-light.png" height="94" />
+    <img alt="Forester" src="assets/titlecard-universal.png" height="94" />
   </picture>
 </p>
 

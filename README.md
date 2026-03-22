@@ -1,18 +1,3 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/titlecard-dark.png" />
-    <source media="(prefers-color-scheme: light)" srcset="assets/titlecard-light.png" />
-    <img alt="Forester" src="assets/titlecard-universal.png" height="94" />
-  </picture>
-</p>
-
-<p align="center">
-  VSCode support for <a href="https://www.jonmsterling.com/jms-005P.xml">Forester</a>, a tool for scientific notes.<br>
-  Forked from <a href="https://github.com/filmerjarred/topos-vscode-forester">topos-vscode-forester</a> (Jarred Filmer / Topos Institute), which was itself forked from <a href="https://github.com/Trebor-Huang/vscode-forester">vscode-forester</a> (Trebor-Huang).
-</p>
-
----
-
 ## Features
 
 ### Language Support

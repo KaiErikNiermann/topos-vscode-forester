@@ -4,7 +4,7 @@
   "description": "Enhanced VSCode support for forester",
   "repository": "github:KaiErikNiermann/topos-vscode-forester",
   "publisher": "KaiErikNiermann",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "packageManager": "pnpm@10.14.0",
   "engines": {
     "vscode": "^1.86.0"

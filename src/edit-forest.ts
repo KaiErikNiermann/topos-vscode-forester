@@ -470,12 +470,23 @@ export async function renameTreeCommand(treeIdParam?: string): Promise<void> {
  * This is the low-level rename implementation
  */
 export async function renameTreeById(treeId: string): Promise<void> {
-   // Get the tree object
+   // Get cached tree for metadata (title, taxon)
    const tree = await getTree(treeId);
    if (!tree) {
       vscode.window.showErrorMessage(`Tree ${treeId} not found`);
       return;
    }
+
+   // Resolve the actual file from the filesystem rather than relying on the
+   // forest cache, which can be stale after rapid tree creation/deletion and
+   // could point to the wrong file — causing one tree's content to overwrite
+   // another (see: content-duplication bug).
+   //
+   // For inline subtrees (\subtree[id]{...}), no standalone .tree file exists;
+   // the cached sourcePath correctly points to the parent file that contains
+   // the subtree definition, so we fall back to it.
+   const treeFiles = await vscode.workspace.findFiles(`**/${treeId}.tree`, null, 1);
+   const resolvedPath = treeFiles[0]?.fsPath ?? tree.sourcePath;
 
    // Prepare current value for input
    const currentTaxon = tree.taxon || '';
@@ -508,7 +519,7 @@ export async function renameTreeById(treeId: string): Promise<void> {
    const { taxon: newTaxon, title: newTitle } = titleResult;
 
    // Read the current file
-   const fileContent = await vscode.workspace.fs.readFile(vscode.Uri.file(tree.sourcePath));
+   const fileContent = await vscode.workspace.fs.readFile(vscode.Uri.file(resolvedPath));
    const text = Buffer.from(fileContent).toString('utf-8');
    const lines = text.split('\n');
 
@@ -559,7 +570,7 @@ export async function renameTreeById(treeId: string): Promise<void> {
    // Write the updated content back using WorkspaceEdit to trigger file events
    const updatedContent = lines.join('\n');
    const edit = new vscode.WorkspaceEdit();
-   edit.createFile(vscode.Uri.file(tree.sourcePath), { overwrite: true, contents: new Uint8Array(Buffer.from(updatedContent, 'utf-8')) });
+   edit.createFile(vscode.Uri.file(resolvedPath), { overwrite: true, contents: new Uint8Array(Buffer.from(updatedContent, 'utf-8')) });
    await vscode.workspace.applyEdit(edit);
 
    // Show success message

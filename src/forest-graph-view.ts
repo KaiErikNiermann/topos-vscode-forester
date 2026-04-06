@@ -478,10 +478,14 @@ export class ForestGraphView {
     }
 
     function tagEdges() {
+      // Always use taxon-based grouping for edge cross/intra classification
+      // so that force parameters (distance, strength) stay consistent
+      // regardless of the visual clustering method.
+      const taxonById = new Map(data.nodes.map(n => [n.id, n.taxon || '(untaxoned)']));
       for (const e of data.edges) {
         const src = typeof e.source === 'object' ? e.source.id : e.source;
         const tgt = typeof e.target === 'object' ? e.target.id : e.target;
-        e._cross = clusterByNode.get(src) !== clusterByNode.get(tgt);
+        e._cross = taxonById.get(src) !== taxonById.get(tgt);
       }
     }
 

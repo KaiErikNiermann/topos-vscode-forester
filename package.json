@@ -145,6 +145,12 @@
         "icon": "$(type-hierarchy)"
       },
       {
+        "command": "forester.exportGraphView",
+        "title": "Export Forest Graph View (static site)",
+        "category": "Forester",
+        "icon": "$(export)"
+      },
+      {
         "command": "forester.runDatalogQuery",
         "title": "Run Datalog Query",
         "category": "Forester",

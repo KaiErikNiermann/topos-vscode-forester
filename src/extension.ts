@@ -25,6 +25,7 @@ import {
    removeLinkPatternCommand,
 } from "./link-aliases-config";
 import { ForestGraphView } from "./forest-graph-view";
+import { exportGraphView } from "./export-graph-view";
 import { TransclusionTreeProvider } from "./transclusion-tree-view";
 import { BacklinksTreeProvider } from "./backlinks-view";
 import { ContributorsTreeProvider } from "./contributors-view";
@@ -441,6 +442,17 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand(
          "forester.showGraphView",
          () => ForestGraphView.createOrShow(context.extensionUri)
+      ),
+      vscode.commands.registerCommand(
+         "forester.exportGraphView",
+         async () => {
+            try {
+               await exportGraphView(context);
+            } catch (err) {
+               const msg = err instanceof Error ? err.message : String(err);
+               void vscode.window.showErrorMessage(`Export failed: ${msg}`);
+            }
+         }
       ),
       vscode.commands.registerCommand(
          "forester.restartLanguageServer",

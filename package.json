@@ -481,6 +481,8 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@forester/graph-data": "workspace:*",
+    "@forester/graph-view": "workspace:*",
     "@vscode/codicons": "^0.0.41",
     "langium": "^4.2.1",
     "smol-toml": "^1.5.2",

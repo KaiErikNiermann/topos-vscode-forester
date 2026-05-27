@@ -11,6 +11,9 @@ const esmBanner = {
 
 async function main() {
     // ── Extension host bundle (CJS, loaded by VSCode) ────────────────────────
+    // `loader[".css"] = "text"` embeds graph-view/src/renderer.css as a string
+    // literal so the webview can inline it. The file is excluded from the .vsix
+    // by `.vscodeignore`'s `src/**` rule, so we bake it into the bundle instead.
     const ctx = await esbuild.context({
         entryPoints: ["src/extension.ts"],
         bundle: true,
@@ -21,6 +24,7 @@ async function main() {
         platform: "node",
         outfile: "out/extension.js",
         external: ["vscode"],
+        loader: { ".css": "text" },
         logLevel: "info",
         plugins: [
             /* add plugins here */

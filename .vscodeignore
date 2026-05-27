@@ -14,3 +14,15 @@ tests/**
 editors/**
 bin/**
 pnpm-workspace.yaml
+# Workspace package sources/tooling — only their built bundles ship.
+graph-view/src/**
+graph-view/esbuild.config.mjs
+graph-view/node_modules/**
+forester-graph/src/**
+forester-graph/esbuild.config.mjs
+forester-graph/node_modules/**
+forester-graph/dist/**
+# `dist/graph-view/` is intentionally NOT excluded — the .vsix ships it so
+# that `forester.exportGraphView` can copy its files into a user-chosen
+# folder without requiring the source repo or pnpm.
+!dist/graph-view/**

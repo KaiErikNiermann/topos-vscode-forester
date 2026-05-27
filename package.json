@@ -439,6 +439,8 @@
     "prepare": "husky",
     "vscode:prepublish": "pnpm run package-ext",
     "compile": "pnpm run check-types && node esbuild.js",
+    "build:graph-view": "node scripts/build-graph-view.mjs",
+    "release:graph-view": "node scripts/release-graph-view.mjs",
     "check-types": "tsc",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",

@@ -1,0 +1,252 @@
+/**
+ * Forest graph view stylesheet.
+ *
+ * All colors are sourced from `--graph-*` CSS custom properties which are
+ * set by the renderer from the active `Theme` object. To restyle, supply a
+ * different `Theme`; you should not need to override these rules directly.
+ *
+ * Originally extracted from `src/forest-graph-view.ts` lines 219-339; the
+ * `--vscode-*` variables there are replaced by `--graph-*` so this CSS is
+ * VS-Code-host-independent.
+ */
+
+.forester-graph-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--graph-bg);
+  color: var(--graph-fg);
+  font-family: var(--graph-font);
+  font-size: var(--graph-font-size);
+  overflow: hidden;
+}
+
+.forester-graph-view *,
+.forester-graph-view *::before,
+.forester-graph-view *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.forester-graph-view .fgv-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Edges */
+.forester-graph-view .fgv-link {
+  stroke-opacity: 0.65;
+  fill: none;
+}
+.forester-graph-view .fgv-link.fgv-cross-cluster {
+  stroke-opacity: 0.13;
+  stroke-dasharray: 5 4;
+}
+.forester-graph-view .fgv-link.fgv-cross-cluster.fgv-link-active {
+  stroke-opacity: 0.55;
+}
+.forester-graph-view .fgv-link.fgv-transclude { stroke: var(--graph-edge-transclude); }
+.forester-graph-view .fgv-link.fgv-import     { stroke: var(--graph-edge-import); }
+.forester-graph-view .fgv-link.fgv-export     { stroke: var(--graph-edge-export); }
+.forester-graph-view .fgv-link.fgv-ref        { stroke: var(--graph-edge-ref); }
+
+/* Nodes */
+.forester-graph-view .fgv-node circle {
+  cursor: pointer;
+  stroke: var(--graph-bg);
+  stroke-width: 1.5;
+}
+.forester-graph-view .fgv-node circle:hover {
+  stroke: var(--graph-fg);
+  stroke-width: 2.5;
+}
+.forester-graph-view .fgv-node text {
+  pointer-events: none;
+  font-size: 10px;
+  fill: var(--graph-fg);
+  paint-order: stroke;
+  stroke: var(--graph-bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.forester-graph-view .fgv-node.fgv-dimmed { opacity: 0.06; }
+.forester-graph-view .fgv-link.fgv-dimmed { opacity: 0.04; }
+
+/* Controls panel */
+.forester-graph-view .fgv-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: color-mix(in srgb, var(--graph-bg) 92%, var(--graph-fg));
+  border: 1px solid color-mix(in srgb, var(--graph-fg) 18%, transparent);
+  border-radius: 4px;
+  padding: 10px;
+  width: 190px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.forester-graph-view .fgv-controls h3 {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.forester-graph-view .fgv-search {
+  width: 100%;
+  padding: 4px 6px;
+  margin-bottom: 8px;
+  background: color-mix(in srgb, var(--graph-bg) 70%, var(--graph-fg) 8%);
+  color: var(--graph-fg);
+  border: 1px solid color-mix(in srgb, var(--graph-fg) 18%, transparent);
+  border-radius: 3px;
+  font-size: 11px;
+  outline: none;
+  font-family: inherit;
+}
+.forester-graph-view .fgv-search:focus {
+  border-color: var(--graph-edge-transclude);
+}
+
+/* Cluster method row */
+.forester-graph-view .fgv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.forester-graph-view .fgv-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--graph-muted);
+  flex-shrink: 0;
+}
+.forester-graph-view .fgv-cluster-method {
+  flex: 1;
+  padding: 3px 5px;
+  font-size: 11px;
+  background: color-mix(in srgb, var(--graph-bg) 70%, var(--graph-fg) 8%);
+  color: var(--graph-fg);
+  border: 1px solid color-mix(in srgb, var(--graph-fg) 18%, transparent);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.forester-graph-view .fgv-cluster-method:focus {
+  border-color: var(--graph-edge-transclude);
+}
+
+/* Taxon legend */
+.forester-graph-view .fgv-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 3px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+.forester-graph-view .fgv-legend-item:hover { background: var(--graph-hover); }
+.forester-graph-view .fgv-legend-item.fgv-hidden {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+.forester-graph-view .fgv-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.forester-graph-view .fgv-legend-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.forester-graph-view .fgv-legend-count {
+  color: var(--graph-muted);
+  font-size: 10px;
+}
+
+/* Edge legend */
+.forester-graph-view hr {
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--graph-fg) 18%, transparent);
+  margin: 8px 0;
+}
+.forester-graph-view .fgv-edge-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.forester-graph-view .fgv-edge-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.forester-graph-view .fgv-edge-item.fgv-edge-cross {
+  opacity: 0.45;
+  margin-top: 3px;
+}
+.forester-graph-view .fgv-edge-line {
+  width: 18px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* Reset button */
+.forester-graph-view .fgv-reset-btn {
+  width: 100%;
+  padding: 4px 0;
+  margin-top: 8px;
+  background: color-mix(in srgb, var(--graph-edge-transclude) 70%, var(--graph-bg));
+  color: var(--graph-bg);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+}
+.forester-graph-view .fgv-reset-btn:hover {
+  background: var(--graph-edge-transclude);
+}
+
+/* Tooltip */
+.forester-graph-view .fgv-tooltip {
+  position: absolute;
+  pointer-events: none;
+  display: none;
+  background: color-mix(in srgb, var(--graph-bg) 92%, var(--graph-fg));
+  border: 1px solid color-mix(in srgb, var(--graph-fg) 28%, transparent);
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-size: 11px;
+  max-width: 240px;
+  z-index: 200;
+  line-height: 1.6;
+  word-break: break-word;
+  color: var(--graph-fg);
+}
+.forester-graph-view .fgv-tooltip code {
+  font-size: 10px;
+  opacity: 0.8;
+}
+.forester-graph-view .fgv-tooltip-tags {
+  color: var(--graph-muted);
+}
+
+/* Stats bar */
+.forester-graph-view .fgv-stats {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  color: var(--graph-muted);
+  font-size: 10px;
+}

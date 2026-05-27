@@ -1,0 +1,20 @@
+{
+  "name": "@forester/graph-data",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/extract.ts",
+  "bin": {
+    "forester-graph": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs"
+  },
+  "dependencies": {
+    "@forester/graph-view": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.27.2",
+    "typescript": "^5.4.0"
+  }
+}

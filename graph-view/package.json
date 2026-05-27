@@ -1,0 +1,23 @@
+{
+  "name": "@forester/graph-view",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/renderer.ts",
+  "types": "src/types.ts",
+  "exports": {
+    ".": "./src/renderer.ts",
+    "./types": "./src/types.ts",
+    "./default-theme": "./src/default-theme.ts"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs"
+  },
+  "dependencies": {
+    "d3": "^7.9.0"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "esbuild": "^0.27.2",
+    "typescript": "^5.4.0"
+  }
+}

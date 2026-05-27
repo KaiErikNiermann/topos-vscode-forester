@@ -1,3 +1,5 @@
 packages:
   - "."
   - "editors/neovim"
+  - "graph-view"
+  - "forester-graph"

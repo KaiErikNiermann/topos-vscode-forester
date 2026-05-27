@@ -6,6 +6,12 @@ node_modules
 test-forest/
 *.tree
 .serena/
+# Stray IDE-generated transpilation output alongside .ts sources in workspace
+# packages — only the esbuild bundles under their dist/ folders are real outputs.
+graph-view/src/*.js
+graph-view/src/*.js.map
+forester-graph/src/*.js
+forester-graph/src/*.js.map
 # Claude local state (sessions, conversation history, etc.)
 .claude/projects/
 .claude/*.local.json

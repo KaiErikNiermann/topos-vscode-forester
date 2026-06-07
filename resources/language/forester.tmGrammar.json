@@ -8,7 +8,8 @@
       "patterns": [
         { "include": "#tex-command" },
         { "include": "#tex" },
-        { "include": "#verbatim" },
+        { "include": "#verbatim-block" },
+        { "include": "#verbatim-inline" },
         { "include": "#link" },
         {
           "begin": "(\\\\transclude|\\\\import|\\\\export|\\\\ref)\\{",
@@ -70,6 +71,7 @@
           ]
         },
         { "include": "#command" },
+        { "include": "#sig-comment" },
         { "include": "#comment" }
       ]
     },
@@ -170,9 +172,22 @@
         { "include": "text.tex.latex" }
       ]
     },
-    "verbatim": {
-      "begin": "\\\\startverb",
+    "verbatim-block": {
+      "comment": "Block verbatim: \\startverb is the last thing on its line, content spans following lines until \\stopverb. Used by \\codeblock{lang}{\\startverb … \\stopverb}.",
+      "begin": "\\\\startverb(?=\\s*$)",
       "end": "\\\\stopverb",
+      "contentName": "markup.raw.forester",
+      "beginCaptures": {
+        "0": { "name": "constant.language.forester" }
+      },
+      "endCaptures": {
+        "0": { "name": "constant.language.forester" }
+      }
+    },
+    "verbatim-inline": {
+      "comment": "Inline verbatim: \\startverb is followed by content on the same line, e.g. \\code{\\startverb\\taxon{x}\\stopverb}. Ends at \\stopverb OR end of line, so an unterminated verbatim cannot bleed its raw scope across the rest of the document.",
+      "begin": "\\\\startverb(?!\\s*$)",
+      "end": "\\\\stopverb|$",
       "contentName": "markup.raw.forester",
       "beginCaptures": {
         "0": { "name": "constant.language.forester" }
@@ -196,6 +211,29 @@
             "1": { "name": "support.variable.xmlns.forester" }
           }
         }
+      ]
+    },
+    "sig-comment": {
+      "comment": "JSDoc-style highlighting for `%! sig` macro-signature comments: the in-comment tokens (command, param names, kinds, dynamic @sources) get colored scopes so they stand out from ordinary `%` comments.",
+      "begin": "(%!)\\s*(sig)\\b",
+      "end": "$\\n?",
+      "name": "comment.line.documentation.sig.forester",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.comment.forester" },
+        "2": { "name": "keyword.control.directive.sig.forester" }
+      },
+      "patterns": [
+        { "match": "\\\\[A-Za-z]\\w*", "name": "entity.name.function.sig.forester" },
+        { "match": "@[A-Za-z][\\w-]*", "name": "support.type.sig.forester" },
+        { "match": "\\b(flags|number|content|opaque)\\b", "name": "storage.type.sig.forester" },
+        {
+          "match": "([A-Za-z_]\\w*)\\s*(\\?)?(?=\\s*:)",
+          "captures": {
+            "1": { "name": "variable.parameter.sig.forester" },
+            "2": { "name": "keyword.operator.optional.sig.forester" }
+          }
+        },
+        { "match": "\\|", "name": "keyword.operator.sig.forester" }
       ]
     },
     "comment": {

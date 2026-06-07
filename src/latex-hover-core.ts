@@ -695,17 +695,31 @@ export function resolveForesterPreamble(
    return unwrapForesterVerbatimBlocks(value);
 }
 
+// A blank (empty or whitespace-only) line is read by TeX as `\par`, which is
+// illegal inside math mode and aborts the compile with "Missing $ inserted".
+// Such lines are produced when unwrapForesterVerbatimBlocks strips a
+// \startverb / \stopverb herald that sat on its own line, leaving the
+// surrounding indentation behind. Math bodies never need a blank line (\par is
+// never valid between \(..\) or \[..\]), so drop them. NOT applied to `tex`
+// bodies, which may be arbitrary text-mode LaTeX with intentional paragraphs.
+function stripBlankLines(input: string): string {
+   return input
+      .split("\n")
+      .filter(line => line.trim().length > 0)
+      .join("\n");
+}
+
 export function buildRenderableLatexBody(snippet: HoverTexSnippet): string {
    const displayMathEnvironmentPattern =
       /^\s*\\begin\{(equation\*?|align\*?|aligned|alignat\*?|flalign\*?|gather\*?|multline\*?|mathpar)\}[\s\S]*\\end\{\1\}\s*$/;
 
    return match(snippet)
       .with({ kind: "math-inline" }, ({ body }) => {
-         const normalized = unwrapForesterVerbatimBlocks(body);
+         const normalized = stripBlankLines(unwrapForesterVerbatimBlocks(body));
          return `\\(${normalized}\\)`;
       })
       .with({ kind: "math-display" }, ({ body }) => {
-         const normalized = unwrapForesterVerbatimBlocks(body);
+         const normalized = stripBlankLines(unwrapForesterVerbatimBlocks(body));
          if (displayMathEnvironmentPattern.test(normalized)) {
             return normalized;
          }

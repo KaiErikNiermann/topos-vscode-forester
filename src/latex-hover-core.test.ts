@@ -86,6 +86,29 @@ test("unwraps startverb/stopverb inside display math snippets before render", ()
    assert.equal(rendered.includes("\\alpha = \\beta"), true);
 });
 
+test("renders no blank lines inside math (verbatim heralds on their own lines)", () => {
+   // Regression: \startverb / \stopverb sitting on their own indented lines left
+   // a whitespace-only line behind after unwrapping. TeX reads a blank line as
+   // \par, which is illegal in math mode and aborts with "Missing $ inserted".
+   const source = [
+      "##{",
+      "  \\startverb",
+      "  \\alpha = \\begin{cases} a & b \\\\ \\top & d \\end{cases}",
+      "  \\stopverb",
+      "}",
+   ].join("\n");
+   const offset = source.indexOf("\\alpha");
+
+   const snippet = findHoverTexSnippetAtOffset(source, offset);
+   assert.ok(snippet);
+
+   const rendered = buildRenderableLatexBody(snippet);
+   const hasBlankLine = rendered.split("\n").some(line => line.trim().length === 0);
+   assert.equal(hasBlankLine, false, `rendered math must not contain a blank line:\n${rendered}`);
+   assert.equal(rendered.startsWith("\\["), true);
+   assert.equal(rendered.includes("\\begin{cases}"), true);
+});
+
 test("finds \\tex block and extracts both arguments", () => {
    const source = "\\tex{\\get\\base/tex-preamble}{\\begin{bnf}X\\end{bnf}}";
    const offset = source.indexOf("bnf");

@@ -319,14 +319,15 @@ export class ForesterDocumentValidator extends DefaultDocumentValidator {
             });
         }
 
+        // `\startverb…\stopverb` content is literal text to the compiler, so NO
+        // diagnostic should apply there — lexing/parsing errors and every semantic
+        // check alike, for any command at any nesting depth. This single source-range
+        // filter is the one place verbatim is exempted; individual checks need no
+        // verbatim awareness of their own.
         if (text.includes('\\startverb')) {
             const suppressedRanges = findSuppressedRanges(text);
             if (suppressedRanges.length > 0) {
                 filtered = filtered.filter(d => {
-                    const code = (d.data as { code?: string })?.code;
-                    if (code !== 'lexing-error' && code !== 'parsing-error') {
-                        return true;
-                    }
                     const offset = positionToOffset(text, d.range.start.line, d.range.start.character);
                     return !suppressedRanges.some(r => offset >= r.startOffset && offset < r.endOffset);
                 });

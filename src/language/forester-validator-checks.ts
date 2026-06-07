@@ -27,7 +27,6 @@ import {
     isBraceArg,
     isBracketGroup,
     isCommand,
-    isDocument,
     isTextFragment,
     isMathInline,
     isMathDisplay,
@@ -717,6 +716,9 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
     const documents = services.shared.workspace.LangiumDocuments;
     const checker = new ForesterChecks(documents);
 
+    // Note: verbatim (\startverb…\stopverb) content is exempted uniformly by
+    // ForesterDocumentValidator, which drops any diagnostic whose range falls in a
+    // verbatim span — so individual checks below need no verbatim awareness.
     const fastChecks: ValidationChecks<ForesterAstType> = {
         Command: [
             checker.checkBuiltinArity,

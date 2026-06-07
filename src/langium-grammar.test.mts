@@ -784,6 +784,36 @@ await test('\\meta{key}: missing second brace arg — arity warning', async () =
     }
 });
 
+await test('\\meta inside \\startverb…\\stopverb: verbatim — no arity warning', async () => {
+    // The compiler lexes verbatim content as literal text, so a one-brace \meta
+    // between the heralds must NOT trip the arity check (regression: feat-typography).
+    const doc = await parse('\\code{\\startverb\\meta{style:tbl-x}\\stopverb}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const arityWarns = diags.filter(d => d.message.includes('\\meta') && d.message.includes('brace argument'));
+    if (arityWarns.length > 0) {
+        throw new Error(`Unexpected arity warnings on verbatim \\meta: ${arityWarns.map(d => d.message).join('; ')}`);
+    }
+});
+
+await test('frontmatter command nested deep in multi-line \\startverb…\\stopverb: no warning', async () => {
+    // 0009.tree: a LaTeX \tag{…} nested inside braces within a multi-line verbatim
+    // block. Verbatim is exempted uniformly by source range (not per-command), so
+    // any nesting depth is covered — no sibling-of-\startverb special-casing.
+    const src = [
+        '\\p{',
+        '  \\startverb',
+        '    {\\small \\begin{align*} x &\\equiv y \\tag{by $I$} \\end{align*}}',
+        '  \\stopverb',
+        '}',
+    ].join('\n');
+    const doc = await parse(src);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const verbWarns = diags.filter(d => d.message.includes('\\tag'));
+    if (verbWarns.length > 0) {
+        throw new Error(`Unexpected warnings on nested verbatim \\tag: ${verbWarns.map(d => d.message).join('; ')}`);
+    }
+});
+
 // ── Validator: date format checks (Task 5) ───────────────────────────────────
 
 await test('\\date{2024-01-15}: valid ISO date — no date-format warning', async () => {

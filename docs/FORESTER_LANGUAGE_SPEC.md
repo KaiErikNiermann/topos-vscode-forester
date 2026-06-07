@@ -679,25 +679,36 @@ Each tree maintains:
 
 #### Propositions
 
+A relation applied to **space-separated terms** (each term is `?var`,
+`'{content}`, or `@{uri}`) — NOT braced arguments:
+
 ```
-\rel/relation{arg1}{arg2}
+\rel/relation ?X '{value}
 ```
+
+Writing `\rel/relation{?X}{...}` is a parse error: the `{` after the relation
+name is unexpected.
 
 #### Sequents (Rules)
 
 ```
 \datalog{
-  conclusion -: {premise1}{premise2}
+  conclusion -: {premise1} {premise2}
 }
 ```
 
 #### Queries
 
+Each premise is a brace-wrapped proposition; negatives follow `#`:
+
 ```
 \datalog{
-  ?X -: {positive1}{positive2} #{negative1}
+  ?X -: {\rel/has-tag ?X '{algebra}} # {\rel/is-person ?X}
 }
 ```
+
+A bare `\datalog{?X -: …}` evaluates but renders nothing; wrap it in `\query{…}`
+to display the matches inline as a list of linked trees.
 
 ### 9.2 Built-in Relations
 

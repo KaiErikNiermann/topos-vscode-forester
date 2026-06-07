@@ -250,6 +250,37 @@ export class ForesterChecks {
     }
 
     /**
+     * Flag the invalid braced-argument datalog syntax inside \datalog blocks.
+     *
+     * Forester relation premises take space-separated *terms*
+     * (`\rel/is-reference ?X`, `\rel/has-taxon ?X '{Reference}`), NOT braced
+     * arguments (`\rel/is-reference{?X}` / `\rel/has-taxon{?X}{'Reference'}`).
+     * The braced form is a parse error at build time, so surface it in-editor
+     * with the correct shape rather than letting the build fail later.
+     */
+    checkDatalogSyntax(node: Command, accept: ValidationAcceptor): void {
+        if (node.name !== '\\datalog') {
+            return;
+        }
+        const braceArg = node.args.find(isBraceArg);
+        // Use the raw CST text: the body's `\rel/...` are parsed as nested
+        // commands, so a text-fragment-only read would miss them.
+        const text = braceArg?.$cstNode?.text ?? '';
+        // A relation name immediately followed by `{` is the invalid braced form
+        // (the valid form has whitespace then a term: `\rel/<name> ?X`).
+        if (/\\rel\/[\w/-]+\s*\{/.test(text)) {
+            accept(
+                'warning',
+                'Datalog relation arguments are space-separated terms, not braced '
+                + "arguments: write `\\rel/is-reference ?X` or "
+                + "`\\rel/has-taxon ?X '{Reference}`, not `\\rel/is-reference{?X}`. "
+                + 'The braced form is a parse error when the forest is built.',
+                { node: braceArg ?? node },
+            );
+        }
+    }
+
+    /**
      * Detect duplicate \import{tree-id} declarations within a single document.
      * Duplicate imports are legal in Forester but generally indicate a mistake.
      */
@@ -615,6 +646,7 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
         Command: [
             checker.checkBuiltinArity,
             checker.checkDateFormat,
+            checker.checkDatalogSyntax,
         ],
         Document: [
             checker.checkDuplicateImports,

@@ -5,11 +5,16 @@
  * Forest index (from `forester query all`).  Supports single-variable
  * queries over the built-in relations that map directly to forest metadata:
  *
- *   ?X -: {has-taxon{?X}{'<taxon>'}}       → filter by taxon
- *   ?X -: {has-tag{?X}{'<tag>'}}            → filter by tag
- *   ?X -: {is-reference{?X}}                → taxon === "Reference"
- *   ?X -: {is-person{?X}}                   → taxon === "Person"
- *   ?X -: {is-article{?X}}                  → taxon present, not ref/person
+ *   ?X -: {\rel/has-taxon ?X '{<taxon>}}    → filter by taxon
+ *   ?X -: {\rel/has-tag ?X '{<tag>}}        → filter by tag
+ *   ?X -: {\rel/is-reference ?X}            → taxon === "Reference"
+ *   ?X -: {\rel/is-person ?X}               → taxon === "Person"
+ *   ?X -: {\rel/is-article ?X}              → taxon present, not ref/person
+ *
+ * Terms are space-separated (a variable `?X`, a content constant `'{value}`,
+ * or a URI constant `@{uri}`) — matching Forester's actual grammar. The older
+ * braced-argument forms (`\rel/has-taxon{?X}{'value'}`) are tolerated so stale
+ * queries still evaluate, but the language-server validator flags them.
  *
  * Blocks without `-:` are treated as rule/fact definitions and are
  * reported as such without evaluation.
@@ -53,11 +58,13 @@ export function evalDatalogQuery(queryText: string, forest: Forest): DatalogResu
     const varLabel = `?${varMatch[1]}`;
     const afterHead = trimmed.slice(varMatch[0].length).trim();
 
-    // If no body braces, no constraints — return all trees
+    // Apply the positive premises (everything before a `#` negation block).
+    // The relation matchers scan the whole text, so multiple `{…}` premises and
+    // both the modern and legacy term syntaxes are handled.
     let results = forest;
-    if (afterHead.startsWith('{')) {
-        const constraints = extractBraceContent(afterHead);
-        results = applyConstraints(constraints, forest);
+    const positives = afterHead.split('#')[0].trim();
+    if (positives.length > 0) {
+        results = applyConstraints(positives, forest);
     }
 
     if (results.length === 0) {
@@ -76,23 +83,6 @@ export function evalDatalogQuery(queryText: string, forest: Forest): DatalogResu
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Extract the content of the first top-level `{…}` block. */
-function extractBraceContent(text: string): string {
-    if (!text.startsWith('{')) {return text;}
-    let depth = 0;
-    let start = -1;
-    for (let i = 0; i < text.length; i++) {
-        if (text[i] === '{') {
-            if (depth === 0) {start = i + 1;}
-            depth++;
-        } else if (text[i] === '}') {
-            depth--;
-            if (depth === 0) {return text.slice(start, i);}
-        }
-    }
-    return text.slice(1); // unmatched — return rest
-}
 
 /**
  * Apply the recognised built-in-relation constraints from `constraintText`
@@ -115,18 +105,19 @@ function applyConstraints(constraintText: string, forest: Forest): Forest {
         results = results.filter(t => t.tags?.some(tg => tg.toLowerCase() === lower));
     }
 
-    // is-reference — taxon === "Reference"
-    if (/\\rel\/is-reference\{|is-reference\(/.test(constraintText)) {
+    // is-reference — taxon === "Reference" (modern `\rel/is-reference ?X`,
+    // legacy `\rel/is-reference{?X}`, or `is-reference(?X)`)
+    if (/\\rel\/is-reference\b|is-reference\(/.test(constraintText)) {
         results = results.filter(t => t.taxon?.toLowerCase() === 'reference');
     }
 
     // is-person — taxon === "Person"
-    if (/\\rel\/is-person\{|is-person\(/.test(constraintText)) {
+    if (/\\rel\/is-person\b|is-person\(/.test(constraintText)) {
         results = results.filter(t => t.taxon?.toLowerCase() === 'person');
     }
 
     // is-article — has a taxon that is not "Reference" or "Person"
-    if (/\\rel\/is-article\{|is-article\(/.test(constraintText)) {
+    if (/\\rel\/is-article\b|is-article\(/.test(constraintText)) {
         const SKIP = new Set(['reference', 'person']);
         results = results.filter(t => t.taxon && !SKIP.has(t.taxon.toLowerCase()));
     }
@@ -140,12 +131,18 @@ function applyConstraints(constraintText: string, forest: Forest): Forest {
  *   2. `relName(?Var, 'value')`       → returns "value"
  */
 function extractRelationArg(text: string, relName: string): string | undefined {
-    // Form 1: \rel/relName{...}{'value'}
+    // Modern Forester form: \rel/relName ?Var '{value}  (space-separated terms,
+    // content constant = tick + braces).
+    const re0 = new RegExp(`\\\\rel\\/${relName}\\s+\\?\\w+\\s+'\\{([^}]*)\\}`);
+    const m0 = re0.exec(text);
+    if (m0) {return m0[1];}
+
+    // Legacy form: \rel/relName{...}{'value'}
     const re1 = new RegExp(`\\\\rel\\/${relName}\\{[^}]*\\}\\{'([^']*)'\\}`);
     const m1 = re1.exec(text);
     if (m1) {return m1[1];}
 
-    // Form 2: relName(?var, 'value')
+    // Datalog-tuple form: relName(?var, 'value')
     const re2 = new RegExp(`${relName}\\([^,)]*,\\s*'([^']*)'\\)`);
     const m2 = re2.exec(text);
     if (m2) {return m2[1];}

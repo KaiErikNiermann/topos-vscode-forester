@@ -30,6 +30,8 @@ import {
     type Document,
 } from './language/generated/ast.js';
 import { createForesterServices } from './language/forester-module.js';
+import { setProjectSigs } from './language/forester-validator-checks.js';
+import { parseMacroSigs } from './language/sig.js';
 
 // ── Minimal test framework ───────────────────────────────────────────────────
 
@@ -811,6 +813,53 @@ await test('frontmatter command nested deep in multi-line \\startverb…\\stopve
     const verbWarns = diags.filter(d => d.message.includes('\\tag'));
     if (verbWarns.length > 0) {
         throw new Error(`Unexpected warnings on nested verbatim \\tag: ${verbWarns.map(d => d.message).join('; ')}`);
+    }
+});
+
+// ── Validator: %! sig construct-option constraints ───────────────────────────
+// Inject the sig after parse and reset after validate (validateDocument doesn't
+// re-fire the build hook), so these don't contaminate other tests.
+const EMBED_SIG = parseMacroSigs(String.raw`%! sig \embed(opts: flags{mode: image|code|raw, width?: number, align?: left|center|right}, target: @artifact-ref, caption?: content)`);
+
+await test('checkSigConstraints: invalid \\embed mode → warning', async () => {
+    const doc = await parse(String.raw`\p{\embed{video}{x}{}}`);
+    setProjectSigs(EMBED_SIG);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    setProjectSigs(new Map());
+    if (!diags.some(d => /unknown mode 'video'/.test(d.message))) {
+        throw new Error(`Expected a sig warning for invalid embed mode; got: ${diags.map(d => d.message).join('; ')}`);
+    }
+});
+
+await test('checkSigConstraints: invalid \\embed align flag → warning', async () => {
+    const doc = await parse(String.raw`\p{\embed{image align=bogus}{x}{}}`);
+    setProjectSigs(EMBED_SIG);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    setProjectSigs(new Map());
+    if (!diags.some(d => /align.*left\|center\|right/.test(d.message))) {
+        throw new Error(`Expected a sig warning for invalid align; got: ${diags.map(d => d.message).join('; ')}`);
+    }
+});
+
+await test('checkSigConstraints: valid \\embed opts → no sig warning', async () => {
+    const doc = await parse(String.raw`\p{\embed{image align=center width=70}{x}{}}`);
+    setProjectSigs(EMBED_SIG);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    setProjectSigs(new Map());
+    const sigWarns = diags.filter(d => /unknown (mode|flag)|expects/.test(d.message));
+    if (sigWarns.length > 0) {
+        throw new Error(`Unexpected sig warnings: ${sigWarns.map(d => d.message).join('; ')}`);
+    }
+});
+
+await test('checkSigConstraints: \\def\\embed binding site → no warning (defines, not uses)', async () => {
+    const doc = await parse(String.raw`\def\embed[opts][target][caption]{\<html:figure>[class]{artifact-embed}[data-opts]{\opts}{\<html:figcaption>{\caption}}}`);
+    setProjectSigs(EMBED_SIG);
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    setProjectSigs(new Map());
+    const sigWarns = diags.filter(d => /unknown mode|expects|unknown flag/.test(d.message));
+    if (sigWarns.length > 0) {
+        throw new Error(`Unexpected sig warning on \\def\\embed binding site: ${sigWarns.map(d => d.message).join('; ')}`);
     }
 });
 

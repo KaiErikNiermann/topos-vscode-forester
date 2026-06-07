@@ -7,12 +7,13 @@
  * textDocument/formatting handler for all editor clients.
  */
 import type { Module } from 'langium';
-import { inject } from 'langium';
+import { inject, DocumentState } from 'langium';
 import type { DefaultSharedModuleContext, LangiumServices, LangiumSharedServices, PartialLangiumServices } from 'langium/lsp';
 import { createDefaultModule, createDefaultSharedModule } from 'langium/lsp';
 import { ForesterGeneratedModule, ForesterGeneratedSharedModule } from './generated/module.js';
 import { ForesterDocumentValidator } from './forester-validator.js';
-import { registerForesterValidationChecks } from './forester-validator-checks.js';
+import { registerForesterValidationChecks, setProjectSigs } from './forester-validator-checks.js';
+import { parseMacroSigs, type Sig } from './sig.js';
 import { ForesterSemanticTokenProvider } from './forester-semantic-tokens.js';
 import { ForesterDefinitionProvider } from './forester-definition-provider.js';
 import { ForesterCodeLensProvider } from './forester-codelens-provider.js';
@@ -66,6 +67,20 @@ export function createForesterServices(context: DefaultSharedModuleContext): {
 
     shared.ServiceRegistry.register(Forester);
     registerForesterValidationChecks(Forester);
+
+    // Self-load project `%! sig` signatures from the indexed documents before each
+    // validation pass, so checkSigConstraints (server-side) has them. The client
+    // loads its own copy (sig-registry) for completion/hover. IndexedContent runs
+    // after parse, before Validated — every doc's text is available by then.
+    shared.workspace.DocumentBuilder.onBuildPhase(DocumentState.IndexedContent, () => {
+        const sigs = new Map<string, Sig>();
+        for (const doc of shared.workspace.LangiumDocuments.all) {
+            const text = doc.textDocument.getText();
+            if (!text.includes('%! sig')) { continue; }
+            for (const [cmd, sig] of parseMacroSigs(text)) { sigs.set(cmd, sig); }
+        }
+        setProjectSigs(sigs);
+    });
 
     return { shared, Forester };
 }

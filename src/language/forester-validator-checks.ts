@@ -35,6 +35,13 @@ import {
     isMathParenGroup,
 } from './generated/ast.js';
 import type { ForesterServices } from './forester-module.js';
+import { validateFlags, type Sig } from './sig.js';
+
+// Project `%! sig` signatures, injected by the extension (sig-registry → vscode).
+// Kept as a plain module variable so this validator stays vscode-free — the
+// headless grammar tests run with an empty map and produce no sig diagnostics.
+let projectSigs: ReadonlyMap<string, Sig> = new Map();
+export function setProjectSigs(sigs: ReadonlyMap<string, Sig>): void { projectSigs = sigs; }
 
 // ── Arity table ──────────────────────────────────────────────────────────────
 // Maps command name (with leading backslash) → expected brace-arg count +
@@ -232,6 +239,13 @@ function firstBraceArgText(node: Command): string {
         .trim();
 }
 
+/** Raw inner text of a single argument (delimiters stripped, whitespace kept —
+ *  needed for the flag mini-language where spaces separate tokens). */
+function argText(arg: AstNode): string {
+    const t = arg.$cstNode?.text ?? '';
+    return t.replace(/^[{[(]/, '').replace(/[}\])]$/, '').trim();
+}
+
 // ── Validator class ───────────────────────────────────────────────────────────
 
 export class ForesterChecks {
@@ -266,6 +280,40 @@ export class ForesterChecks {
                 { node },
             );
         }
+    }
+
+    /**
+     * Validate construct option VALUES against the project `%! sig` signatures
+     * (the single source shared with the notes build). The Nth brace call-arg maps
+     * to the Nth signature param; enum params and `flags{…}` params are checked
+     * (mode/align/etc.). Dynamic `@…` and content/opaque params are not constrained
+     * here (soft / handled elsewhere). Verbatim is exempted by the document validator.
+     */
+    checkSigConstraints(node: Command, accept: ValidationAcceptor): void {
+        const sig = projectSigs.get(node.name);
+        if (!sig) {
+            return;
+        }
+        if (isBindingSite(node)) {
+            return; // the `\embed` in `\def\embed…{body}` is the definition, not a use
+        }
+        const braceArgs = node.args.filter(isBraceArg);
+        sig.params.forEach((param, i) => {
+            const arg = braceArgs[i];
+            if (!arg) {
+                return; // missing arg — count handled by checkBuiltinArity / nothing to validate
+            }
+            if (param.kind.tag === 'flags') {
+                for (const d of validateFlags(param.kind.fields, argText(arg), node.name).diagnostics) {
+                    accept('warning', `${d.construct} ${d.param ? `'${d.param}' ` : ''}— ${d.message}`, { node: arg });
+                }
+            } else if (param.kind.tag === 'enum') {
+                const text = argText(arg);
+                if (text && !param.kind.values.includes(text)) {
+                    accept('warning', `${node.name} '${param.name}' expects ${param.kind.values.join('|')}, got '${text}'`, { node: arg });
+                }
+            }
+        });
     }
 
     /**
@@ -722,6 +770,7 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
     const fastChecks: ValidationChecks<ForesterAstType> = {
         Command: [
             checker.checkBuiltinArity,
+            checker.checkSigConstraints,
             checker.checkDateFormat,
             checker.checkDatalogSyntax,
             checker.checkStructuralCommandContext,

@@ -12,6 +12,7 @@ import { ForesterDocumentFormattingEditProvider, ForesterDocumentRangeFormatting
 import { initFormatterConfig, scanMacrosCommand, refreshIgnoredCommandsCache, clearIgnoredCommandsCache } from "./formatter-config";
 import { initLanguageToolBridge, checkAllTreeFilesCommand } from "./languageToolIntegration";
 import { registerSpeedFixCommand } from "./speedfix";
+import { registerSigCompletion, registerSigHover } from "./sig-completion";
 import { SubtreeAutoIdFeature } from "./subtree-auto-id";
 import { ForesterLatexHoverService } from "./latex-hover";
 import {
@@ -479,23 +480,30 @@ export async function activate(context: vscode.ExtensionContext) {
             channel.appendLine(queryText);
             channel.appendLine('─'.repeat(60));
 
-            const forest = await getForest({ fastReturnStale: true });
-            const result = evalDatalogQuery(queryText, forest);
+            try {
+               const forest = await getForest({ fastReturnStale: true });
+               const result = evalDatalogQuery(queryText, forest);
 
-            channel.appendLine(result.message);
-            if (result.rows.length > 0) {
-               channel.appendLine('');
-               // Column widths
-               const widths = result.columns.map((col, i) =>
-                  Math.max(col.length, ...result.rows.map(r => (r[i] ?? '').length))
-               );
-               const header = result.columns.map((col, i) => col.padEnd(widths[i])).join('  ');
-               const divider = widths.map(w => '-'.repeat(w)).join('  ');
-               channel.appendLine(header);
-               channel.appendLine(divider);
-               for (const row of result.rows) {
-                  channel.appendLine(row.map((cell, i) => cell.padEnd(widths[i])).join('  '));
+               channel.appendLine(result.message);
+               if (result.rows.length > 0) {
+                  channel.appendLine('');
+                  // Column widths
+                  const widths = result.columns.map((col, i) =>
+                     Math.max(col.length, ...result.rows.map(r => (r[i] ?? '').length))
+                  );
+                  const header = result.columns.map((col, i) => col.padEnd(widths[i])).join('  ');
+                  const divider = widths.map(w => '-'.repeat(w)).join('  ');
+                  channel.appendLine(header);
+                  channel.appendLine(divider);
+                  for (const row of result.rows) {
+                     channel.appendLine(row.map((cell, i) => cell.padEnd(widths[i])).join('  '));
+                  }
                }
+            } catch (err) {
+               // Never let the datalog feature fail silently — surface it.
+               const msg = err instanceof Error ? err.message : String(err);
+               channel.appendLine(`Error evaluating query: ${msg}`);
+               vscode.window.showErrorMessage(`Forester datalog query failed: ${msg}`);
             }
          }
       )
@@ -748,55 +756,11 @@ export async function activate(context: vscode.ExtensionContext) {
    const completionProvider = await registerCompletionProvider();
    context.subscriptions.push(completionProvider);
 
-   // Taxon completion: scans workspace for existing taxons + hardcoded defaults
-   const DEFAULT_TAXONS = [
-      "Definition", "Theorem", "Lemma", "Proposition", "Corollary",
-      "Example", "Remark", "Note", "Proof", "Construction",
-      "Conjecture", "Exercise", "Problem", "Solution", "Reference", "Person", "Institution",
-   ];
-
-   const taxonCompletionProvider = vscode.languages.registerCompletionItemProvider(
-      { scheme: "file", language: "forester" },
-      {
-         async provideCompletionItems(doc, pos) {
-            const lineText = doc.getText(
-               new vscode.Range(new vscode.Position(pos.line, 0), pos),
-            );
-            // Only trigger inside \taxon{...}
-            const match = /\\taxon\{([^}]*)$/.exec(lineText);
-            if (!match) { return []; }
-
-            const typedSoFar = match[1];
-            const replaceRange = new vscode.Range(
-               new vscode.Position(pos.line, pos.character - typedSoFar.length),
-               pos,
-            );
-
-            // Collect taxons from workspace forest
-            const forest = await getForest({ fastReturnStale: true });
-            const seen = new Set<string>();
-            for (const t of DEFAULT_TAXONS) { seen.add(t); }
-            for (const tree of forest) {
-               if (tree.taxon) { seen.add(tree.taxon); }
-            }
-
-            // Sort: defaults first (in order), then workspace-discovered (alphabetical)
-            const defaultSet = new Set(DEFAULT_TAXONS);
-            const extra = [...seen].filter(t => !defaultSet.has(t)).sort();
-            const ordered = [...DEFAULT_TAXONS, ...extra];
-
-            return ordered.map((taxon, i) => {
-               const item = new vscode.CompletionItem(taxon, vscode.CompletionItemKind.EnumMember);
-               item.range = replaceRange;
-               item.detail = defaultSet.has(taxon) ? "Built-in taxon" : "Workspace taxon";
-               item.sortText = String(i).padStart(4, "0");
-               return item;
-            });
-         },
-      },
-      "{", // trigger on opening brace after \taxon
-   );
-   context.subscriptions.push(taxonCompletionProvider);
+   // Signature-driven parameter completion + hover, for both project `%! sig`
+   // constructs (embed/codeblock/d3) AND builtins (\taxon, \transclude/\ref/… via
+   // command-metadata) — supersedes the old hard-coded \taxon-only provider.
+   registerSigCompletion(context);
+   registerSigHover(context);
 }
 
 // This method is called when your extension is deactivated

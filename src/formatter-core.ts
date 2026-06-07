@@ -446,6 +446,16 @@ export function tokenize(text: string, options: FormatOptions = {}): Token[] {
                 continue;
             }
 
+            // Escaped backslash (\\) - a literal backslash escape. Emit it as a
+            // single text token and consume both characters, so a following
+            // command (e.g. \\taxon) is NOT split off as a separate command and
+            // line-broken. (\\ is the escape; what follows is ordinary text.)
+            if (text[i + 1] === "\\") {
+                tokens.push({ type: "text", value: "\\\\" });
+                i += 2;
+                continue;
+            }
+
             let cmd = "\\";
             i++;
             // Command name: alphanumeric, hyphens, slashes, and question marks
@@ -789,8 +799,10 @@ export function format(text: string, options: FormatOptions = {}): string {
                 pendingBlockCommand = isBlockCommand(cmdName) ? cmdName : null;
                 const isAfterDef = lastCommandName === "def";
 
-                // Top-level commands should start on a new line
-                if (isTopLevelCommand(cmdName) && !isAfterDef && !lineStart && !lastWasNewline) {
+                // Top-level commands should start on a new line — but only when
+                // actually at the top level. Inside a brace group (e.g. a command
+                // shown in \code{…} or any argument) they must not force a break.
+                if (isTopLevelCommand(cmdName) && depth === 0 && !isAfterDef && !lineStart && !lastWasNewline) {
                     result += "\n";
                     lineStart = true;
                 }

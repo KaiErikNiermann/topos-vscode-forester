@@ -105,6 +105,54 @@ const TEX_CONTENT_COMMANDS: ReadonlySet<string> = new Set([
 // Commands that introduce a lexical binding (\\def \\let)
 const LEXICAL_BINDING_COMMANDS: ReadonlySet<string> = new Set(['\\def', '\\let']);
 
+// Structural / frontmatter-only commands. These produce no rendered output —
+// they mutate the tree's frontmatter — so they are only meaningful on a tree's
+// top-level tape. Nested inside rendered content (\p{…}, \code{…}, any
+// command argument) the compiler hard-errors (structural_command_in_content),
+// so we surface the same problem in-editor before the build fails.
+const FRONTMATTER_COMMANDS: ReadonlySet<string> = new Set([
+    '\\title', '\\taxon', '\\author', '\\contributor', '\\date',
+    '\\parent', '\\tag', '\\meta', '\\number',
+]);
+
+// \subtree{…} opens a nested tree with its own frontmatter, so frontmatter
+// commands are legal inside it (matching the compiler's eval_subtree reset).
+const FRONTMATTER_SCOPE_RESET: ReadonlySet<string> = new Set(['\\subtree']);
+
+// \scope{…} only opens a fresh *binding* scope; its body is spliced at the
+// enclosing level (Expand.ml: `Scope body -> body @ …`), so it is transparent
+// for the purpose of deciding top-level vs. rendered-content position.
+const FRONTMATTER_TRANSPARENT_SCOPE: ReadonlySet<string> = new Set(['\\scope']);
+
+/**
+ * Decide whether `node` sits on a tree's top-level tape (where frontmatter
+ * commands are legal) or inside rendered content (where they are not).
+ *
+ * Walks up the container chain. The first BraceArg owned by a command decides:
+ *   • \subtree body → fresh frontmatter scope → top-level (legal)
+ *   • \scope  body → transparent → keep walking from the scope's own position
+ *   • any other command's arg → rendered content (illegal)
+ * Reaching the document root through only groups means top-level.
+ */
+function isInRenderedContent(node: Command): boolean {
+    let current: AstNode | undefined = node.$container;
+    while (current !== undefined) {
+        if (isBraceArg(current)) {
+            const owner: AstNode | undefined = current.$container;
+            if (isCommand(owner)) {
+                if (FRONTMATTER_SCOPE_RESET.has(owner.name)) return false;
+                if (FRONTMATTER_TRANSPARENT_SCOPE.has(owner.name)) {
+                    current = owner.$container;
+                    continue;
+                }
+                return true;
+            }
+        }
+        current = current.$container;
+    }
+    return false;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -278,6 +326,33 @@ export class ForesterChecks {
                 { node: braceArg ?? node },
             );
         }
+    }
+
+    /**
+     * Flag structural/frontmatter commands (\taxon, \title, \meta, \tag, …) used
+     * inside rendered content (\p{…}, \code{…}, any command argument).
+     *
+     * These commands silently mutate the tree's frontmatter and render nothing,
+     * which is almost always a mistake when nested. The compiler treats this as a
+     * hard error (structural_command_in_content), so we report it as 'error' here
+     * to keep the editor and the build in agreement. To show such markup
+     * literally, use \startverb…\stopverb.
+     */
+    checkStructuralCommandContext(node: Command, accept: ValidationAcceptor): void {
+        if (!FRONTMATTER_COMMANDS.has(node.name)) return;
+        if (isOnCommentLine(node)) return;
+        if (isBindingSite(node)) return; // \def\taxon… redefines, not a use site
+        if (!isInRenderedContent(node)) return;
+
+        accept(
+            'error',
+            `Structural command ${node.name} only belongs at the top level of a tree. `
+            + 'Nested inside content it produces no output and silently mutates the '
+            + "tree's frontmatter (the compiler rejects this). Move it out of the "
+            + 'surrounding \\p{…}/\\code{…}/argument, or use \\startverb…\\stopverb to '
+            + 'show it literally.',
+            { node },
+        );
     }
 
     /**
@@ -647,6 +722,7 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
             checker.checkBuiltinArity,
             checker.checkDateFormat,
             checker.checkDatalogSyntax,
+            checker.checkStructuralCommandContext,
         ],
         Document: [
             checker.checkDuplicateImports,

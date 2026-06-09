@@ -28,7 +28,7 @@ export const DEFAULT_TAG_CLOSURE_HINT_TAGS = [
 
 const OPAQUE_TEX_COMMANDS = new Set(["tex", "texmath", "texfig", "ltexfig"]);
 
-interface CommandHeader {
+export interface CommandHeader {
    name: string
    endIndex: number
 }
@@ -45,7 +45,7 @@ function isCommandNameContinue(char: string): boolean {
    return /^[A-Za-z0-9_\/:\-?@]$/.test(char);
 }
 
-function isEscaped(source: string, index: number): boolean {
+export function isEscaped(source: string, index: number): boolean {
    let backslashes = 0;
    for (let i = index - 1; i >= 0 && source[i] === "\\"; i -= 1) {
       backslashes += 1;
@@ -53,7 +53,7 @@ function isEscaped(source: string, index: number): boolean {
    return backslashes % 2 === 1;
 }
 
-function skipComment(source: string, startIndex: number): number {
+export function skipComment(source: string, startIndex: number): number {
    let index = startIndex;
    while (index < source.length && source[index] !== "\n") {
       index += 1;
@@ -61,7 +61,7 @@ function skipComment(source: string, startIndex: number): number {
    return index;
 }
 
-function skipWhitespaceAndComments(source: string, startIndex: number, endIndex: number): number {
+export function skipWhitespaceAndComments(source: string, startIndex: number, endIndex: number): number {
    let index = startIndex;
    while (index < endIndex) {
       const char = source[index];
@@ -78,7 +78,7 @@ function skipWhitespaceAndComments(source: string, startIndex: number, endIndex:
    return index;
 }
 
-function scanBalanced(
+export function scanBalanced(
    source: string,
    startIndex: number,
    endIndex: number,
@@ -110,7 +110,7 @@ function scanBalanced(
    return null;
 }
 
-function readCommandHeader(source: string, backslashIndex: number, endIndex: number): CommandHeader | null {
+export function readCommandHeader(source: string, backslashIndex: number, endIndex: number): CommandHeader | null {
    if (backslashIndex + 1 >= endIndex) {
       return null;
    }

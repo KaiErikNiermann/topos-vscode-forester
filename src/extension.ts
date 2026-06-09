@@ -13,6 +13,7 @@ import { initFormatterConfig, scanMacrosCommand, refreshIgnoredCommandsCache, cl
 import { initLanguageToolBridge, checkAllTreeFilesCommand } from "./languageToolIntegration";
 import { registerSpeedFixCommand } from "./speedfix";
 import { registerSigCompletion, registerSigHover } from "./sig-completion";
+import { registerSigInlayHints } from "./sig-inlay";
 import { SubtreeAutoIdFeature } from "./subtree-auto-id";
 import { ForesterLatexHoverService } from "./latex-hover";
 import {
@@ -761,6 +762,10 @@ export async function activate(context: vscode.ExtensionContext) {
    // command-metadata) — supersedes the old hard-coded \taxon-only provider.
    registerSigCompletion(context);
    registerSigHover(context);
+
+   // clangd-style `{name: …}` parameter-name inlay hints for the same sig-typed
+   // commands, so each positional brace's role is visible without hovering.
+   registerSigInlayHints(context);
 }
 
 // This method is called when your extension is deactivated

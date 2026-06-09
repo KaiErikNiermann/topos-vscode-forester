@@ -295,6 +295,11 @@
           ],
           "description": "Allowlist of Forester tag labels that receive closure inlay hints. Use command names with or without a leading backslash (for example `ul` or `\\ul`) and `##` for display-math blocks."
         },
+        "forester.inlayHints.paramNames.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show clangd-style parameter-name inlay hints inside the braces of sig-typed commands (for example `\\embed{opts: …}{target: …}{caption: …}`), surfacing each positional argument's role."
+        },
         "forester.languageTool.enable": {
           "type": "boolean",
           "default": true,
@@ -463,6 +468,7 @@
     "test:corpus": "pnpm dlx esbuild tests/corpus-langium.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/corpus-langium-test.mjs && node out/corpus-langium-test.mjs",
     "test:latex-hover": "pnpm dlx tsx src/latex-hover-core.test.ts",
     "test:tag-closure-inlay": "pnpm dlx tsx src/tag-closure-inlay-core.test.ts",
+    "test:sig-inlay": "pnpm dlx tsx src/sig-inlay-core.test.ts",
     "test:subtree-auto-id": "pnpm dlx tsx src/subtree-auto-id.test.ts",
     "test:diagnostics": "pnpm dlx tsx src/forester-diagnostics.test.ts",
     "test:language-server": "pnpm run compile && NODE_PATH=./test/stubs node out/languageToolIntegration.test.js",

@@ -5,8 +5,8 @@
  * figure, embed opts) it offers the param's enum / dynamic value set; inside an
  * `opts: flags{…}` arg it offers the mode bareword, flag keys, and flag values.
  *
- * Dynamic value sources (`@language @figure @taxon @tree-id`) are resolved from
- * the workspace; `@artifact-ref`/`@bib-ref` are left to a later pass.
+ * Dynamic value sources (`@language @figure @taxon @tree-id @artifact-ref
+ * @bib-ref`) are all resolved from the workspace / current tree.
  */
 import * as vscode from 'vscode';
 import type { ParamKind, Param } from './language/sig.js';
@@ -26,8 +26,21 @@ async function paramsFor(command: string): Promise<readonly Param[] | undefined>
     return (await getProjectSigs()).get(command)?.params ?? BUILTIN_PARAMS.get(command);
 }
 
+/**
+ * Artifact keys an `\embed` target can reference, declared in THIS tree as
+ * `\meta{artifact-file:KEY}{…}` (the per-tree artifact index — artifacts don't
+ * cross trees, so we scan the current document only). Returns the `#artifact:KEY`
+ * forms an embed target actually takes.
+ */
+function artifactRefs(doc: vscode.TextDocument): string[] {
+    const re = /\\meta\s*\{\s*artifact-file:([^{}]+?)\s*\}/g;
+    const keys = new Set<string>();
+    for (const m of doc.getText().matchAll(re)) { keys.add(`#artifact:${m[1]!.trim()}`); }
+    return [...keys];
+}
+
 /** Resolve a dynamic `@source` to its value set (workspace-derived where applicable). */
-async function resolveDynamic(source: string): Promise<readonly string[]> {
+async function resolveDynamic(source: string, doc?: vscode.TextDocument): Promise<readonly string[]> {
     switch (source) {
         case 'language': return LANGUAGES;
         case 'figure': {
@@ -45,14 +58,21 @@ async function resolveDynamic(source: string): Promise<readonly string[]> {
             const forest = await getForest({ fastReturnStale: true });
             return forest.map(t => t.uri).filter(Boolean);
         }
-        default: return []; // @artifact-ref / @bib-ref — later
+        case 'artifact-ref': return doc ? artifactRefs(doc) : [];
+        case 'bib-ref': {
+            // Citations target reference trees (`\cite{tree-id}`), which the forest
+            // marks with the `Reference` taxon — offer those ids.
+            const forest = await getForest({ fastReturnStale: true });
+            return forest.filter(t => t.taxon?.toLowerCase() === 'reference').map(t => t.uri).filter(Boolean);
+        }
+        default: return [];
     }
 }
 
 /** Values to suggest for a param kind (enum literals or a resolved dynamic set). */
-async function valuesFor(kind: ParamKind): Promise<readonly string[]> {
+async function valuesFor(kind: ParamKind, doc?: vscode.TextDocument): Promise<readonly string[]> {
     if (kind.tag === 'enum') { return kind.values; }
-    if (kind.tag === 'dynamic') { return resolveDynamic(kind.source); }
+    if (kind.tag === 'dynamic') { return resolveDynamic(kind.source, doc); }
     return [];
 }
 
@@ -66,17 +86,18 @@ function items(values: readonly string[], range: vscode.Range, kindLabel: string
     });
 }
 
-// Completion inside an `opts: flags{…}` first arg: mode bareword, flag keys, values.
+// Completion inside an `opts: flags{…}` arg: mode bareword, flag keys, values.
 async function flagCompletions(
     fields: readonly import('./language/sig.js').FlagField[],
     typed: string,
     pos: vscode.Position,
+    doc: vscode.TextDocument,
 ): Promise<vscode.CompletionItem[]> {
     const valueMatch = /(\w+)=(\S*)$/.exec(typed);
     if (valueMatch) {
         const field = fields.find(f => f.name === valueMatch[1]);
         if (!field) { return []; }
-        const vals = await valuesFor(field.kind);
+        const vals = await valuesFor(field.kind, doc);
         const start = pos.translate(0, -(valueMatch[2]?.length ?? 0));
         return items(vals, new vscode.Range(start, pos), `${valueMatch[1]} value`);
     }
@@ -124,26 +145,68 @@ export function registerSigHover(context: vscode.ExtensionContext): void {
     context.subscriptions.push(provider);
 }
 
+/**
+ * Locate the `\command` and 0-based brace-arg index the cursor sits in, plus the
+ * text typed so far in that arg. Walks left from the cursor: the cursor must be
+ * inside an unmatched `{`; preceding balanced `{…}`/`[…]`/`(…)` groups are earlier
+ * args. Only BRACE groups advance the param index, matching how `%! sig` params map
+ * positionally onto a macro's brace binders (so e.g. `\embed{opts}{target}` →
+ * target is arg index 1).
+ */
+function argContext(line: string): { command: string; argIndex: number; typed: string } | null {
+    // The brace we're typing in = the last unmatched '{' to the cursor's left.
+    let depth = 0;
+    let open = -1;
+    for (let i = line.length - 1; i >= 0; i--) {
+        const ch = line[i];
+        if (ch === '}') { depth++; }
+        else if (ch === '{') { if (depth === 0) { open = i; break; } depth--; }
+    }
+    if (open === -1) { return null; }
+    const typed = line.slice(open + 1);
+
+    // Walk left over earlier args to find the owning command and count brace args.
+    let i = open - 1;
+    let argIndex = 0;
+    for (;;) {
+        while (i >= 0 && /\s/.test(line[i]!)) { i--; }
+        if (i < 0) { return null; }
+        const ch = line[i]!;
+        if (ch === '}' || ch === ']' || ch === ')') {
+            const openCh = ch === '}' ? '{' : ch === ']' ? '[' : '(';
+            let d = 0;
+            while (i >= 0) {
+                if (line[i] === ch) { d++; }
+                else if (line[i] === openCh) { d--; if (d === 0) { i--; break; } }
+                i--;
+            }
+            if (ch === '}') { argIndex++; } // only brace args carry positional params
+            continue;
+        }
+        break;
+    }
+    const cm = /\\(\w+)$/.exec(line.slice(0, i + 1));
+    return cm ? { command: `\\${cm[1]}`, argIndex, typed } : null;
+}
+
 export function registerSigCompletion(context: vscode.ExtensionContext): void {
     const provider = vscode.languages.registerCompletionItemProvider(
         { scheme: 'file', language: 'forester' },
         {
             async provideCompletionItems(doc, pos) {
                 const line = doc.getText(new vscode.Range(new vscode.Position(pos.line, 0), pos));
-                // \command{<typed-so-far>  — the first brace arg (no nested braces yet)
-                const m = /\\(\w+)\{([^{}]*)$/.exec(line);
-                if (!m) { return []; }
-                const param = (await paramsFor(`\\${m[1]}`))?.[0];
+                const ctx = argContext(line);
+                if (!ctx) { return []; }
+                const param = (await paramsFor(ctx.command))?.[ctx.argIndex];
                 if (!param) { return []; }
-                const typed = m[2] ?? '';
-                if (param.kind.tag === 'flags') { return flagCompletions(param.kind.fields, typed, pos); }
-                const vals = await valuesFor(param.kind);
+                if (param.kind.tag === 'flags') { return flagCompletions(param.kind.fields, ctx.typed, pos, doc); }
+                const vals = await valuesFor(param.kind, doc);
                 if (vals.length === 0) { return []; }
-                const word = /(\S*)$/.exec(typed)?.[1] ?? '';
+                const word = /(\S*)$/.exec(ctx.typed)?.[1] ?? '';
                 return items(vals, new vscode.Range(pos.translate(0, -word.length), pos), param.name);
             },
         },
-        '{', '=', ' ',
+        '{', '=', ' ', '#', ':',
     );
     context.subscriptions.push(provider);
 }

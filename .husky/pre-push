@@ -2,11 +2,34 @@
 set -e
 
 echo "▶ pre-push: Neovim plugin lint..."
-if command -v luacheck >/dev/null 2>&1; then
-  luacheck editors/neovim/lua/ editors/neovim/plugin/ \
-    --globals vim \
-    --no-unused-args \
-    --max-line-length 120
-else
-  echo "  luacheck not found, skipping (install with: sudo apt install lua-check)"
+
+LUACHECK_TARGETS="editors/neovim/lua/ editors/neovim/plugin/"
+LUACHECK_FLAGS="--globals vim --no-unused-args --max-line-length 120"
+
+if ! command -v luacheck >/dev/null 2>&1; then
+  echo "  luacheck not found, skipping (install with: sudo pacman -S luacheck  /  apt install lua-check)"
+  exit 0
 fi
+
+# luacheck 1.2.0 crashes under Lua 5.5 (loop vars became <const>; standards.lua
+# reassigns one). Detect that startup crash and fall back to a compatible Lua.
+if luacheck --version >/dev/null 2>&1; then
+  luacheck $LUACHECK_TARGETS $LUACHECK_FLAGS
+  exit $?
+fi
+
+echo "  default luacheck is broken under this Lua; retrying with an older interpreter..."
+rocks_script=$(ls /usr/lib/luarocks/rocks-*/luacheck/*/bin/luacheck 2>/dev/null | head -1)
+if [ -n "$rocks_script" ]; then
+  luadir=$(echo "$rocks_script" | sed -E 's#.*/rocks-([0-9.]+)/.*#\1#')
+  for lua in lua5.4 lua5.3; do
+    if command -v "$lua" >/dev/null 2>&1; then
+      exec "$lua" \
+        -e "package.path='/usr/share/lua/$luadir/?.lua;/usr/share/lua/$luadir/?/init.lua;'..package.path" \
+        "$rocks_script" $LUACHECK_TARGETS $LUACHECK_FLAGS
+    fi
+  done
+fi
+
+echo "  no working luacheck interpreter found, skipping lint."
+exit 0

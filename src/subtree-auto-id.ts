@@ -6,6 +6,7 @@ import {
    computeSubtreeIdScanState,
    DEFAULT_SUBTREE_TEMPLATE,
    extractSubtreeReferenceIds,
+   canonicalStemKey,
    fromBase36Stem,
    isCanonicalBase36Stem,
    nextCanonicalBase36Id,
@@ -344,7 +345,7 @@ export class SubtreeAutoIdFeature implements vscode.Disposable {
       await this.ensureScanned();
 
       const candidate = nextCanonicalBase36Id(this.knownCanonicalIds, this.nextCanonicalValue);
-      this.knownCanonicalIds.add(candidate.id);
+      this.knownCanonicalIds.add(canonicalStemKey(candidate.id));
       this.nextCanonicalValue = candidate.nextValue;
       return candidate.id;
    }
@@ -355,7 +356,7 @@ export class SubtreeAutoIdFeature implements vscode.Disposable {
          return;
       }
 
-      this.knownCanonicalIds.add(trimmedId);
+      this.knownCanonicalIds.add(canonicalStemKey(trimmedId));
 
       const decodedId = fromBase36Stem(trimmedId);
       if (decodedId === undefined) {

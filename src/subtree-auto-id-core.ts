@@ -1,7 +1,11 @@
 import { match } from "ts-pattern";
 
 const SUBTREE_WITH_ID_REGEX = /\\subtree\s*\[([^\]]+)\]/g;
-const BASE36_STEM_REGEX = /^[0-9a-z]{4}$/;
+// Case-insensitive on purpose: forester encodes stems with an uppercase
+// alphabet (BaseN.ml) while this extension emits lowercase, so `008A` and
+// `008a` are the same slot. Reading only one case makes the other's ids look
+// free, and the "next" id we hand out lands on a tree that already exists.
+const BASE36_STEM_REGEX = /^[0-9a-zA-Z]{4}$/;
 
 export const DEFAULT_SUBTREE_TEMPLATE = "\\subtree[<id>]{\n  \\title{$1}\n}$0";
 export const MAX_BASE36_VALUE = 36 ** 4 - 1;
@@ -54,7 +58,7 @@ export function fromBase36Stem(stem: string): number | undefined {
    }
 
    let value = 0;
-   for (const character of stem) {
+   for (const character of stem.toLowerCase()) {
       const digit = BASE36_DIGITS.indexOf(character);
       if (digit < 0) {
          return undefined;
@@ -65,16 +69,21 @@ export function fromBase36Stem(stem: string): number | undefined {
    return value;
 }
 
+/** Case-folded key for "is this slot taken?" tests — see {@link BASE36_STEM_REGEX}. */
+export function canonicalStemKey(stem: string): string {
+   return stem.toLowerCase();
+}
+
 export function nextCanonicalBase36Id(
    knownCanonicalIds: Iterable<string>,
    startValue: number,
 ): NextCanonicalIdResult {
-   const knownIdSet = new Set(knownCanonicalIds);
+   const knownIdSet = new Set([...knownCanonicalIds].map(canonicalStemKey));
 
    let candidateValue = startValue;
    while (candidateValue <= MAX_BASE36_VALUE) {
       const candidateId = toBase36(candidateValue);
-      if (!knownIdSet.has(candidateId)) {
+      if (!knownIdSet.has(canonicalStemKey(candidateId))) {
          return {
             id: candidateId,
             nextValue: candidateValue + 1,
@@ -96,7 +105,7 @@ function collectCanonicalIds(ids: Iterable<string>, sink: Set<string>): number {
          continue;
       }
 
-      sink.add(id);
+      sink.add(canonicalStemKey(id));
       maxValue = Math.max(maxValue, canonicalValue);
    }
 

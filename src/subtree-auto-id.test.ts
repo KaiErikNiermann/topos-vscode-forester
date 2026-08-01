@@ -42,16 +42,29 @@ test("Extract subtree IDs from subtree commands with bracketed IDs", () => {
 });
 
 test("Compute scan state from tree names and subtree refs using canonical 4-char base36 only", () => {
-   const treeIds = ["00af", "notes-about-cats", "00b9", "ABCD"];
+   const treeIds = ["00af", "notes-about-cats", "00b9"];
    const subtreeIds = ["xyz", "00ba", "a0ff"];
 
    const state = computeSubtreeIdScanState(treeIds, subtreeIds);
    const expectedMax = Math.max(fromBase36Stem("00ba") ?? -1, fromBase36Stem("a0ff") ?? -1);
 
    assert.equal(state.knownCanonicalIds.has("notes-about-cats"), false);
-   assert.equal(state.knownCanonicalIds.has("ABCD"), false);
    assert.equal(state.knownCanonicalIds.has("00ba"), true);
    assert.equal(state.nextCanonicalValue, expectedMax + 1);
+});
+
+test("Uppercase stems occupy the same slot as their lowercase twin", () => {
+   // forester encodes with an uppercase alphabet, this extension with a
+   // lowercase one. Reading only our own case makes forester's addresses look
+   // free, and the next ID we hand out lands on a tree that already exists.
+   assert.equal(fromBase36Stem("008A"), fromBase36Stem("008a"));
+
+   const state = computeSubtreeIdScanState(["008A"], []);
+   assert.equal(state.knownCanonicalIds.has("008a"), true);
+   assert.equal(state.nextCanonicalValue, (fromBase36Stem("008a") ?? -1) + 1);
+
+   // ...and an uppercase ID must never be re-issued in lowercase.
+   assert.notEqual(nextCanonicalBase36Id(["008A"], fromBase36Stem("008a") ?? 0).id, "008a");
 });
 
 test("nextCanonicalBase36Id skips used canonical IDs in sequence", () => {

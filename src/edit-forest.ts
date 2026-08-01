@@ -297,6 +297,17 @@ async function createNewTree(options: CreateNewTreeOptions = {}): Promise<{ tree
       // Create the new tree file
       const random: boolean = vscode.workspace.getConfiguration('forester').get('create.random') ?? false;
 
+      // Snapshot before allocating: the only way to tell the stub forester is
+      // about to create apart from a tree that was already there.
+      const preExistingTrees = new Set<string>(
+         (await vscode.workspace.fs.readDirectory(destFolder).then(
+            entries => entries,
+            () => [] as [string, vscode.FileType][],
+         ))
+            .filter(([name, type]) => type === vscode.FileType.File && name.endsWith(".tree"))
+            .map(([name]) => vscode.Uri.joinPath(destFolder, name).fsPath),
+      );
+
       let newTreeFilePath = (await command(["new",
          "--dest", destFolder.fsPath,
          "--prefix", prefix,
@@ -311,6 +322,21 @@ async function createNewTree(options: CreateNewTreeOptions = {}): Promise<{ tree
 
       const uri = vscode.Uri.file(newTreeFilePath);
       const treeId = path.basename(newTreeFilePath, '.tree');
+
+      // We are about to write with `overwrite: true`, which is only safe on the
+      // stub `forester new` just created for us. forester allocates from its
+      // forest index, and a stale index hands back an address that is already
+      // spent — so make sure the path it returned really is new. Overwriting a
+      // tree that predates this command would destroy it with no undo.
+      if (preExistingTrees.has(uri.fsPath)) {
+         vscode.window.showErrorMessage(
+            `Refusing to create tree "${treeId}": ${newTreeFilePath} already existed before ` +
+            `this command ran. forester allocated an address that is already in use; ` +
+            `the existing tree has been left untouched.`
+         );
+         return undefined;
+      }
+
       let newTreeContent = (await vscode.workspace.fs.readFile(uri)).toString();
 
       // Handle date first, then author, blank line, then taxon and title

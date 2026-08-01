@@ -512,7 +512,18 @@ export async function renameTreeById(treeId: string): Promise<void> {
    // the cached sourcePath correctly points to the parent file that contains
    // the subtree definition, so we fall back to it.
    const treeFiles = await vscode.workspace.findFiles(`**/${treeId}.tree`, null, 1);
-   const resolvedPath = treeFiles[0]?.fsPath ?? tree.sourcePath;
+   if (treeFiles.length === 0) {
+      // An inline \subtree[id]{...} has no file of its own, and sourcePath points
+      // at its parent. The rewrite below matches \title{ at the start of a line,
+      // which inside a parent only ever hits the parent's own title — renaming
+      // the subtree would silently retitle the whole tree that contains it.
+      vscode.window.showErrorMessage(
+         `Cannot rename "${treeId}" from here: it is an inline \\subtree with no .tree file ` +
+         `of its own. Edit its \\title{...} in ${path.basename(tree.sourcePath)} instead.`
+      );
+      return;
+   }
+   const resolvedPath = treeFiles[0].fsPath;
 
    // Prepare current value for input
    const currentTaxon = tree.taxon || '';

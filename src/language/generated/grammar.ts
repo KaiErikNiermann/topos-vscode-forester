@@ -41,7 +41,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@16"
+              "$ref": "#/rules@17"
             },
             "arguments": [
               {
@@ -57,7 +57,14 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@24"
+              "$ref": "#/rules@25"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@27"
             },
             "arguments": []
           },
@@ -71,21 +78,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@25"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@33"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@21"
+              "$ref": "#/rules@34"
             },
             "arguments": []
           },
@@ -106,14 +99,21 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@32"
+              "$ref": "#/rules@24"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@31"
+              "$ref": "#/rules@33"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@32"
             },
             "arguments": []
           }
@@ -122,6 +122,17 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
       "entry": false,
       "fragment": false,
       "parameters": []
+    },
+    {
+      "$type": "TerminalRule",
+      "name": "VERBATIM_SPAN",
+      "definition": {
+        "$type": "RegexToken",
+        "regex": "/\\\\\\\\startverb[\\\\s\\\\S]*?\\\\\\\\stopverb/",
+        "parenthesized": false
+      },
+      "fragment": false,
+      "hidden": false
     },
     {
       "$type": "TerminalRule",
@@ -299,6 +310,13 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                 {
                   "$type": "RuleCall",
                   "rule": {
+                    "$ref": "#/rules@5"
+                  },
+                  "arguments": []
+                },
+                {
+                  "$type": "RuleCall",
+                  "rule": {
                     "$ref": "#/rules@4"
                   },
                   "arguments": []
@@ -307,13 +325,6 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                   "$type": "RuleCall",
                   "rule": {
                     "$ref": "#/rules@3"
-                  },
-                  "arguments": []
-                },
-                {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@2"
                   },
                   "arguments": []
                 }
@@ -328,7 +339,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                 "guardCondition": {
                   "$type": "ParameterReference",
                   "parameter": {
-                    "$ref": "#/rules@16/parameters@0"
+                    "$ref": "#/rules@17/parameters@0"
                   }
                 },
                 "elements": [
@@ -339,7 +350,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                     "terminal": {
                       "$type": "RuleCall",
                       "rule": {
-                        "$ref": "#/rules@18"
+                        "$ref": "#/rules@19"
                       },
                       "arguments": [
                         {
@@ -363,7 +374,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                   "value": {
                     "$type": "ParameterReference",
                     "parameter": {
-                      "$ref": "#/rules@16/parameters@0"
+                      "$ref": "#/rules@17/parameters@0"
                     }
                   }
                 },
@@ -375,7 +386,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                     "terminal": {
                       "$type": "RuleCall",
                       "rule": {
-                        "$ref": "#/rules@17"
+                        "$ref": "#/rules@18"
                       },
                       "arguments": []
                     },
@@ -399,7 +410,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@18"
+              "$ref": "#/rules@19"
             },
             "arguments": [
               {
@@ -415,14 +426,14 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@19"
+              "$ref": "#/rules@20"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@20"
+              "$ref": "#/rules@21"
             },
             "arguments": []
           }
@@ -456,7 +467,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                 "guardCondition": {
                   "$type": "ParameterReference",
                   "parameter": {
-                    "$ref": "#/rules@18/parameters@0"
+                    "$ref": "#/rules@19/parameters@0"
                   }
                 },
                 "elements": [
@@ -467,7 +478,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                     "terminal": {
                       "$type": "RuleCall",
                       "rule": {
-                        "$ref": "#/rules@27"
+                        "$ref": "#/rules@28"
                       },
                       "arguments": []
                     },
@@ -482,7 +493,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                   "value": {
                     "$type": "ParameterReference",
                     "parameter": {
-                      "$ref": "#/rules@18/parameters@0"
+                      "$ref": "#/rules@19/parameters@0"
                     }
                   }
                 },
@@ -686,11 +697,23 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
         "feature": "content",
         "operator": "=",
         "terminal": {
-          "$type": "RuleCall",
-          "rule": {
-            "$ref": "#/rules@9"
-          },
-          "arguments": []
+          "$type": "Alternatives",
+          "elements": [
+            {
+              "$type": "RuleCall",
+              "rule": {
+                "$ref": "#/rules@10"
+              },
+              "arguments": []
+            },
+            {
+              "$type": "RuleCall",
+              "rule": {
+                "$ref": "#/rules@2"
+              },
+              "arguments": []
+            }
+          ]
         }
       },
       "entry": false,
@@ -706,7 +729,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@8"
+              "$ref": "#/rules@9"
             },
             "arguments": []
           },
@@ -717,7 +740,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@27"
+                "$ref": "#/rules@28"
               },
               "arguments": []
             },
@@ -742,7 +765,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@7"
+              "$ref": "#/rules@8"
             },
             "arguments": []
           },
@@ -753,7 +776,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@27"
+                "$ref": "#/rules@28"
               },
               "arguments": []
             },
@@ -778,7 +801,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@16"
+              "$ref": "#/rules@17"
             },
             "arguments": [
               {
@@ -808,7 +831,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@28"
+              "$ref": "#/rules@27"
             },
             "arguments": []
           },
@@ -823,6 +846,13 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             "$type": "RuleCall",
             "rule": {
               "$ref": "#/rules@30"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@31"
             },
             "arguments": []
           }
@@ -849,7 +879,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@27"
+                "$ref": "#/rules@28"
               },
               "arguments": []
             },
@@ -875,7 +905,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@6"
+            "$ref": "#/rules@7"
           },
           "arguments": []
         }
@@ -897,13 +927,6 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@10"
-              },
-              "arguments": []
-            },
-            {
-              "$type": "RuleCall",
-              "rule": {
                 "$ref": "#/rules@11"
               },
               "arguments": []
@@ -912,6 +935,13 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
               "$type": "RuleCall",
               "rule": {
                 "$ref": "#/rules@12"
+              },
+              "arguments": []
+            },
+            {
+              "$type": "RuleCall",
+              "rule": {
+                "$ref": "#/rules@13"
               },
               "arguments": []
             },
@@ -948,7 +978,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@6"
+            "$ref": "#/rules@7"
           },
           "arguments": []
         }
@@ -970,13 +1000,6 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@10"
-              },
-              "arguments": []
-            },
-            {
-              "$type": "RuleCall",
-              "rule": {
                 "$ref": "#/rules@11"
               },
               "arguments": []
@@ -985,6 +1008,13 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
               "$type": "RuleCall",
               "rule": {
                 "$ref": "#/rules@12"
+              },
+              "arguments": []
+            },
+            {
+              "$type": "RuleCall",
+              "rule": {
+                "$ref": "#/rules@13"
               },
               "arguments": []
             }
@@ -1005,7 +1035,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
         "terminal": {
           "$type": "RuleCall",
           "rule": {
-            "$ref": "#/rules@5"
+            "$ref": "#/rules@6"
           },
           "arguments": []
         }
@@ -1018,5 +1048,5 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
   "imports": [],
   "interfaces": [],
   "types": [],
-  "$comment": "/**\\n * Forester .tree language grammar for Langium 4.x\\n *\\n * Task coverage:\\n *   Task 5  – Terminal rules (COMMAND_NAME, delimiters, math, verbatim, text, hidden)\\n *   Task 6  – Top-level metadata command rules (\\\\title, \\\\taxon, \\\\author, …)\\n *   Task 7  – Block command rules (\\\\p, \\\\ul, \\\\li, \\\\subtree, …)\\n *   Task 8  – Verbatim blocks (\`\`\`…\`\`\` fence; \\\\startverb content handled via ignoredCommands)\\n *   Task 9  – Math syntax  #{…} inline  and  ##{…} display\\n *   Task 10 – Content-preserving commands (\\\\tex{}{}, \\\\codeblock{}{}, \\\\pre{}{})\\n *   Task 11 – Macro definition \\\\def and macro calls\\n *   Task 12 – Link-like commands (\\\\transclude, \\\\import, \\\\export, \\\\ref)\\n *\\n * Design decisions\\n * ─────────────────\\n * • Tasks 6, 7, 10, 11, 12 all share the same syntactic structure:\\n *   \\\\commandName followed by zero or more Argument{} [] ().\\n *   A single \`Command\` parser rule covers all of them; the formatter and\\n *   hover provider distinguish command categories by name at the semantic level,\\n *   mirroring the BLOCK_COMMANDS / TOP_LEVEL_COMMANDS / TEX_CONTENT_COMMANDS\\n *   constants in formatter-core.ts.\\n *\\n * • Math (task 9) is parsed with nested parser rules (MathNode*) rather than\\n *   an opaque regex terminal so that balanced-brace nesting is handled correctly\\n *   by the parser for arbitrary depth.\\n *\\n * • Verbatim \`\`\` fences (task 8) are captured as a single opaque VERBATIM_BLOCK\\n *   terminal using a non-greedy [\\\\s\\\\S]*? pattern, so the formatter can emit the\\n *   content unchanged.  \\\\startverb{…} is a plain Command; its brace content is\\n *   preserved by the formatter via the ignoredCommands hook (task 20).\\n *\\n * • A lone backslash not followed by a name character is treated as plain TEXT.\\n */"
+  "$comment": "/**\\n * Forester .tree language grammar for Langium 4.x\\n *\\n * Task coverage:\\n *   Task 5  – Terminal rules (COMMAND_NAME, delimiters, math, verbatim, text, hidden)\\n *   Task 6  – Top-level metadata command rules (\\\\title, \\\\taxon, \\\\author, …)\\n *   Task 7  – Block command rules (\\\\p, \\\\ul, \\\\li, \\\\subtree, …)\\n *   Task 8  – Verbatim blocks (\`\`\`…\`\`\` fence and \\\\startverb…\\\\stopverb span)\\n *   Task 9  – Math syntax  #{…} inline  and  ##{…} display\\n *   Task 10 – Content-preserving commands (\\\\tex{}{}, \\\\codeblock{}{}, \\\\pre{}{})\\n *   Task 11 – Macro definition \\\\def and macro calls\\n *   Task 12 – Link-like commands (\\\\transclude, \\\\import, \\\\export, \\\\ref)\\n *\\n * Design decisions\\n * ─────────────────\\n * • Tasks 6, 7, 10, 11, 12 all share the same syntactic structure:\\n *   \\\\commandName followed by zero or more Argument{} [] ().\\n *   A single \`Command\` parser rule covers all of them; the formatter and\\n *   hover provider distinguish command categories by name at the semantic level,\\n *   mirroring the BLOCK_COMMANDS / TOP_LEVEL_COMMANDS / TEX_CONTENT_COMMANDS\\n *   constants in formatter-core.ts.\\n *\\n * • Math (task 9) is parsed with nested parser rules (MathNode*) rather than\\n *   an opaque regex terminal so that balanced-brace nesting is handled correctly\\n *   by the parser for arbitrary depth.\\n *\\n * • Verbatim \`\`\` fences and \\\\startverb…\\\\stopverb spans (task 8) are captured as\\n *   single opaque terminals using a non-greedy [\\\\s\\\\S]*? pattern, so the formatter\\n *   can emit the content unchanged. Their bodies are not Forester syntax — the\\n *   compiler's lexer swallows them wholesale — so parsing into them only ever\\n *   invented errors.\\n *\\n * • A lone backslash not followed by a name character is treated as plain TEXT.\\n */"
 }`));

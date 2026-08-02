@@ -238,6 +238,24 @@ await test('verbatim block followed by regular content', async () => {
     assertOk(p, 'Expected \\p after verbatim');
 });
 
+await test('\\startverb…\\stopverb parses as an opaque VerbatimBlock', async () => {
+    const doc = await parseClean('\\p{\\startverb\nlet f = (d, i) => xs[i] || d;\n\\stopverb}');
+    const p = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\p');
+    assertOk(p, 'Expected \\p');
+    const vb = (p as Command).args[0]?.nodes.find(isVerbatimBlock);
+    // The body is JavaScript: its parens and brackets do not balance as Forester
+    // syntax, so parsing into it produced a cascade of phantom bracket errors.
+    assertOk(vb, 'Expected the verbatim span to be one opaque node');
+    assertIs(vb.content.includes('xs[i]'), 'Expected the body preserved verbatim');
+});
+
+await test('\\startverb…\\stopverb inside math is opaque too', async () => {
+    const doc = await parseClean('##{\n\\startverb\n(-\\infty, \\textrm{max}\\ c]\n\\stopverb\n}');
+    const md = doc.nodes.find(isMathDisplay);
+    assertOk(md, 'Expected MathDisplay');
+    assertOk(md.nodes.find(isVerbatimBlock), 'Expected VerbatimBlock inside math');
+});
+
 // ── Tests: Inline math #{...} ─────────────────────────────────────────────────
 
 await test('#{x^2} parses as MathInline at top level', async () => {

@@ -5,7 +5,7 @@
  *   Task 5  – Terminal rules (COMMAND_NAME, delimiters, math, verbatim, text, hidden)
  *   Task 6  – Top-level metadata command rules (\title, \taxon, \author, …)
  *   Task 7  – Block command rules (\p, \ul, \li, \subtree, …)
- *   Task 8  – Verbatim blocks (```…``` fence; \startverb content handled via ignoredCommands)
+ *   Task 8  – Verbatim blocks (```…``` fence and \startverb…\stopverb span)
  *   Task 9  – Math syntax  #{…} inline  and  ##{…} display
  *   Task 10 – Content-preserving commands (\tex{}{}, \codeblock{}{}, \pre{}{})
  *   Task 11 – Macro definition \def and macro calls
@@ -24,10 +24,11 @@
  *   an opaque regex terminal so that balanced-brace nesting is handled correctly
  *   by the parser for arbitrary depth.
  *
- * • Verbatim ``` fences (task 8) are captured as a single opaque VERBATIM_BLOCK
- *   terminal using a non-greedy [\s\S]*? pattern, so the formatter can emit the
- *   content unchanged.  \startverb{…} is a plain Command; its brace content is
- *   preserved by the formatter via the ignoredCommands hook (task 20).
+ * • Verbatim ``` fences and \startverb…\stopverb spans (task 8) are captured as
+ *   single opaque terminals using a non-greedy [\s\S]*? pattern, so the formatter
+ *   can emit the content unchanged. Their bodies are not Forester syntax — the
+ *   compiler's lexer swallows them wholesale — so parsing into them only ever
+ *   invented errors.
  *
  * • A lone backslash not followed by a name character is treated as plain TEXT.
  */
@@ -51,6 +52,14 @@ Node:
 // ============================================================================
 // TASK 5 — Terminal rules
 // ============================================================================
+
+// Verbatim span:  \startverb …anything… \stopverb
+// Forester's lexer swallows everything up to the \stopverb herald, so the body
+// is not Forester syntax at all — it is routinely JavaScript or TeX whose
+// brackets do not balance. Parsing \startverb as an ordinary command made every
+// such body a cascade of phantom bracket errors. Must precede COMMAND_NAME so
+// the longer match wins.
+terminal VERBATIM_SPAN: /\\startverb[\s\S]*?\\stopverb/;
 
 // XML namespace declaration: \xmlns:prefix  (spec §4.6)
 //   e.g. \xmlns:html{http://www.w3.org/1999/xhtml}
@@ -85,6 +94,7 @@ terminal HASH_INLINE:  /#{/;
 // Captured as a single opaque token; the formatter preserves it verbatim.
 // Non-greedy [\s\S]*? ensures we close at the first matching ```.
 terminal VERBATIM_BLOCK: /```[\s\S]*?```/;
+
 
 // Plain text: any run of characters that are not Forester special characters.
 // Special: \ { } [ ] ( ) \n \t (space) % # `
@@ -180,14 +190,13 @@ ParenGroup:
 
 // ============================================================================
 // TASK 8 — Verbatim blocks
-//   ``` fences → captured as a single VERBATIM_BLOCK terminal above.
-//   \startverb{…} / \stopverb → parsed as ordinary Commands; the formatter
-//   skips reformatting their brace content when the command name appears in
-//   the ignoredCommands set (task 20 / ForesterFormatterConfig).
+//   ``` fences         → VERBATIM_BLOCK terminal above.
+//   \startverb…\stopverb → VERBATIM_SPAN terminal above.
+// Both are opaque, so the formatter emits them unchanged.
 // ============================================================================
 
 VerbatimBlock:
-    content=VERBATIM_BLOCK;
+    content=(VERBATIM_BLOCK | VERBATIM_SPAN);
 
 // ============================================================================
 // TASK 9 — Math syntax
@@ -207,7 +216,7 @@ MathDisplay:
 // Nodes inside math: nested commands, more math, explicit brace groups,
 // escapes (e.g. \\ line break), and text
 MathNode:
-    Command<true> | MathInline | MathDisplay | MathBraceGroup
+    Command<true> | VerbatimBlock | MathInline | MathDisplay | MathBraceGroup
     | MathEscape | MathText;
 
 // Explicit { } group inside math (e.g. for TeX grouping)

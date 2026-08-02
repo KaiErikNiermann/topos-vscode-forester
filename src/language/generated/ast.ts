@@ -7,6 +7,7 @@
 import * as langium from 'langium';
 
 export const ForesterTerminals = {
+    VERBATIM_SPAN: /\\startverb[\s\S]*?\\stopverb/,
     DECL_XMLNS: /\\xmlns:[a-zA-Z]+/,
     XML_COMMAND_NAME: /\\<[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?>/,
     COMMAND_NAME: /\\[A-Za-z0-9\-\/\?\*]+/,
@@ -211,7 +212,7 @@ export function isMathInline(item: unknown): item is MathInline {
     return reflection.isInstance(item, MathInline.$type);
 }
 
-export type MathNode = Command | MathBraceGroup | MathDisplay | MathEscape | MathInline | MathText;
+export type MathNode = Command | MathBraceGroup | MathDisplay | MathEscape | MathInline | MathText | VerbatimBlock;
 
 export const MathNode = {
     $type: 'MathNode'
@@ -292,7 +293,7 @@ export function isTextFragment(item: unknown): item is TextFragment {
 }
 
 export interface VerbatimBlock extends langium.AstNode {
-    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathDisplay | MathInline | ParenArg | ParenGroup;
     readonly $type: 'VerbatimBlock';
     content: string;
 }
@@ -520,7 +521,7 @@ export class ForesterAstReflection extends langium.AbstractAstReflection {
                     name: VerbatimBlock.content
                 }
             },
-            superTypes: [Node.$type]
+            superTypes: [MathNode.$type, Node.$type]
         },
         WikiLink: {
             name: WikiLink.$type,

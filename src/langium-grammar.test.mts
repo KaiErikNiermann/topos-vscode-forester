@@ -56,6 +56,14 @@ function assertOk<T>(value: T, msg?: string): asserts value is NonNullable<T> {
     }
 }
 
+// For type-guard results. assertOk would accept `false` — it only rejects
+// null/undefined — so every assertIs(isFoo(x)) was a test that could not fail.
+function assertIs(value: boolean, msg = 'Expected the type guard to hold'): asserts value {
+    if (!value) {
+        throw new Error(msg);
+    }
+}
+
 function assertEqual(actual: unknown, expected: unknown, msg?: string): void {
     if (actual !== expected) {
         throw new Error(
@@ -149,7 +157,7 @@ await test('\\p with multiple children parses correctly', async () => {
     const doc = await parseClean('\\p{Hello World}');
     const cmd = firstCommand(doc, '\\p');
     assertEqual(cmd.args.length, 1);
-    assertOk(isBraceArg(cmd.args[0]), 'Expected BraceArg');
+    assertIs(isBraceArg(cmd.args[0]), 'Expected BraceArg');
     // "Hello" and "World" are each a TextFragment (WS between them is hidden)
     const frags = cmd.args[0].nodes.filter(isTextFragment);
     if (frags.length === 0) {
@@ -176,11 +184,11 @@ await test('\\subtree with bracket address arg [id] and brace body', async () =>
 await test('deeply nested braces parse without errors', async () => {
     const doc = await parseClean('\\p{\\ul{\\li{nested content}}}');
     const p = firstCommand(doc, '\\p');
-    assertOk(isBraceArg(p.args[0]), 'Expected BraceArg on \\p');
+    assertIs(isBraceArg(p.args[0]), 'Expected BraceArg on \\p');
     const ulNode = p.args[0].nodes.find(n => isCommand(n) && (n as Command).name === '\\ul');
     assertOk(ulNode, 'Expected \\ul inside \\p');
     const ul = ulNode as Command;
-    assertOk(isBraceArg(ul.args[0]), 'Expected BraceArg on \\ul');
+    assertIs(isBraceArg(ul.args[0]), 'Expected BraceArg on \\ul');
     const liNode = ul.args[0].nodes.find(n => isCommand(n) && (n as Command).name === '\\li');
     assertOk(liNode, 'Expected \\li inside \\ul');
 });
@@ -198,7 +206,7 @@ await test('\\tex{preamble}{body} parses as Command with two BraceArgs', async (
 await test('command nested in brace arg of another command', async () => {
     const doc = await parseClean('\\scope{\\p{\\em{important}}}');
     const scope = firstCommand(doc, '\\scope');
-    assertOk(isBraceArg(scope.args[0]), 'Expected BraceArg on \\scope');
+    assertIs(isBraceArg(scope.args[0]), 'Expected BraceArg on \\scope');
     const pNode = scope.args[0].nodes.find(n => isCommand(n) && (n as Command).name === '\\p');
     assertOk(pNode, 'Expected \\p inside \\scope');
 });
@@ -264,7 +272,7 @@ await test('#{x^{a+b}} parses nested MathBraceGroup', async () => {
 await test('inline math inside \\p body', async () => {
     const doc = await parseClean('\\p{The equation #{x^2} is key.}');
     const p = firstCommand(doc, '\\p');
-    assertOk(isBraceArg(p.args[0]));
+    assertIs(isBraceArg(p.args[0]));
     const mi = p.args[0].nodes.find(isMathInline);
     assertOk(mi, 'Expected MathInline inside \\p body');
 });
@@ -296,7 +304,7 @@ await test('display math with \\frac command inside', async () => {
 await test('display math inside \\p body', async () => {
     const doc = await parseClean('\\p{See ##{x^2}.}');
     const p = firstCommand(doc, '\\p');
-    assertOk(isBraceArg(p.args[0]));
+    assertIs(isBraceArg(p.args[0]));
     const md = p.args[0].nodes.find(isMathDisplay);
     assertOk(md, 'Expected MathDisplay inside \\p body');
 });
@@ -305,7 +313,7 @@ await test('##{ must not be confused with #{ inside body', async () => {
     const source = '\\p{#{inline} and ##{display}}';
     const doc = await parseClean(source);
     const p = firstCommand(doc, '\\p');
-    assertOk(isBraceArg(p.args[0]));
+    assertIs(isBraceArg(p.args[0]));
     const mi = p.args[0].nodes.find(isMathInline);
     const md = p.args[0].nodes.find(isMathDisplay);
     assertOk(mi, 'Expected MathInline');
@@ -323,7 +331,7 @@ await test('percent comment is consumed without error', async () => {
 await test('inline comment inside brace arg', async () => {
     const doc = await parseClean('\\title{Hello % comment\nWorld}');
     const cmd = firstCommand(doc, '\\title');
-    assertOk(isBraceArg(cmd.args[0]));
+    assertIs(isBraceArg(cmd.args[0]));
     // Should have at least one TextFragment for Hello and one for World
     const frags = cmd.args[0].nodes.filter(isTextFragment);
     const combined = frags.map(f => f.value).join('');
@@ -356,7 +364,7 @@ await test('\\transclude{tree-id} parses as Command with BraceArg', async () => 
     const doc = await parseClean('\\transclude{jms-001A}');
     const cmd = firstCommand(doc, '\\transclude');
     assertEqual(cmd.args.length, 1);
-    assertOk(isBraceArg(cmd.args[0]));
+    assertIs(isBraceArg(cmd.args[0]));
 });
 
 await test('\\import followed by \\export', async () => {
@@ -378,8 +386,8 @@ await test('full subtree with metadata and math parses cleanly', async () => {
 }`;
     const doc = await parseClean(source);
     const subtree = firstCommand(doc, '\\subtree');
-    assertOk(isBracketArg(subtree.args[0]), 'Expected bracket arg for ID');
-    assertOk(isBraceArg(subtree.args[1]), 'Expected brace arg for body');
+    assertIs(isBracketArg(subtree.args[0]), 'Expected bracket arg for ID');
+    assertIs(isBraceArg(subtree.args[1]), 'Expected brace arg for body');
     const body = subtree.args[1];
     const title = body.nodes.find(n => isCommand(n) && (n as Command).name === '\\title');
     assertOk(title, 'Expected \\title');
@@ -470,8 +478,8 @@ await test('\\inferrule* parses as single command token', async () => {
     const doc = await parseClean('\\inferrule*{premise}{conclusion}');
     const cmd = firstCommand(doc, '\\inferrule*');
     assertEqual(cmd.args.length, 2);
-    assertOk(isBraceArg(cmd.args[0]));
-    assertOk(isBraceArg(cmd.args[1]));
+    assertIs(isBraceArg(cmd.args[0]));
+    assertIs(isBraceArg(cmd.args[1]));
 });
 
 await test('\\operatorname* parses as single command token', async () => {
@@ -533,7 +541,7 @@ await test('\\\\ inside math parses as MathEscape', async () => {
 await test('[text](url) parses as BracketGroup + ParenGroup', async () => {
     const doc = await parseClean('\\p{See [link text](https://example.com) here}');
     const p = firstCommand(doc, '\\p');
-    assertOk(isBraceArg(p.args[0]));
+    assertIs(isBraceArg(p.args[0]));
     const bg = p.args[0].nodes.find(isBracketGroup);
     assertOk(bg, 'Expected BracketGroup for [link text]');
     const pg = p.args[0].nodes.find(isParenGroup);
@@ -543,7 +551,7 @@ await test('[text](url) parses as BracketGroup + ParenGroup', async () => {
 await test('standalone [text] inside brace arg parses as BracketGroup', async () => {
     const doc = await parseClean('\\p{prefix [bracketed content] suffix}');
     const p = firstCommand(doc, '\\p');
-    assertOk(isBraceArg(p.args[0]));
+    assertIs(isBraceArg(p.args[0]));
     const bg = p.args[0].nodes.find(isBracketGroup);
     assertOk(bg, 'Expected BracketGroup inside \\p body');
 });
@@ -552,9 +560,9 @@ await test('\\inferrule*[right=Atom]{premise}{conclusion} parses correctly', asy
     const doc = await parseClean('\\inferrule*[right=Atom]{premise}{conclusion}');
     const cmd = firstCommand(doc, '\\inferrule*');
     assertEqual(cmd.args.length, 3);
-    assertOk(isBracketArg(cmd.args[0]), 'Expected BracketArg');
-    assertOk(isBraceArg(cmd.args[1]), 'Expected first BraceArg');
-    assertOk(isBraceArg(cmd.args[2]), 'Expected second BraceArg');
+    assertIs(isBracketArg(cmd.args[0]), 'Expected BracketArg');
+    assertIs(isBraceArg(cmd.args[1]), 'Expected first BraceArg');
+    assertIs(isBraceArg(cmd.args[2]), 'Expected second BraceArg');
 });
 
 await test('[...] inside math parses as MathBracketGroup', async () => {
@@ -563,7 +571,7 @@ await test('[...] inside math parses as MathBracketGroup', async () => {
     assertOk(mi, 'Expected MathInline');
     const sqrt = mi.nodes.find(n => isCommand(n) && (n as Command).name === '\\sqrt');
     assertOk(sqrt, 'Expected \\sqrt command');
-    assertOk(isBracketArg((sqrt as Command).args[0]), 'Expected BracketArg [n] on \\sqrt');
+    assertIs(isBracketArg((sqrt as Command).args[0]), 'Expected BracketArg [n] on \\sqrt');
 });
 
 // ── Real-world file tests ──────────────────────────────────────────────────
@@ -578,14 +586,14 @@ await test('0007.tree-like content: \\inferrule*[right=Atom-$\\top$] parses', as
 }`;
     const doc = await parseClean(source);
     const infrule = firstCommand(doc, '\\infrule');
-    assertOk(isBraceArg(infrule.args[0]));
+    assertIs(isBraceArg(infrule.args[0]));
 });
 
 await test('double backslash \\\\ inside brace arg parses as Escape', async () => {
     const source = '\\p{line1 \\\\ line2}';
     const doc = await parseClean(source);
     const p = firstCommand(doc, '\\p');
-    assertOk(isBraceArg(p.args[0]));
+    assertIs(isBraceArg(p.args[0]));
     const esc = p.args[0].nodes.find(isEscape);
     assertOk(esc, 'Expected Escape for \\\\ inside \\p body');
 });
@@ -689,14 +697,14 @@ await test('001c.tree-like content: tikzcd with \\arrow[r, "0"] parses', async (
 }`;
     const doc = await parseClean(source);
     const cmd = firstCommand(doc, '\\texfig');
-    assertOk(isBraceArg(cmd.args[0]));
+    assertIs(isBraceArg(cmd.args[0]));
 });
 
 await test('0022.tree-like content: markdown link [1](bradley2007calculus)', async () => {
     const source = '\\p{See this result [1](bradley2007calculus) for more.}';
     const doc = await parseClean(source);
     const p = firstCommand(doc, '\\p');
-    assertOk(isBraceArg(p.args[0]));
+    assertIs(isBraceArg(p.args[0]));
     const bg = p.args[0].nodes.find(isBracketGroup);
     assertOk(bg, 'Expected BracketGroup for [1]');
     const pg = p.args[0].nodes.find(isParenGroup);

@@ -113,6 +113,8 @@ interface BracketEntry {
     offset: number;
     line: number;
     character: number;
+    /** True when this '{' is the one opened by #{ or ##{ — closing it ends math. */
+    opensMath?: boolean;
 }
 
 function offsetToPosition(text: string, offset: number): Position {
@@ -132,11 +134,16 @@ function offsetToPosition(text: string, offset: number): Position {
 /**
  * Stack-based bracket matching over raw document text.
  * Skips: escaped delimiters (\{ \} \[ \]), \startverb…\stopverb,
- * % line comments, and ```…``` verbatim fences.
+ * % line comments, ```…``` verbatim fences, and brackets/parens inside
+ * #{…} / ##{…} — those are TeX, which does not require them to balance.
  */
 export function findBracketMismatches(text: string, uri: string): Diagnostic[] {
     const diagnostics: Diagnostic[] = [];
     const stack: BracketEntry[] = [];
+    // How many math spans are open. Everything nested inside one is TeX, so a
+    // formula may legitimately write (a, b] or \left(…\right] — only braces
+    // still pair, and one of them ends the span.
+    let mathDepth = 0;
     let i = 0;
     let line = 0;
     let character = 0;
@@ -197,13 +204,24 @@ export function findBracketMismatches(text: string, uri: string): Diagnostic[] {
 
         // Handle #{ and ##{ (math openers — push as {)
         if (text[i] === '#' && i + 1 < text.length && text[i + 1] === '#' && i + 2 < text.length && text[i + 2] === '{') {
-            stack.push({ opener: '{', offset: i, line, character });
+            stack.push({ opener: '{', offset: i, line, character, opensMath: true });
+            mathDepth++;
             advance(); advance(); advance();
             continue;
         }
         if (text[i] === '#' && i + 1 < text.length && text[i + 1] === '{') {
-            stack.push({ opener: '{', offset: i, line, character });
+            stack.push({ opener: '{', offset: i, line, character, opensMath: true });
+            mathDepth++;
             advance(); advance();
+            continue;
+        }
+
+        // Inside math, brackets and parens are TeX notation rather than
+        // structure: (a, b] and [a, b) mismatch by design and \left( may be
+        // closed by \right]. Pairing them here invents errors the compiler
+        // does not report.
+        if (mathDepth > 0 && (text[i] === '[' || text[i] === ']' || text[i] === '(' || text[i] === ')')) {
+            advance();
             continue;
         }
 
@@ -246,9 +264,9 @@ export function findBracketMismatches(text: string, uri: string): Diagnostic[] {
                             ),
                         ],
                     });
-                    stack.pop();
-                } else {
-                    stack.pop();
+                }
+                if (stack.pop()?.opensMath === true) {
+                    mathDepth--;
                 }
             }
             advance();

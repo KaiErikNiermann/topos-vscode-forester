@@ -242,7 +242,11 @@ await test('\\startverb…\\stopverb parses as an opaque VerbatimBlock', async (
     const doc = await parseClean('\\p{\\startverb\nlet f = (d, i) => xs[i] || d;\n\\stopverb}');
     const p = doc.nodes.find(n => isCommand(n) && (n as Command).name === '\\p');
     assertOk(p, 'Expected \\p');
-    const vb = (p as Command).args[0]?.nodes.find(isVerbatimBlock);
+    const body = (p as Command).args[0];
+    // Narrow before .find: on a union of array types TS drops the type-predicate
+    // overload, so the result would come back unnarrowed.
+    assertIs(isBraceArg(body), 'Expected a brace arg on \\p');
+    const vb = body.nodes.find(isVerbatimBlock);
     // The body is JavaScript: its parens and brackets do not balance as Forester
     // syntax, so parsing into it produced a cascade of phantom bracket errors.
     assertOk(vb, 'Expected the verbatim span to be one opaque node');
@@ -1097,9 +1101,11 @@ await test('peek range: document with no prose falls back to title range', async
     assertOk(titleCmd.$cstNode, 'Expected CstNode on \\title command');
     // The only non-whitespace TextFragment would be inside the \title BraceArg,
     // NOT a direct child of Document (its $container is BraceArg, not Document).
-    const directProse = doc.nodes.find(
-        n => isTextFragment(n) && n.value.trim().length > 0,
-    );
+    // filter-then-find: the inline arrow is not a type predicate, so find alone
+    // would hand back an unnarrowed Node.
+    const directProse = doc.nodes
+        .filter(isTextFragment)
+        .find(n => n.value.trim().length > 0);
     // Should be undefined — all text is nested inside command args
     if (directProse !== undefined) {
         throw new Error(
@@ -1444,6 +1450,35 @@ await test('bracket mismatch: math #{x + {y}} handles #{ opener correctly', asyn
     const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
     const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
     assertEmpty(bracketDiags, 'Expected no bracket-mismatch diagnostics for math mode #{...}');
+});
+
+// TeX does not require brackets and parens to balance, so the bracket checker
+// must not pair them inside math — the compiler does not either.
+for (const [label, source] of [
+    ['half-open interval', '#{[a, b)}'],
+    ['preimage of a half-open interval', '##{X^{-1}((-\\infty, r])}'],
+    ['\\left( closed by \\right]', '#{\\left(\\frac{1}{2}\\right]}'],
+    ['nested math span', '#{a[ #{b)} ]}'],
+] as const) {
+    await test(`bracket mismatch: math tolerates ${label}`, async () => {
+        const doc = await parse(source);
+        const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+        assertEmpty(
+            diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch'),
+            `Expected no bracket-mismatch diagnostics for ${source}`,
+        );
+    });
+}
+
+await test('bracket mismatch: a real mismatch after a math span is still reported', async () => {
+    // Guards the math-depth counter: it must return to zero when #{…} closes,
+    // otherwise every later bracket error in the file goes unreported.
+    const doc = await parse('#{(a, b]} \\p{[x)}');
+    const diags = await Forester.validation.DocumentValidator.validateDocument(doc);
+    const bracketDiags = diags.filter(d => (d.data as { code?: string })?.code === 'bracket-mismatch');
+    if (bracketDiags.length === 0) {
+        throw new Error('Expected the [x) mismatch outside math to still be reported');
+    }
 });
 
 await test('bracket mismatch: multiple errors in one file are all reported', async () => {

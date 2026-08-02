@@ -45,7 +45,7 @@ entry Document:
 // This allows [text](url) markdown links, standalone [groups], and (groups)
 // to appear at any node position without error.
 Node:
-    Command | VerbatimBlock | MathDisplay | MathInline | WikiLink
+    Command<false> | VerbatimBlock | MathDisplay | MathInline | WikiLink
     | BraceGroup | BracketGroup | ParenGroup | TextFragment | Escape;
 
 // ============================================================================
@@ -135,18 +135,26 @@ hidden terminal NL: /\r?\n/;
 // the semantic/formatting layer.
 // ============================================================================
 
-Command:
-    name=(COMMAND_NAME | XML_COMMAND_NAME | DECL_XMLNS) args+=Argument*;
+// In math a command takes brace arguments only. Bracket and paren args are a
+// Forester calling convention that TeX does not share: \left( opens a
+// delimiter that \right] is free to close, and the [n] of \sqrt[n]{x} is
+// notation. Consuming them as arguments demands a matching closer that a
+// formula need not have.
+Command<Math>:
+    name=(COMMAND_NAME | XML_COMMAND_NAME | DECL_XMLNS)
+    (<Math> args+=BraceArg<true>* | <!Math> args+=Argument*);
 
 // ============================================================================
 // Argument forms: {}, [], ()
 // ============================================================================
 
 Argument:
-    BraceArg | BracketArg | ParenArg;
+    BraceArg<false> | BracketArg | ParenArg;
 
-BraceArg:
-    '{' nodes+=Node* '}';
+// Braces group in TeX as well as in Forester, so a math command's argument
+// stays in math: its body keeps the relaxed bracket and paren handling.
+BraceArg<Math>:
+    '{' (<Math> nodes+=MathNode* | <!Math> nodes+=Node*) '}';
 
 BracketArg:
     '[' nodes+=Node* ']';
@@ -196,30 +204,29 @@ MathInline:
 MathDisplay:
     HASH_DISPLAY nodes+=MathNode* '}';
 
-// Nodes inside math: nested commands, more math, explicit brace/bracket/paren groups,
+// Nodes inside math: nested commands, more math, explicit brace groups,
 // escapes (e.g. \\ line break), and text
 MathNode:
-    Command | MathInline | MathDisplay | MathBraceGroup
-    | MathBracketGroup | MathParenGroup | MathEscape | MathText;
+    Command<true> | MathInline | MathDisplay | MathBraceGroup
+    | MathEscape | MathText;
 
 // Explicit { } group inside math (e.g. for TeX grouping)
 MathBraceGroup:
     '{' nodes+=MathNode* '}';
-
-// Bracket and paren groups inside math (e.g. \binom[...], subscripts, tikzcd \arrow[...])
-MathBracketGroup:
-    '[' nodes+=MathNode* ']';
-
-MathParenGroup:
-    '(' nodes+=MathNode* ')';
 
 // Escape sequence inside math (e.g. \\ for line break, \{ for literal brace)
 MathEscape:
     value=ESCAPE;
 
 // Raw text content inside math (LaTeX tokens, digits, operators, …)
+//
+// Brackets and parens are text here, deliberately — they are TeX notation, not
+// Forester grouping, and TeX does not require them to balance: (a, b] and
+// [a, b) mismatch by design, and \left. \right) leaves one side unpaired.
+// Matching them as groups turned ordinary formulae into parse errors. Braces
+// above stay structural: they group in TeX too, and one has to close the math.
 MathText:
-    value=(TEXT | BARE_HASH | BARE_BACKTICK);
+    value=(TEXT | BARE_HASH | BARE_BACKTICK | '[' | ']' | '(' | ')');
 
 // ============================================================================
 // Escaped percent and plain text fragments

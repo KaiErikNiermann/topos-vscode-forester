@@ -31,8 +31,6 @@ import {
     isMathInline,
     isMathDisplay,
     isMathBraceGroup,
-    isMathBracketGroup,
-    isMathParenGroup,
 } from './generated/ast.js';
 import type { ForesterServices } from './forester-module.js';
 import { validateFlags, type Sig } from './sig.js';
@@ -177,7 +175,7 @@ function isInTexMode(node: AstNode): boolean {
             return true;
         }
         // Inside an explicit { } group within math
-        if (isMathBraceGroup(current) || isMathBracketGroup(current) || isMathParenGroup(current)) {
+        if (isMathBraceGroup(current)) {
             return true;
         }
         // Inside a BraceArg of \tex, \texfig, or \ltexfig

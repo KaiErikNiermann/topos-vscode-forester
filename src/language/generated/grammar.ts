@@ -43,7 +43,16 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             "rule": {
               "$ref": "#/rules@16"
             },
-            "arguments": []
+            "arguments": [
+              {
+                "$type": "NamedArgument",
+                "value": {
+                  "$type": "BooleanLiteral",
+                  "true": false
+                },
+                "calledByName": false
+              }
+            ]
           },
           {
             "$type": "RuleCall",
@@ -69,7 +78,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@35"
+              "$ref": "#/rules@33"
             },
             "arguments": []
           },
@@ -97,14 +106,14 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@34"
+              "$ref": "#/rules@32"
             },
             "arguments": []
           },
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@33"
+              "$ref": "#/rules@31"
             },
             "arguments": []
           }
@@ -271,6 +280,12 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
     {
       "$type": "ParserRule",
       "name": "Command",
+      "parameters": [
+        {
+          "$type": "Parameter",
+          "name": "Math"
+        }
+      ],
       "definition": {
         "$type": "Group",
         "elements": [
@@ -306,23 +321,74 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             }
           },
           {
-            "$type": "Assignment",
-            "feature": "args",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@17"
+            "$type": "Alternatives",
+            "elements": [
+              {
+                "$type": "Group",
+                "guardCondition": {
+                  "$type": "ParameterReference",
+                  "parameter": {
+                    "$ref": "#/rules@16/parameters@0"
+                  }
+                },
+                "elements": [
+                  {
+                    "$type": "Assignment",
+                    "feature": "args",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@18"
+                      },
+                      "arguments": [
+                        {
+                          "$type": "NamedArgument",
+                          "value": {
+                            "$type": "BooleanLiteral",
+                            "true": true
+                          },
+                          "calledByName": false
+                        }
+                      ]
+                    },
+                    "cardinality": "*"
+                  }
+                ]
               },
-              "arguments": []
-            },
-            "cardinality": "*"
+              {
+                "$type": "Group",
+                "guardCondition": {
+                  "$type": "Negation",
+                  "value": {
+                    "$type": "ParameterReference",
+                    "parameter": {
+                      "$ref": "#/rules@16/parameters@0"
+                    }
+                  }
+                },
+                "elements": [
+                  {
+                    "$type": "Assignment",
+                    "feature": "args",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@17"
+                      },
+                      "arguments": []
+                    },
+                    "cardinality": "*"
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
       "entry": false,
-      "fragment": false,
-      "parameters": []
+      "fragment": false
     },
     {
       "$type": "ParserRule",
@@ -335,7 +401,16 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             "rule": {
               "$ref": "#/rules@18"
             },
-            "arguments": []
+            "arguments": [
+              {
+                "$type": "NamedArgument",
+                "value": {
+                  "$type": "BooleanLiteral",
+                  "true": false
+                },
+                "calledByName": false
+              }
+            ]
           },
           {
             "$type": "RuleCall",
@@ -360,6 +435,12 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
     {
       "$type": "ParserRule",
       "name": "BraceArg",
+      "parameters": [
+        {
+          "$type": "Parameter",
+          "name": "Math"
+        }
+      ],
       "definition": {
         "$type": "Group",
         "elements": [
@@ -368,17 +449,60 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             "value": "{"
           },
           {
-            "$type": "Assignment",
-            "feature": "nodes",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@1"
+            "$type": "Alternatives",
+            "elements": [
+              {
+                "$type": "Group",
+                "guardCondition": {
+                  "$type": "ParameterReference",
+                  "parameter": {
+                    "$ref": "#/rules@18/parameters@0"
+                  }
+                },
+                "elements": [
+                  {
+                    "$type": "Assignment",
+                    "feature": "nodes",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@27"
+                      },
+                      "arguments": []
+                    },
+                    "cardinality": "*"
+                  }
+                ]
               },
-              "arguments": []
-            },
-            "cardinality": "*"
+              {
+                "$type": "Group",
+                "guardCondition": {
+                  "$type": "Negation",
+                  "value": {
+                    "$type": "ParameterReference",
+                    "parameter": {
+                      "$ref": "#/rules@18/parameters@0"
+                    }
+                  }
+                },
+                "elements": [
+                  {
+                    "$type": "Assignment",
+                    "feature": "nodes",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@1"
+                      },
+                      "arguments": []
+                    },
+                    "cardinality": "*"
+                  }
+                ]
+              }
+            ]
           },
           {
             "$type": "Keyword",
@@ -387,8 +511,7 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
         ]
       },
       "entry": false,
-      "fragment": false,
-      "parameters": []
+      "fragment": false
     },
     {
       "$type": "ParserRule",
@@ -657,7 +780,16 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             "rule": {
               "$ref": "#/rules@16"
             },
-            "arguments": []
+            "arguments": [
+              {
+                "$type": "NamedArgument",
+                "value": {
+                  "$type": "BooleanLiteral",
+                  "true": true
+                },
+                "calledByName": false
+              }
+            ]
           },
           {
             "$type": "RuleCall",
@@ -693,20 +825,6 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
               "$ref": "#/rules@30"
             },
             "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@31"
-            },
-            "arguments": []
-          },
-          {
-            "$type": "RuleCall",
-            "rule": {
-              "$ref": "#/rules@32"
-            },
-            "arguments": []
           }
         ]
       },
@@ -740,72 +858,6 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
           {
             "$type": "Keyword",
             "value": "}"
-          }
-        ]
-      },
-      "entry": false,
-      "fragment": false,
-      "parameters": []
-    },
-    {
-      "$type": "ParserRule",
-      "name": "MathBracketGroup",
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "Keyword",
-            "value": "["
-          },
-          {
-            "$type": "Assignment",
-            "feature": "nodes",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@27"
-              },
-              "arguments": []
-            },
-            "cardinality": "*"
-          },
-          {
-            "$type": "Keyword",
-            "value": "]"
-          }
-        ]
-      },
-      "entry": false,
-      "fragment": false,
-      "parameters": []
-    },
-    {
-      "$type": "ParserRule",
-      "name": "MathParenGroup",
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "Keyword",
-            "value": "("
-          },
-          {
-            "$type": "Assignment",
-            "feature": "nodes",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@27"
-              },
-              "arguments": []
-            },
-            "cardinality": "*"
-          },
-          {
-            "$type": "Keyword",
-            "value": ")"
           }
         ]
       },
@@ -862,6 +914,22 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
                 "$ref": "#/rules@12"
               },
               "arguments": []
+            },
+            {
+              "$type": "Keyword",
+              "value": "["
+            },
+            {
+              "$type": "Keyword",
+              "value": "]"
+            },
+            {
+              "$type": "Keyword",
+              "value": "("
+            },
+            {
+              "$type": "Keyword",
+              "value": ")"
             }
           ]
         }

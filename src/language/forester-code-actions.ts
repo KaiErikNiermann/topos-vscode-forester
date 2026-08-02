@@ -14,7 +14,7 @@
  *   • Cursor on #method that has no object definition → "Create method stub [method]{}"
  */
 import type { CodeAction, CodeActionParams } from 'vscode-languageserver';
-import type { LangiumDocument, LangiumDocuments, CancellationToken } from 'langium';
+import type { AstNode, LangiumDocument, LangiumDocuments, CancellationToken } from 'langium';
 import type { CodeActionProvider, LangiumServices } from 'langium/lsp';
 import {
     isCommand,
@@ -361,8 +361,9 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
             if (!isDocument(root)) {continue;}
 
             for (const node of [...root.nodes]) {
-                // Stream contents manually to avoid a full AstUtils import here
-                const stack = [node];
+                // Stream contents manually to avoid a full AstUtils import here.
+                // AstNode, not Node: a brace arg in math holds MathNodes.
+                const stack: AstNode[] = [node];
                 while (stack.length > 0) {
                     const current = stack.pop()!;
                     if (isCommand(current) && (current.name === '\\object' || current.name === '\\patch')) {

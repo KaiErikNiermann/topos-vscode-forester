@@ -17,7 +17,6 @@ import {
     isDocument,
     isEscape,
     isMathBraceGroup,
-    isMathBracketGroup,
     isMathDisplay,
     isMathEscape,
     isMathInline,
@@ -565,13 +564,47 @@ await test('\\inferrule*[right=Atom]{premise}{conclusion} parses correctly', asy
     assertIs(isBraceArg(cmd.args[2]), 'Expected second BraceArg');
 });
 
-await test('[...] inside math parses as MathBracketGroup', async () => {
+await test('[...] after a command inside math is text, not a bracket arg', async () => {
     const doc = await parseClean('#{\\sqrt[n]{x}}');
     const mi = doc.nodes.find(isMathInline);
     assertOk(mi, 'Expected MathInline');
     const sqrt = mi.nodes.find(n => isCommand(n) && (n as Command).name === '\\sqrt');
     assertOk(sqrt, 'Expected \\sqrt command');
-    assertIs(isBracketArg((sqrt as Command).args[0]), 'Expected BracketArg [n] on \\sqrt');
+    // In TeX the [n] is notation, not an argument. Claiming it as a BracketArg
+    // demands a ']' that the surrounding formula is under no obligation to have.
+    // It ends the argument list instead, leaving {x} a sibling group — which is
+    // also how Forester's own parser sees it (Tape_effect pairs a command with
+    // the brace groups that follow it only at expansion time).
+    assertEqual((sqrt as Command).args.length, 0, 'Expected [n] to end the arg list');
+    assertOk(mi.nodes.find(isMathBraceGroup), 'Expected {x} as a sibling MathBraceGroup');
+});
+
+// ── Mismatched delimiters in math (TeX does not balance them) ───────────────
+
+for (const [label, source] of [
+    ['half-open interval', '#{[a, b)}'],
+    ['preimage of a half-open interval', '##{X^{-1}((-\\infty, r])}'],
+    ['\\left( closed by \\right]', '#{\\left(\\frac{1}{2}\\right]}'],
+    ['unpaired closer', '#{\\right]}'],
+    ['mismatch inside a macro brace arg', '#{\\text{[0, 1)}}'],
+] as const) {
+    await test(`math accepts a mismatched delimiter: ${label}`, async () => {
+        await parseClean(source);
+    });
+}
+
+await test('braces still group inside math, and still end it', async () => {
+    const doc = await parseClean('#{x^{a+b}}');
+    const mi = doc.nodes.find(isMathInline);
+    assertOk(mi, 'Expected MathInline');
+    assertOk(mi.nodes.find(isMathBraceGroup), 'Expected MathBraceGroup for ^{...}');
+    assertEqual(doc.nodes.length, 1, 'Expected the trailing } to close the math');
+});
+
+await test('[text](url) link syntax still parses outside math', async () => {
+    const doc = await parseClean('[link](target)');
+    assertIs(isBracketGroup(doc.nodes[0]!), 'Expected BracketGroup');
+    assertIs(isParenGroup(doc.nodes[1]!), 'Expected ParenGroup');
 });
 
 // ── Real-world file tests ──────────────────────────────────────────────────

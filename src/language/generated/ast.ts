@@ -48,7 +48,7 @@ export function isArgument(item: unknown): item is Argument {
 export interface BraceArg extends langium.AstNode {
     readonly $container: Command;
     readonly $type: 'BraceArg';
-    nodes: Array<Node>;
+    nodes: Array<MathNode | Node>;
 }
 
 export const BraceArg = {
@@ -106,9 +106,9 @@ export function isBracketGroup(item: unknown): item is BracketGroup {
 }
 
 export interface Command extends langium.AstNode {
-    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathDisplay | MathInline | ParenArg | ParenGroup;
     readonly $type: 'Command';
-    args: Array<Argument>;
+    args: Array<Argument | BraceArg>;
     name: string;
 }
 
@@ -152,7 +152,7 @@ export function isEscape(item: unknown): item is Escape {
 }
 
 export interface MathBraceGroup extends langium.AstNode {
-    readonly $container: MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup;
+    readonly $container: BraceArg | MathBraceGroup | MathDisplay | MathInline;
     readonly $type: 'MathBraceGroup';
     nodes: Array<MathNode>;
 }
@@ -166,23 +166,8 @@ export function isMathBraceGroup(item: unknown): item is MathBraceGroup {
     return reflection.isInstance(item, MathBraceGroup.$type);
 }
 
-export interface MathBracketGroup extends langium.AstNode {
-    readonly $container: MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup;
-    readonly $type: 'MathBracketGroup';
-    nodes: Array<MathNode>;
-}
-
-export const MathBracketGroup = {
-    $type: 'MathBracketGroup',
-    nodes: 'nodes'
-} as const;
-
-export function isMathBracketGroup(item: unknown): item is MathBracketGroup {
-    return reflection.isInstance(item, MathBracketGroup.$type);
-}
-
 export interface MathDisplay extends langium.AstNode {
-    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathDisplay | MathInline | ParenArg | ParenGroup;
     readonly $type: 'MathDisplay';
     nodes: Array<MathNode>;
 }
@@ -197,7 +182,7 @@ export function isMathDisplay(item: unknown): item is MathDisplay {
 }
 
 export interface MathEscape extends langium.AstNode {
-    readonly $container: MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup;
+    readonly $container: BraceArg | MathBraceGroup | MathDisplay | MathInline;
     readonly $type: 'MathEscape';
     value: string;
 }
@@ -212,7 +197,7 @@ export function isMathEscape(item: unknown): item is MathEscape {
 }
 
 export interface MathInline extends langium.AstNode {
-    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup | ParenArg | ParenGroup;
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Document | MathBraceGroup | MathDisplay | MathInline | ParenArg | ParenGroup;
     readonly $type: 'MathInline';
     nodes: Array<MathNode>;
 }
@@ -226,7 +211,7 @@ export function isMathInline(item: unknown): item is MathInline {
     return reflection.isInstance(item, MathInline.$type);
 }
 
-export type MathNode = Command | MathBraceGroup | MathBracketGroup | MathDisplay | MathEscape | MathInline | MathParenGroup | MathText;
+export type MathNode = Command | MathBraceGroup | MathDisplay | MathEscape | MathInline | MathText;
 
 export const MathNode = {
     $type: 'MathNode'
@@ -236,25 +221,10 @@ export function isMathNode(item: unknown): item is MathNode {
     return reflection.isInstance(item, MathNode.$type);
 }
 
-export interface MathParenGroup extends langium.AstNode {
-    readonly $container: MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup;
-    readonly $type: 'MathParenGroup';
-    nodes: Array<MathNode>;
-}
-
-export const MathParenGroup = {
-    $type: 'MathParenGroup',
-    nodes: 'nodes'
-} as const;
-
-export function isMathParenGroup(item: unknown): item is MathParenGroup {
-    return reflection.isInstance(item, MathParenGroup.$type);
-}
-
 export interface MathText extends langium.AstNode {
-    readonly $container: MathBraceGroup | MathBracketGroup | MathDisplay | MathInline | MathParenGroup;
+    readonly $container: BraceArg | MathBraceGroup | MathDisplay | MathInline;
     readonly $type: 'MathText';
-    value: string;
+    value: '(' | ')' | '[' | ']' | string;
 }
 
 export const MathText = {
@@ -361,12 +331,10 @@ export type ForesterAstType = {
     Document: Document
     Escape: Escape
     MathBraceGroup: MathBraceGroup
-    MathBracketGroup: MathBracketGroup
     MathDisplay: MathDisplay
     MathEscape: MathEscape
     MathInline: MathInline
     MathNode: MathNode
-    MathParenGroup: MathParenGroup
     MathText: MathText
     Node: Node
     ParenArg: ParenArg
@@ -466,16 +434,6 @@ export class ForesterAstReflection extends langium.AbstractAstReflection {
             },
             superTypes: [MathNode.$type]
         },
-        MathBracketGroup: {
-            name: MathBracketGroup.$type,
-            properties: {
-                nodes: {
-                    name: MathBracketGroup.nodes,
-                    defaultValue: []
-                }
-            },
-            superTypes: [MathNode.$type]
-        },
         MathDisplay: {
             name: MathDisplay.$type,
             properties: {
@@ -510,16 +468,6 @@ export class ForesterAstReflection extends langium.AbstractAstReflection {
             properties: {
             },
             superTypes: []
-        },
-        MathParenGroup: {
-            name: MathParenGroup.$type,
-            properties: {
-                nodes: {
-                    name: MathParenGroup.nodes,
-                    defaultValue: []
-                }
-            },
-            superTypes: [MathNode.$type]
         },
         MathText: {
             name: MathText.$type,

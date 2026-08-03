@@ -26,6 +26,7 @@
 		"src/langium-formatter.test.mts",
 		"src/langium-hover.test.mts",
 		"src/langium-grammar.test.mts",
+		"src/langium-validation.test.mts",
 		// Corpus test is ESM and built by esbuild separately
 		"tests",
 		// Workspace packages — each has its own tsconfig + esbuild config.

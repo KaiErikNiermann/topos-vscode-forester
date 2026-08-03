@@ -77,9 +77,26 @@ const CROSS_REF_COMMANDS: ReadonlySet<string> = new Set([
     '\\import', '\\export', '\\transclude', '\\ref',
 ]);
 
+// Forester commands whose names are also LaTeX macros of the same name.
+//
+// Inside TeX mode the LaTeX reading wins: the compiler emits these as TeX
+// control sequences instead of resolving them (Expand.ml, `tex_shadowed`), so
+// none of the Forester-side checks below apply to them there. \tag is the
+// motivating case — it is both Forester's tagging command and amsmath's
+// equation-number macro, and `##{ E = mc^2 \tag{1} }` means the amsmath one.
+//
+// Keep in sync with `tex_shadowed` in the compiler's Expand.ml.
+const MATH_SHADOWED_COMMANDS: ReadonlySet<string> = new Set(['\\tag']);
+
+// \forester/<name> recovers the Forester meaning of a shadowed name, so it is
+// usable inside math (and harmless outside it).
+const FORESTER_ESCAPE_HATCHES: readonly string[] =
+    [...MATH_SHADOWED_COMMANDS].map((name) => `\\forester/${name.slice(1)}`);
+
 // Complete set of Forester built-in commands (full name, including leading backslash).
 // Commands matching this set are never "unresolved".
 const ALL_BUILTIN_COMMANDS: ReadonlySet<string> = new Set([
+    ...FORESTER_ESCAPE_HATCHES,
     // Metadata / top-level
     '\\title', '\\taxon', '\\author', '\\contributor', '\\date', '\\parent',
     '\\tag', '\\meta', '\\number', '\\solution',
@@ -191,6 +208,15 @@ function isInTexMode(node: AstNode): boolean {
 }
 
 /**
+ * Return true if `node` names a Forester command that TeX mode shadows — i.e.
+ * here it is a LaTeX macro, not a Forester command, so Forester-side checks on
+ * the name (arity, frontmatter-only placement) would be false positives.
+ */
+function isShadowedByTexMode(node: Command): boolean {
+    return MATH_SHADOWED_COMMANDS.has(node.name) && isInTexMode(node);
+}
+
+/**
  * Return true if `node` is the Command immediately following a \def or \let
  * in the same parent nodes array — i.e., it is the name being bound.
  */
@@ -265,6 +291,11 @@ export class ForesterChecks {
     checkBuiltinArity(node: Command, accept: ValidationAcceptor): void {
         const spec = BUILTIN_ARITY.get(node.name);
         if (!spec) {
+            return;
+        }
+        // In math the name is a LaTeX macro; its Forester arity says nothing
+        // about it (\tag*{1}, \tag {1} and friends are all valid amsmath).
+        if (isShadowedByTexMode(node)) {
             return;
         }
 
@@ -387,6 +418,7 @@ export class ForesterChecks {
         if (!FRONTMATTER_COMMANDS.has(node.name)) return;
         if (isOnCommentLine(node)) return;
         if (isBindingSite(node)) return; // \def\taxon… redefines, not a use site
+        if (isShadowedByTexMode(node)) return; // \tag in math is amsmath's, not ours
         if (!isInRenderedContent(node)) return;
 
         accept(

@@ -1,0 +1,28 @@
+% Corpus fixture: !{ … } raw groups must parse cleanly.
+% The body is LaTeX, using every character forester's own syntax claims —
+% '%' comments, bracket options, '&' and '\\' separators, '#1' parameters —
+% plus TeX delimiters that deliberately do not balance.
+\import{base-macros}
+\title{Raw groups}
+
+\texfig!{
+  \begin{tikzpicture}[
+    over/.style={decorate, decoration={brace, amplitude=5pt, raise=#1}, thick},
+    sep/.style={inner xsep=0pt},
+  ]
+    % a comment, and a half-open interval that must not be paired: (0, 1]
+    \matrix (M) [matrix of math nodes, column sep=0pt, inner sep=1pt] {
+      \{ & a_1 & |[sep]| {,}\, & \ldots & |[sep]| {,}\, & a_n & \} \\
+    };
+    \draw[over=2pt] (M-1-2.north west) -- (M-1-6.north east)
+      node[midway, above=9pt] {$A$};
+  \end{tikzpicture}
+}
+
+\p{Prose after a raw group is ordinary forester again, with #{x^2} math.}
+
+\ltexfig{https://q.uiver.app/}!{
+  \[ \left. \frac{a}{b} \right) \]
+}
+
+\p{A raw group also nests braces: \texfig!{ \x{\y{\z}} } inline.}

@@ -5,6 +5,10 @@ node_modules
 *.vsix
 test-forest/
 *.tree
+# ...except the shared grammar corpus, whose whole purpose is to be run in CI
+# against both parsers (see tests/corpus/README.md). The blanket rule above
+# had been keeping that directory empty, so test:corpus asserted nothing.
+!tests/corpus/*.tree
 .serena/
 # Stray IDE-generated transpilation output alongside .ts sources in workspace
 # packages — only the esbuild bundles under their dist/ folders are real outputs.

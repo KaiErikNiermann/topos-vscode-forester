@@ -1,3 +1,5 @@
+import { rawGroupEnd } from "./raw-group.js";
+
 export interface SubtreeMetadata {
    id?: string
    taxon?: string
@@ -261,6 +263,16 @@ export function collectTagClosureHints(source: string, options: TagClosureHintOp
          if (char === "%" && !isEscaped(source, index)) {
             index = skipComment(source, index);
             continue;
+         }
+
+         // !{…} is opaque: its body is LaTeX, so descending would hint every
+         // \begin{…} in it as if it were a forester command.
+         if (char === "!" && !isEscaped(source, index)) {
+            const rawEnd = rawGroupEnd(source, index);
+            if (rawEnd !== null && rawEnd <= endIndex) {
+               index = rawEnd;
+               continue;
+            }
          }
 
          if (char === "#" && !isEscaped(source, index)) {

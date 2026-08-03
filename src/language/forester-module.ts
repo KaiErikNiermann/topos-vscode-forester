@@ -20,6 +20,7 @@ import { ForesterCodeLensProvider } from './forester-codelens-provider.js';
 import { ForesterCodeActionProvider } from './forester-code-actions.js';
 import { ForesterLspFormatter } from './forester-lsp-formatter.js';
 import { ForesterLspInlayHintProvider } from './forester-lsp-inlay-hints.js';
+import { ForesterTokenBuilder } from './forester-token-builder.js';
 
 /**
  * Forester-specific services added on top of the default Langium LSP services.
@@ -33,6 +34,11 @@ export type ForesterServices = LangiumServices & ForesterAddedServices;
  * DI module registering Forester-specific overrides.
  */
 export const ForesterModule: Module<ForesterServices, PartialLangiumServices> = {
+    parser: {
+        // Installs the brace-counting pattern for !{…}, which a terminal regex
+        // cannot express.
+        TokenBuilder: () => new ForesterTokenBuilder(),
+    },
     validation: {
         DocumentValidator: (services) => new ForesterDocumentValidator(services),
     },

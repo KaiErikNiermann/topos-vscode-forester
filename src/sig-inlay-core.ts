@@ -15,6 +15,7 @@
  * balanced scanning, math `#{…}`/`##{…}` skipping) so hints never land inside
  * comments, verbatim heralds, or math.
  */
+import { rawGroupEnd } from "./raw-group.js";
 import {
     isEscaped,
     skipComment,
@@ -59,6 +60,16 @@ export function collectParamNameHints(
             if (char === '%' && !isEscaped(source, index)) {
                 index = skipComment(source, index);
                 continue;
+            }
+
+            // Skip `!{…}` raw groups wholesale, as with math below: their body
+            // is LaTeX, and its macros are not forester commands to hint.
+            if (char === '!' && !isEscaped(source, index)) {
+                const rawEnd = rawGroupEnd(source, index);
+                if (rawEnd !== null && rawEnd <= endIndex) {
+                    index = rawEnd;
+                    continue;
+                }
             }
 
             // Skip math `#{…}` / `##{…}` wholesale — no command hints inside.

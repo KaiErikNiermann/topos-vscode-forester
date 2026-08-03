@@ -8,6 +8,7 @@ import * as langium from 'langium';
 
 export const ForesterTerminals = {
     VERBATIM_SPAN: /\\startverb[\s\S]*?\\stopverb/,
+    RAW_GROUP: /!\{[\s\S]*?\}/,
     DECL_XMLNS: /\\xmlns:[a-zA-Z]+/,
     XML_COMMAND_NAME: /\\<[A-Za-z][A-Za-z0-9-]*(?::[A-Za-z][A-Za-z0-9-]*)?>/,
     COMMAND_NAME: /\\[A-Za-z0-9\-\/\?\*]+/,
@@ -36,7 +37,7 @@ export type ForesterKeywordNames =
 
 export type ForesterTokenNames = ForesterTerminalNames | ForesterKeywordNames;
 
-export type Argument = BraceArg | BracketArg | ParenArg;
+export type Argument = BraceArg | BracketArg | ParenArg | RawGroup;
 
 export const Argument = {
     $type: 'Argument'
@@ -237,7 +238,7 @@ export function isMathText(item: unknown): item is MathText {
     return reflection.isInstance(item, MathText.$type);
 }
 
-export type Node = BraceGroup | BracketGroup | Command | Escape | MathDisplay | MathInline | ParenGroup | TextFragment | VerbatimBlock | WikiLink;
+export type Node = BraceGroup | BracketGroup | Command | Escape | MathDisplay | MathInline | ParenGroup | RawGroup | TextFragment | VerbatimBlock | WikiLink;
 
 export const Node = {
     $type: 'Node'
@@ -275,6 +276,21 @@ export const ParenGroup = {
 
 export function isParenGroup(item: unknown): item is ParenGroup {
     return reflection.isInstance(item, ParenGroup.$type);
+}
+
+export interface RawGroup extends langium.AstNode {
+    readonly $container: BraceArg | BraceGroup | BracketArg | BracketGroup | Command | Document | ParenArg | ParenGroup;
+    readonly $type: 'RawGroup';
+    content: string;
+}
+
+export const RawGroup = {
+    $type: 'RawGroup',
+    content: 'content'
+} as const;
+
+export function isRawGroup(item: unknown): item is RawGroup {
+    return reflection.isInstance(item, RawGroup.$type);
 }
 
 export interface TextFragment extends langium.AstNode {
@@ -340,6 +356,7 @@ export type ForesterAstType = {
     Node: Node
     ParenArg: ParenArg
     ParenGroup: ParenGroup
+    RawGroup: RawGroup
     TextFragment: TextFragment
     VerbatimBlock: VerbatimBlock
     WikiLink: WikiLink
@@ -504,6 +521,15 @@ export class ForesterAstReflection extends langium.AbstractAstReflection {
                 }
             },
             superTypes: [Node.$type]
+        },
+        RawGroup: {
+            name: RawGroup.$type,
+            properties: {
+                content: {
+                    name: RawGroup.content
+                }
+            },
+            superTypes: [Argument.$type, Node.$type]
         },
         TextFragment: {
             name: TextFragment.$type,

@@ -1,78 +1,137 @@
 {
   "scopeName": "source.forester",
   "patterns": [
-    { "include": "#body" }
+    {
+      "include": "#body"
+    }
   ],
   "repository": {
     "body": {
       "patterns": [
-        { "include": "#tex-command" },
-        { "include": "#tex" },
-        { "include": "#verbatim-block" },
-        { "include": "#verbatim-inline" },
-        { "include": "#link" },
+        {
+          "include": "#raw-group"
+        },
+        {
+          "include": "#tex-command"
+        },
+        {
+          "include": "#tex"
+        },
+        {
+          "include": "#verbatim-block"
+        },
+        {
+          "include": "#verbatim-inline"
+        },
+        {
+          "include": "#link"
+        },
         {
           "begin": "(\\\\transclude|\\\\import|\\\\export|\\\\ref)\\{",
           "end": "\\}",
-          "patterns": [{ "include": "#body" }],
+          "patterns": [
+            {
+              "include": "#body"
+            }
+          ],
           "contentName": "markup.underline.link.forester",
           "beginCaptures": {
-            "1": { "name": "constant.language.forester" }
+            "1": {
+              "name": "constant.language.forester"
+            }
           }
         },
         {
           "begin": "(\\\\em)\\{",
           "end": "\\}",
-          "patterns": [{ "include": "#body" }],
+          "patterns": [
+            {
+              "include": "#body"
+            }
+          ],
           "contentName": "markup.italic.forester",
           "beginCaptures": {
-            "1": { "name": "constant.language.forester" }
+            "1": {
+              "name": "constant.language.forester"
+            }
           }
         },
         {
           "begin": "(\\\\strong)\\{",
           "end": "\\}",
-          "patterns": [{ "include": "#body" }],
+          "patterns": [
+            {
+              "include": "#body"
+            }
+          ],
           "contentName": "markup.bold.forester",
           "beginCaptures": {
-            "1": { "name": "constant.language.forester" }
+            "1": {
+              "name": "constant.language.forester"
+            }
           }
         },
         {
           "begin": "(\\\\title)\\{",
           "end": "\\}",
-          "patterns": [{ "include": "#body" }],
+          "patterns": [
+            {
+              "include": "#body"
+            }
+          ],
           "contentName": "markup.heading.forester",
           "beginCaptures": {
-            "1": { "name": "constant.language.forester" }
+            "1": {
+              "name": "constant.language.forester"
+            }
           }
         },
         {
           "begin": "(\\\\code)\\{",
           "end": "\\}",
-          "patterns": [{ "include": "#body" }],
+          "patterns": [
+            {
+              "include": "#body"
+            }
+          ],
           "contentName": "markup.inline.raw.forester",
           "beginCaptures": {
-            "1": { "name": "constant.language.forester" }
+            "1": {
+              "name": "constant.language.forester"
+            }
           }
         },
         {
           "begin": "#?#\\{",
           "end": "\\}",
-          "patterns": [{ "include": "#body" }],
+          "patterns": [
+            {
+              "include": "#body"
+            }
+          ],
           "contentName": "meta.math.forester"
         },
         {
           "begin": "\\{",
           "end": "\\}",
           "patterns": [
-            { "include": "#text" },
-            { "include": "#body" }
+            {
+              "include": "#text"
+            },
+            {
+              "include": "#body"
+            }
           ]
         },
-        { "include": "#command" },
-        { "include": "#sig-comment" },
-        { "include": "#comment" }
+        {
+          "include": "#command"
+        },
+        {
+          "include": "#sig-comment"
+        },
+        {
+          "include": "#comment"
+        }
       ]
     },
     "text": {
@@ -88,15 +147,25 @@
       "begin": "(\\\\startverb)(%)(tex).*",
       "end": "\\\\stopverb",
       "patterns": [
-        { "include": "text.tex.latex" }
+        {
+          "include": "text.tex.latex"
+        }
       ],
       "beginCaptures": {
-        "1": { "name": "constant.language.forester" },
-        "2": { "name": "punctuation.definition.comment.forester comment.line.percentage.forester" },
-        "3": { "name": "keyword.other.forester" }
+        "1": {
+          "name": "constant.language.forester"
+        },
+        "2": {
+          "name": "punctuation.definition.comment.forester comment.line.percentage.forester"
+        },
+        "3": {
+          "name": "keyword.other.forester"
+        }
       },
       "endCaptures": {
-        "0": { "name": "constant.language.forester" }
+        "0": {
+          "name": "constant.language.forester"
+        }
       },
       "contentName": "embedded.latex"
     },
@@ -105,22 +174,36 @@
       "begin": "(\\\\tex)\\s*(\\{)",
       "end": "(\\})",
       "beginCaptures": {
-        "1": { "name": "constant.language.forester" },
-        "2": { "name": "punctuation.definition.group.begin.forester" }
+        "1": {
+          "name": "constant.language.forester"
+        },
+        "2": {
+          "name": "punctuation.definition.group.begin.forester"
+        }
       },
       "endCaptures": {
-        "1": { "name": "punctuation.definition.group.end.forester" }
+        "1": {
+          "name": "punctuation.definition.group.end.forester"
+        }
       },
       "patterns": [
-        { "include": "#tex-preamble-content" }
+        {
+          "include": "#tex-preamble-content"
+        }
       ]
     },
     "tex-preamble-content": {
       "comment": "Content inside \\tex first arg (preamble) with LaTeX highlighting",
       "patterns": [
-        { "include": "#tex-nested-brace-latex" },
-        { "include": "text.tex.latex" },
-        { "include": "#tex-second-arg" }
+        {
+          "include": "#tex-nested-brace-latex"
+        },
+        {
+          "include": "text.tex.latex"
+        },
+        {
+          "include": "#tex-second-arg"
+        }
       ]
     },
     "tex-second-arg": {
@@ -128,16 +211,28 @@
       "begin": "(\\})\\s*(\\{)",
       "end": "(\\})",
       "beginCaptures": {
-        "1": { "name": "punctuation.definition.group.end.forester" },
-        "2": { "name": "punctuation.definition.group.begin.forester" }
+        "1": {
+          "name": "punctuation.definition.group.end.forester"
+        },
+        "2": {
+          "name": "punctuation.definition.group.begin.forester"
+        }
       },
       "endCaptures": {
-        "1": { "name": "punctuation.definition.group.end.forester" }
+        "1": {
+          "name": "punctuation.definition.group.end.forester"
+        }
       },
       "patterns": [
-        { "include": "#tex-verbatim-block" },
-        { "include": "#tex-nested-brace-content" },
-        { "include": "text.tex.latex" }
+        {
+          "include": "#tex-verbatim-block"
+        },
+        {
+          "include": "#tex-nested-brace-content"
+        },
+        {
+          "include": "text.tex.latex"
+        }
       ],
       "contentName": "meta.embedded.block.latex"
     },
@@ -146,8 +241,12 @@
       "begin": "\\{",
       "end": "\\}",
       "patterns": [
-        { "include": "#tex-nested-brace-latex" },
-        { "include": "text.tex.latex" }
+        {
+          "include": "#tex-nested-brace-latex"
+        },
+        {
+          "include": "text.tex.latex"
+        }
       ]
     },
     "tex-verbatim-block": {
@@ -156,10 +255,14 @@
       "end": "\\\\stopverb",
       "contentName": "markup.raw.forester",
       "beginCaptures": {
-        "0": { "name": "constant.language.forester" }
+        "0": {
+          "name": "constant.language.forester"
+        }
       },
       "endCaptures": {
-        "0": { "name": "constant.language.forester" }
+        "0": {
+          "name": "constant.language.forester"
+        }
       }
     },
     "tex-nested-brace-content": {
@@ -167,9 +270,15 @@
       "begin": "\\{",
       "end": "\\}",
       "patterns": [
-        { "include": "#tex-verbatim-block" },
-        { "include": "#tex-nested-brace-content" },
-        { "include": "text.tex.latex" }
+        {
+          "include": "#tex-verbatim-block"
+        },
+        {
+          "include": "#tex-nested-brace-content"
+        },
+        {
+          "include": "text.tex.latex"
+        }
       ]
     },
     "verbatim-block": {
@@ -178,10 +287,14 @@
       "end": "\\\\stopverb",
       "contentName": "markup.raw.forester",
       "beginCaptures": {
-        "0": { "name": "constant.language.forester" }
+        "0": {
+          "name": "constant.language.forester"
+        }
       },
       "endCaptures": {
-        "0": { "name": "constant.language.forester" }
+        "0": {
+          "name": "constant.language.forester"
+        }
       }
     },
     "verbatim-inline": {
@@ -190,10 +303,14 @@
       "end": "\\\\stopverb|$",
       "contentName": "markup.raw.forester",
       "beginCaptures": {
-        "0": { "name": "constant.language.forester" }
+        "0": {
+          "name": "constant.language.forester"
+        }
       },
       "endCaptures": {
-        "0": { "name": "constant.language.forester" }
+        "0": {
+          "name": "constant.language.forester"
+        }
       }
     },
     "command": {
@@ -201,14 +318,20 @@
         {
           "match": "\\\\[A-Za-z][0-9A-Za-z\\-/#]*",
           "captures": {
-            "0": { "name": "constant.language.forester" }
+            "0": {
+              "name": "constant.language.forester"
+            }
           }
         },
         {
           "match": "\\\\<([A-Za-z][0-9A-Za-z\\-/#:]*)>",
           "captures": {
-            "0": { "name": "constant.language.forester" },
-            "1": { "name": "support.variable.xmlns.forester" }
+            "0": {
+              "name": "constant.language.forester"
+            },
+            "1": {
+              "name": "support.variable.xmlns.forester"
+            }
           }
         }
       ]
@@ -219,21 +342,41 @@
       "end": "$\\n?",
       "name": "comment.line.documentation.sig.forester",
       "beginCaptures": {
-        "1": { "name": "punctuation.definition.comment.forester" },
-        "2": { "name": "keyword.control.directive.sig.forester" }
+        "1": {
+          "name": "punctuation.definition.comment.forester"
+        },
+        "2": {
+          "name": "keyword.control.directive.sig.forester"
+        }
       },
       "patterns": [
-        { "match": "\\\\[A-Za-z]\\w*", "name": "entity.name.function.sig.forester" },
-        { "match": "@[A-Za-z][\\w-]*", "name": "support.type.sig.forester" },
-        { "match": "\\b(flags|number|content|opaque)\\b", "name": "storage.type.sig.forester" },
+        {
+          "match": "\\\\[A-Za-z]\\w*",
+          "name": "entity.name.function.sig.forester"
+        },
+        {
+          "match": "@[A-Za-z][\\w-]*",
+          "name": "support.type.sig.forester"
+        },
+        {
+          "match": "\\b(flags|number|content|opaque)\\b",
+          "name": "storage.type.sig.forester"
+        },
         {
           "match": "([A-Za-z_]\\w*)\\s*(\\?)?(?=\\s*:)",
           "captures": {
-            "1": { "name": "variable.parameter.sig.forester" },
-            "2": { "name": "keyword.operator.optional.sig.forester" }
+            "1": {
+              "name": "variable.parameter.sig.forester"
+            },
+            "2": {
+              "name": "keyword.operator.optional.sig.forester"
+            }
           }
         },
-        { "match": "\\|", "name": "keyword.operator.sig.forester" }
+        {
+          "match": "\\|",
+          "name": "keyword.operator.sig.forester"
+        }
       ]
     },
     "comment": {
@@ -251,14 +394,45 @@
         {
           "match": "\\[([^\\[]*)\\]\\(([^\\)]*)\\)",
           "captures": {
-            "1": { "name": "markup.text.forester" },
-            "2": { "name": "markup.underline.link.forester" }
+            "1": {
+              "name": "markup.text.forester"
+            },
+            "2": {
+              "name": "markup.underline.link.forester"
+            }
           }
         },
         {
           "begin": "\\[\\[",
           "end": "\\]\\]",
           "contentName": "markup.underline.link.forester"
+        }
+      ]
+    },
+    "raw-group": {
+      "comment": "!{ … } raw group. Forester lexes the body verbatim, so it is foreign syntax — in practice LaTeX, which is what it is highlighted as. Braces must balance (that is how the group ends), so the recursive nested-brace rule keeps the outermost } as the terminator.",
+      "begin": "(!)(\\{)",
+      "end": "(\\})",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.forester"
+        },
+        "2": {
+          "name": "punctuation.definition.group.begin.forester"
+        }
+      },
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.group.end.forester"
+        }
+      },
+      "contentName": "embedded.latex",
+      "patterns": [
+        {
+          "include": "#tex-nested-brace-latex"
+        },
+        {
+          "include": "text.tex.latex"
         }
       ]
     }

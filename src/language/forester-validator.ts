@@ -19,6 +19,7 @@
  */
 import type { LangiumDocument, LangiumCoreServices, ValidationOptions } from 'langium';
 import { DefaultDocumentValidator } from 'langium';
+import { findRawGroupSpans, rawGroupEnd } from '../raw-group.js';
 import {
     type CancellationToken,
     type Diagnostic,
@@ -38,9 +39,17 @@ interface SuppressedRange {
  * Find the enclosing brace block for each \startverb…\stopverb pair.
  * We scan backwards from \startverb for the nearest unmatched '{' and
  * forwards from \stopverb for the nearest unmatched '}'.
+ *
+ * !{…} raw groups are added as-is: they already delimit exactly the foreign
+ * text, so there is nothing to expand outward to. Without them, dropping the
+ * \startverb wrapper in favour of a raw group would also drop this blanket
+ * suppression and put every check back on the LaTeX.
  */
 function findSuppressedRanges(text: string): SuppressedRange[] {
-    const ranges: SuppressedRange[] = [];
+    const ranges: SuppressedRange[] = findRawGroupSpans(text).map((s) => ({
+        startOffset: s.startOffset,
+        endOffset: s.endOffset,
+    }));
     const startPattern = /\\startverb\b/g;
     const stopPattern = /\\stopverb\b/g;
 
@@ -175,6 +184,17 @@ export function findBracketMismatches(text: string, uri: string): Diagnostic[] {
                 advance();
             }
             continue;
+        }
+
+        // Skip !{…} raw groups. Their contents are foreign syntax whose
+        // brackets need not balance — the whole point of the form — and the
+        // group's own braces are already matched by rawGroupEnd.
+        if (text[i] === '!') {
+            const end = rawGroupEnd(text, i);
+            if (end !== null) {
+                while (i < end) {advance();}
+                continue;
+            }
         }
 
         // Skip \startverb…\stopverb

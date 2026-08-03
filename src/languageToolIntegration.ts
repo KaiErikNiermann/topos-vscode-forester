@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
+import { findRawGroupSpans } from "./raw-group.js";
 
 const languageToolLog = vscode.window.createOutputChannel("Forester LanguageTool");
 
@@ -456,7 +457,21 @@ export function filterSyntacticDiagnostics(uri: vscode.Uri, diagnostics: vscode.
 export type RangeLike = { start: number; end: number };
 
 export function buildIgnoreRanges(text: string): RangeLike[] {
-   const ranges: RangeLike[] = [];
+   // Spans whose contents are not prose and must never reach the grammar
+   // checker. Both forms below are brace/herald delimited rather than
+   // pattern-matched, so unlike the regexes they cover nested braces and
+   // multi-line bodies exactly — a TikZ node label like `\node {Some words};`
+   // is precisely the case the regexes below let through.
+   const ranges: RangeLike[] = findRawGroupSpans(text).map((s) => ({
+      start: s.startOffset,
+      end: s.endOffset,
+   }));
+   const verbatim = /\\startverb[\s\S]*?\\stopverb/g;
+   let v: RegExpExecArray | null;
+   while ((v = verbatim.exec(text)) !== null) {
+      ranges.push({ start: v.index, end: v.index + v[0].length });
+   }
+
    const regexes = [
       /#\{[\s\S]*?\}/g,  // custom inline latex
       /##\{[\s\S]*?\}/g, // custom inline latex block

@@ -6,6 +6,7 @@
  */
 
 import { match, P } from "ts-pattern";
+import { rawGroupEnd } from "./raw-group.js";
 
 // Top-level metadata commands that should be on their own line
 export const TOP_LEVEL_COMMANDS: readonly string[] = [
@@ -362,6 +363,18 @@ export function tokenize(text: string, options: FormatOptions = {}): Token[] {
             }
             tokens.push({ type: "comment", value: comment });
             continue;
+        }
+
+        // Raw groups !{...} — foreign syntax, preserved byte for byte. Emitted
+        // as one ignored block so no reindenting or line-breaking reaches
+        // inside; a LaTeX body's own layout is load-bearing.
+        if (text[i] === "!") {
+            const end = rawGroupEnd(text, i);
+            if (end !== null) {
+                tokens.push({ type: "ignored_block", value: text.slice(i, end), commandName: "raw_group" });
+                i = end;
+                continue;
+            }
         }
 
         // Verbatim blocks ```...```

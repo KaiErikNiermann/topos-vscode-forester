@@ -46,7 +46,7 @@ entry Document:
 // This allows [text](url) markdown links, standalone [groups], and (groups)
 // to appear at any node position without error.
 Node:
-    Command<false> | VerbatimBlock | MathDisplay | MathInline | WikiLink
+    Command<false> | VerbatimBlock | RawGroup | MathDisplay | MathInline | WikiLink
     | BraceGroup | BracketGroup | ParenGroup | TextFragment | Escape;
 
 // ============================================================================
@@ -60,6 +60,19 @@ Node:
 // such body a cascade of phantom bracket errors. Must precede COMMAND_NAME so
 // the longer match wins.
 terminal VERBATIM_SPAN: /\\startverb[\s\S]*?\\stopverb/;
+
+// Raw group:  !{ …anything… }
+// Forester's lexer copies the body out untouched — '%' is not a comment,
+// brackets and parens do not group, '#{' does not open math — so an ordinary
+// LaTeX figure body needs no escaping. Braces are the exception, since one of
+// them ends the group, so the body's must balance (a backslash and the
+// character after it are consumed together, which is what keeps \{ \} \\ from
+// counting).
+//
+// That balancing is why this regex is a placeholder: a regular expression
+// cannot count. ForesterTokenBuilder replaces the pattern with a matcher that
+// can — see forester-token-builder.ts. Must precede COMMAND_NAME and TEXT.
+terminal RAW_GROUP: /!\{[\s\S]*?\}/;
 
 // XML namespace declaration: \xmlns:prefix  (spec §4.6)
 //   e.g. \xmlns:html{http://www.w3.org/1999/xhtml}
@@ -158,8 +171,11 @@ Command<Math>:
 // Argument forms: {}, [], ()
 // ============================================================================
 
+// A raw group is an argument form of its own: forester's grammar accepts a
+// verbatim token wherever a braced argument goes, so \texfig!{…} binds exactly
+// like \texfig{…}.
 Argument:
-    BraceArg<false> | BracketArg | ParenArg;
+    BraceArg<false> | BracketArg | ParenArg | RawGroup;
 
 // Braces group in TeX as well as in Forester, so a math command's argument
 // stays in math: its body keeps the relaxed bracket and paren handling.
@@ -197,6 +213,11 @@ ParenGroup:
 
 VerbatimBlock:
     content=(VERBATIM_BLOCK | VERBATIM_SPAN);
+
+// !{…} — opaque like the verbatim forms above, so the formatter leaves it be
+// and no check descends into it.
+RawGroup:
+    content=RAW_GROUP;
 
 // ============================================================================
 // TASK 9 — Math syntax

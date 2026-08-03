@@ -1,4 +1,5 @@
 import { match } from "ts-pattern";
+import { rawGroupEnd } from "./raw-group.js";
 
 export interface TextRange {
    start: number
@@ -655,6 +656,17 @@ function unwrapForesterVerbatimBlocks(input: string): string {
    let i = 0;
 
    while (i < input.length) {
+      // !{…} — drop the delimiters and keep the body, the same as the herald
+      // form below. Without this the preview would compile a literal "!{".
+      if (input[i] === "!") {
+         const end = rawGroupEnd(input, i);
+         if (end !== null) {
+            out += input.slice(i + 2, end - 1);
+            i = end;
+            continue;
+         }
+      }
+
       if (!input.startsWith("\\startverb", i)) {
          out += input[i];
          i++;

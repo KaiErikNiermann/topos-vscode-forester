@@ -8,7 +8,7 @@
 - **Inline title hints** — the title and taxon of a transcluded/imported/exported tree appear beside the link.
 - **LaTeX hover preview** — hover over `#{...}`, `##{...}`, or `\tex{...}{...}` to see a rendered preview.
 - **Tag closure inlay hints** — shows the opening command name after its closing brace (e.g., `} ul`). Configurable allowlist of tags.
-- **Subtree auto-ID** — new `\subtree{...}` blocks get the next canonical 4-character lowercase base36 ID automatically (opt-in).
+- **Subtree auto-ID** — new `\subtree{...}` blocks get the next canonical 4-character base36 ID automatically, in forester's own uppercase alphabet so the ID is byte-identical to what `forester new` would allocate (opt-in).
 
 ![navigate links](https://raw.githubusercontent.com/KaiErikNiermann/topos-vscode-forester/main/demo/link.gif)
 

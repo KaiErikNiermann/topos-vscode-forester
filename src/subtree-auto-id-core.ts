@@ -1,15 +1,22 @@
 import { match } from "ts-pattern";
 
 const SUBTREE_WITH_ID_REGEX = /\\subtree\s*\[([^\]]+)\]/g;
-// Case-insensitive on purpose: forester encodes stems with an uppercase
-// alphabet (BaseN.ml) while this extension emits lowercase, so `008A` and
-// `008a` are the same slot. Reading only one case makes the other's ids look
-// free, and the "next" id we hand out lands on a tree that already exists.
+// Reading is case-insensitive because a forest can already contain stems in
+// either case: `008A` and `008a` name one slot, since address allocation folds
+// case. Reading only one case makes the other's ids look free, and the "next"
+// id we hand out lands on a tree that already exists.
 const BASE36_STEM_REGEX = /^[0-9a-zA-Z]{4}$/;
 
 export const DEFAULT_SUBTREE_TEMPLATE = "\\subtree[<id>]{\n  \\title{$1}\n}$0";
 export const MAX_BASE36_VALUE = 36 ** 4 - 1;
-export const BASE36_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+// Writing, by contrast, is uppercase — byte-for-byte forester's own alphabet
+// (`BaseN.Base36` in lib/prelude/BaseN.ml). Emitting lowercase used to produce
+// `009c` beside forester's `009C.tree`: two trees to the index, one slot to
+// every allocator, and a case_folded_address warning at build time. Worse,
+// forester's `int_of_string` only accepts its own alphabet, so a lowercase stem
+// is not a number to it — it drops out of the allocator's sequence entirely and
+// the very next `forester new` reissues that slot in uppercase.
+export const BASE36_DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE36_WIDTH = 4;
 
 export interface SubtreeIdScanState {
@@ -58,7 +65,7 @@ export function fromBase36Stem(stem: string): number | undefined {
    }
 
    let value = 0;
-   for (const character of stem.toLowerCase()) {
+   for (const character of stem.toUpperCase()) {
       const digit = BASE36_DIGITS.indexOf(character);
       if (digit < 0) {
          return undefined;
@@ -69,9 +76,12 @@ export function fromBase36Stem(stem: string): number | undefined {
    return value;
 }
 
-/** Case-folded key for "is this slot taken?" tests — see {@link BASE36_STEM_REGEX}. */
+/**
+ * Case-folded key for "is this slot taken?" tests — see {@link BASE36_STEM_REGEX}.
+ * Folds to upper case so the key of an id we emit is the id itself.
+ */
 export function canonicalStemKey(stem: string): string {
-   return stem.toLowerCase();
+   return stem.toUpperCase();
 }
 
 export function nextCanonicalBase36Id(

@@ -7,15 +7,28 @@ local config = require("forester.config")
 
 local M = {}
 
-local BASE36_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
+-- Uppercase, byte-for-byte forester's own alphabet (`BaseN.Base36` in
+-- lib/prelude/BaseN.ml). Emitting lowercase produces `009c` beside forester's
+-- `009C.tree`: two trees to the index, one slot to every allocator, and a
+-- case_folded_address warning at build time.
+local BASE36_DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 local BASE36_WIDTH = 4
 local MAX_VALUE = 36 ^ 4 - 1
 
---- Check if a string is a canonical 4-char base36 stem.
+--- Case-folded key for "is this slot taken?" tests. Folds up, so the key of an
+--- ID we emit is the ID itself.
+---@param stem string
+---@return string
+function M.canonical_key(stem)
+  return stem:upper()
+end
+
+--- Check if a string is a canonical 4-char base36 stem. Accepts either case: a
+--- forest can already hold stems in both, and they name the same slot.
 ---@param id string
 ---@return boolean
 function M.is_canonical(id)
-  return #id == 4 and id:match("^[0-9a-z]+$") ~= nil
+  return #id == 4 and id:match("^[0-9a-zA-Z]+$") ~= nil
 end
 
 --- Convert a non-negative integer to a zero-padded base36 string.
@@ -48,8 +61,9 @@ function M.from_base36(stem)
   if not M.is_canonical(stem) then return nil end
 
   local value = 0
-  for i = 1, #stem do
-    local ch = stem:sub(i, i)
+  local folded = M.canonical_key(stem)
+  for i = 1, #folded do
+    local ch = folded:sub(i, i)
     local digit = BASE36_DIGITS:find(ch, 1, true)
     if not digit then return nil end
     value = value * 36 + (digit - 1)
@@ -81,7 +95,7 @@ function M.next_id(known_ids)
   for _, id in ipairs(known_ids) do
     local val = M.from_base36(id)
     if val then
-      known_set[id] = true
+      known_set[M.canonical_key(id)] = true
       if val > max_val then max_val = val end
     end
   end
@@ -89,7 +103,7 @@ function M.next_id(known_ids)
   local start = max_val < 0 and 0 or (max_val + 1)
   for candidate = start, MAX_VALUE do
     local candidate_id = M.to_base36(candidate)
-    if not known_set[candidate_id] then
+    if not known_set[M.canonical_key(candidate_id)] then
       return candidate_id
     end
   end

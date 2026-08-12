@@ -49,22 +49,31 @@ test("Compute scan state from tree names and subtree refs using canonical 4-char
    const expectedMax = Math.max(fromBase36Stem("00ba") ?? -1, fromBase36Stem("a0ff") ?? -1);
 
    assert.equal(state.knownCanonicalIds.has("notes-about-cats"), false);
-   assert.equal(state.knownCanonicalIds.has("00ba"), true);
+   assert.equal(state.knownCanonicalIds.has("00BA"), true);
    assert.equal(state.nextCanonicalValue, expectedMax + 1);
 });
 
-test("Uppercase stems occupy the same slot as their lowercase twin", () => {
-   // forester encodes with an uppercase alphabet, this extension with a
-   // lowercase one. Reading only our own case makes forester's addresses look
-   // free, and the next ID we hand out lands on a tree that already exists.
+test("Generated IDs use forester's uppercase alphabet", () => {
+   // Anything we emit has to be byte-identical to what `forester new` would
+   // allocate for the same slot (BaseN.Base36). A lowercase twin is a distinct
+   // tree to the index but the same slot to every allocator.
+   assert.equal(nextCanonicalBase36Id([], 10).id, "000A");
+   assert.equal(toBase36(fromBase36Stem("00ZZ") ?? 0), "00ZZ");
+   assert.match(nextCanonicalBase36Id([], 35).id, /^[0-9A-Z]{4}$/);
+});
+
+test("Lowercase stems in an existing forest still occupy their slot", () => {
+   // Older forests carry lowercase ids this extension emitted before it
+   // switched alphabets; they must keep reserving their slot.
    assert.equal(fromBase36Stem("008A"), fromBase36Stem("008a"));
 
-   const state = computeSubtreeIdScanState(["008A"], []);
-   assert.equal(state.knownCanonicalIds.has("008a"), true);
+   const state = computeSubtreeIdScanState(["008a"], []);
+   assert.equal(state.knownCanonicalIds.has("008A"), true);
    assert.equal(state.nextCanonicalValue, (fromBase36Stem("008a") ?? -1) + 1);
 
-   // ...and an uppercase ID must never be re-issued in lowercase.
-   assert.notEqual(nextCanonicalBase36Id(["008A"], fromBase36Stem("008a") ?? 0).id, "008a");
+   // ...and neither case may be re-issued once the slot is taken.
+   assert.notEqual(nextCanonicalBase36Id(["008a"], fromBase36Stem("008a") ?? 0).id, "008A");
+   assert.notEqual(nextCanonicalBase36Id(["008A"], fromBase36Stem("008a") ?? 0).id, "008A");
 });
 
 test("nextCanonicalBase36Id skips used canonical IDs in sequence", () => {
@@ -77,8 +86,9 @@ test("nextCanonicalBase36Id skips used canonical IDs in sequence", () => {
 
 test("Base36 encoding/decoding follows canonical 4-char format", () => {
    assert.equal(toBase36(0), "0000");
-   assert.equal(toBase36(MAX_BASE36_VALUE), "zzzz");
+   assert.equal(toBase36(MAX_BASE36_VALUE), "ZZZZ");
    assert.equal(fromBase36Stem("00z0"), 1260);
+   assert.equal(fromBase36Stem("00Z0"), 1260);
 });
 
 test("nextCanonicalBase36Id throws when canonical range is exhausted", () => {

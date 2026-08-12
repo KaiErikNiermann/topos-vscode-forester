@@ -250,7 +250,7 @@
         "forester.subtree.autoId.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "When enabled, new \\subtree blocks get the next canonical 4-character lowercase base36 ID (^[0-9a-z]{4}$), ignoring arbitrary text IDs."
+          "description": "When enabled, new \\subtree blocks get the next canonical 4-character base36 ID in forester's own uppercase alphabet (^[0-9A-Z]{4}$), ignoring arbitrary text IDs. Existing IDs are recognised in either case, since address allocation folds case."
         },
         "forester.subtree.autoId.template": {
           "type": "string",

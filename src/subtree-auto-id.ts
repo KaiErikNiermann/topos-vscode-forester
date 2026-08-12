@@ -186,7 +186,7 @@ export class SubtreeAutoIdFeature implements vscode.Disposable {
       completion.sortText = "0000-subtree-auto-id";
       completion.preselect = true;
       completion.detail = "Insert subtree template with the next canonical 4-char base36 ID";
-      completion.documentation = "ID generation scans tree filenames and existing \\subtree[...] references for canonical IDs matching ^[0-9a-z]{4}$.";
+      completion.documentation = "ID generation scans tree filenames and existing \\subtree[...] references for canonical IDs matching ^[0-9a-zA-Z]{4}$, and emits forester's own uppercase form.";
       completion.command = {
          command: RESERVE_SUBTREE_ID_COMMAND,
          title: "Reserve generated subtree ID",

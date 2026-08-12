@@ -171,7 +171,7 @@ export class SubtreeAutoIdFeature implements vscode.Disposable {
 
       let generatedId: string;
       try {
-         generatedId = await this.peekNextId();
+         generatedId = await this.peekNextId(document);
       } catch (error) {
          this.reportGenerationError(error);
          return [];
@@ -206,7 +206,7 @@ export class SubtreeAutoIdFeature implements vscode.Disposable {
       for (const insertionPoint of insertionPoints) {
          let generatedId: string;
          try {
-            generatedId = await this.reserveNextId();
+            generatedId = await this.reserveNextId(event.document);
          } catch (error) {
             this.reportGenerationError(error);
             return;
@@ -334,15 +334,38 @@ export class SubtreeAutoIdFeature implements vscode.Disposable {
       vscode.window.showErrorMessage("Forester subtree auto-ID failed: no canonical 4-character base36 IDs are available.");
    }
 
-   private async peekNextId(): Promise<string> {
+   /**
+    * Fold the live buffer into the index before generating from it.
+    *
+    * The disk scan can trail reality by a moment — `just new` writes
+    * `009C.tree` and we generate an ID inside it before the watcher has fired,
+    * so `009C` looks free and we hand it straight back to the file we are
+    * sitting in. The buffer always knows its own name and the subtree IDs
+    * already typed into it, so consult it first.
+    */
+   private reserveFromDocument(document: vscode.TextDocument): void {
+      this.reserveId(path.basename(document.fileName, ".tree"));
+
+      for (const id of extractSubtreeReferenceIds(document.getText())) {
+         this.reserveId(id);
+      }
+   }
+
+   private async peekNextId(document?: vscode.TextDocument): Promise<string> {
       await this.ensureScanned();
+      if (document !== undefined) {
+         this.reserveFromDocument(document);
+      }
 
       const candidate = nextCanonicalBase36Id(this.knownCanonicalIds, this.nextCanonicalValue);
       return candidate.id;
    }
 
-   private async reserveNextId(): Promise<string> {
+   private async reserveNextId(document?: vscode.TextDocument): Promise<string> {
       await this.ensureScanned();
+      if (document !== undefined) {
+         this.reserveFromDocument(document);
+      }
 
       const candidate = nextCanonicalBase36Id(this.knownCanonicalIds, this.nextCanonicalValue);
       this.knownCanonicalIds.add(canonicalStemKey(candidate.id));

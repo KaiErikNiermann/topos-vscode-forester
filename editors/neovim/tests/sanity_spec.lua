@@ -136,9 +136,9 @@ test("to_base36(36) = '0010'", function()
   assert_eq(m.to_base36(36), "0010")
 end)
 
-test("to_base36(1679615) = 'zzzz'", function()
+test("to_base36(1679615) = 'ZZZZ'", function()
   local m = require("forester.subtree_auto_id")
-  assert_eq(m.to_base36(36 ^ 4 - 1), "zzzz")
+  assert_eq(m.to_base36(36 ^ 4 - 1), "ZZZZ")
 end)
 
 test("from_base36 round-trips", function()
@@ -152,8 +152,13 @@ test("from_base36 rejects invalid input", function()
   local m = require("forester.subtree_auto_id")
   assert_eq(m.from_base36(""), nil)
   assert_eq(m.from_base36("abc"), nil)    -- too short
-  assert_eq(m.from_base36("ABCD"), nil)   -- uppercase
   assert_eq(m.from_base36("ab-d"), nil)   -- invalid char
+end)
+
+test("from_base36 reads either case, since both name one slot", function()
+  local m = require("forester.subtree_auto_id")
+  assert_eq(m.from_base36("008a"), m.from_base36("008A"))
+  assert_eq(m.canonical_key("008a"), "008A")
 end)
 
 test("is_canonical validates correctly", function()

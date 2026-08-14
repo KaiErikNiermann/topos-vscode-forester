@@ -102,26 +102,10 @@
           }
         },
         {
-          "begin": "#?#\\{",
-          "end": "\\}",
-          "patterns": [
-            {
-              "include": "#body"
-            }
-          ],
-          "contentName": "meta.math.forester"
+          "include": "#math"
         },
         {
-          "begin": "\\{",
-          "end": "\\}",
-          "patterns": [
-            {
-              "include": "#text"
-            },
-            {
-              "include": "#body"
-            }
-          ]
+          "include": "#braces"
         },
         {
           "include": "#command"
@@ -131,6 +115,74 @@
         },
         {
           "include": "#comment"
+        }
+      ]
+    },
+    "math-body": {
+      "comment": "Body of #{ … } / ##{ … }. Forester lexes math with a rule of its own (`math` in lib/parser/Lexer.mll) that emits no square, paren or '!{' tokens, so the constructs those characters spell elsewhere cannot form here: '[[…]]' is a link only because the parser sees one square group nested in another (Expand.ml), and with no square tokens there are no such groups — a bracket matrix is TeX. '!' is a factorial rather than a raw-group herald. Hence #link and #raw-group are absent from this list; everything else the math rule does recognise — commands, comments, verbatim, nested math, braces — stays.",
+      "patterns": [
+        {
+          "include": "#tex-command"
+        },
+        {
+          "include": "#tex"
+        },
+        {
+          "include": "#verbatim-block"
+        },
+        {
+          "include": "#verbatim-inline"
+        },
+        {
+          "include": "#math"
+        },
+        {
+          "include": "#math-braces"
+        },
+        {
+          "include": "#command"
+        },
+        {
+          "include": "#sig-comment"
+        },
+        {
+          "include": "#comment"
+        }
+      ]
+    },
+    "math": {
+      "begin": "#?#\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#math-body"
+        }
+      ],
+      "contentName": "meta.math.forester"
+    },
+    "braces": {
+      "comment": "A { … } group in ordinary body text. Recursing rather than skipping to the next '}' is what keeps an enclosing block — the math rule above, most of all — from being closed by a brace that belongs to something nested inside it.",
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#text"
+        },
+        {
+          "include": "#body"
+        }
+      ]
+    },
+    "math-braces": {
+      "comment": "As #braces, but staying inside math: a group nested in a formula is still a formula, so \\mathcal{[[x]]} must not find a link either.",
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#text"
+        },
+        {
+          "include": "#math-body"
         }
       ]
     },

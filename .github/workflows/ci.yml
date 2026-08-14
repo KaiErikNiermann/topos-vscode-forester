@@ -67,6 +67,9 @@ jobs:
       - name: Grammar corpus conformance tests
         run: pnpm run test:corpus
 
+      - name: TextMate grammar scope tests
+        run: pnpm run test:tmgrammar
+
   lsp-standalone:
     name: Language Server Standalone
     runs-on: ubuntu-latest

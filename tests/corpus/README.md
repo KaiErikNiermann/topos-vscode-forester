@@ -41,6 +41,16 @@ tree-sitter should match these exactly.
 | `WS`             | `[ \t]+`                                           | Horizontal whitespace (hidden)  |
 | `NL`             | `\r?\n`                                            | Newline (hidden)                |
 
+### Terminals that stop at the math boundary
+
+`WIKI_LINK` and `RAW_GROUP` are the exceptions to the table above: they must
+**not** match inside `#{…}` / `##{…}`. Forester lexes math with a rule of its
+own (`math` in `lib/parser/Lexer.mll`) that emits no square, paren or `!{`
+tokens, so `[[…]]` cannot become the nested square groups `Expand.ml` turns
+into a link, and `!` is a factorial rather than a raw-group herald. A grammar
+whose lexer has no modes has to say this in the parser instead — Langium does
+it by admitting both terminals as math text. See `002-math-brackets.tree`.
+
 ## Adding New Fixtures
 
 When adding syntax to either grammar:

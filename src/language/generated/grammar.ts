@@ -1004,6 +1004,20 @@ export const ForesterGrammar = (): Grammar => loadedForesterGrammar ?? (loadedFo
             {
               "$type": "Keyword",
               "value": ")"
+            },
+            {
+              "$type": "RuleCall",
+              "rule": {
+                "$ref": "#/rules@7"
+              },
+              "arguments": []
+            },
+            {
+              "$type": "RuleCall",
+              "rule": {
+                "$ref": "#/rules@3"
+              },
+              "arguments": []
             }
           ]
         }

@@ -1,0 +1,32 @@
+% Corpus fixture: inside #{…} / ##{…}, brackets are TeX notation and nothing
+% more. Forester lexes math with a rule of its own (`math` in Lexer.mll) that
+% emits no square or paren tokens, so none of the constructs those characters
+% spell elsewhere in the language can form here: no [text](url) link, no
+% [[wiki-link]], no !{raw group}. A parser that carries them into math turns
+% ordinary formulae into syntax errors.
+\import{base-macros}
+\title{Brackets in math}
+
+\p{Outside math the same characters do all their usual work: a
+[titled link](0001), a [[0002]] cross-reference, and a raw group
+\texfig!{\draw (0,0) -- (1,1);} that swallows its body whole.}
+
+% [[…]] here is a bracket matrix, not a cross-reference.
+##{
+  \begin{align*}
+    [\bvec{x}]_\mathcal{C} & = \underset{\mathcal{C} \leftarrow \mathcal{B}}{P} [\bvec{x}]_\mathcal{B} \\
+    & = [[\bvec{b}_1 \quad \bvec{b}_2 \quad \ldots \quad \bvec{b}_3]]
+  \end{align*}
+}
+
+% (…) after […] is a coordinate pair, not a link target.
+\p{The evaluation map #{[f](x) = f(x)} and the half-open interval #{[a, b)}.}
+
+% '!' is a factorial, so !{ opens nothing.
+##{
+  \binom{n}{k} = \frac{n!}{k!\,(n-k)!} \quad n!{2} \neq n
+}
+
+% Delimiters that never balance: TeX pairs them by \left and \right, not by
+% counting, and one side is free to stand alone.
+\p{#{\left(\frac{1}{2}\right]} and #{\right]} and #{X^{-1}((-\infty, r])}.}

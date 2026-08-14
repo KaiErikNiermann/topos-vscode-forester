@@ -615,6 +615,52 @@ for (const [label, source] of [
     });
 }
 
+// ── Lexer terminals that Forester's math rule does not have ─────────────────
+//
+// WIKI_LINK and RAW_GROUP are terminals, so they match wherever their
+// characters appear — but Forester lexes math with a separate rule that emits
+// neither. `[[…]]` only becomes a link because the *parser* sees one square
+// group nested in another (Expand.ml), and math mode emits no square tokens at
+// all, so a bracket matrix is TeX and nothing else.
+
+await test('a bracket matrix in math is text, not a wiki link', async () => {
+    const doc = await parseClean(String.raw`##{ [[\bvec{b}_1 \quad \bvec{b}_2]] }`);
+    const md = doc.nodes.find(isMathDisplay);
+    assertOk(md, 'Expected MathDisplay');
+    assertOk(md.nodes.find(isMathText), 'Expected the [[…]] run to be MathText');
+    assertIs(md.nodes.every(n => !isWikiLink(n)), 'Expected no WikiLink inside math');
+});
+
+await test('a bracket matrix in inline math is text too', async () => {
+    const doc = await parseClean('#{ [[a b]] }');
+    const mi = doc.nodes.find(isMathInline);
+    assertOk(mi, 'Expected MathInline');
+    assertIs(mi.nodes.every(n => !isWikiLink(n)), 'Expected no WikiLink inside math');
+});
+
+await test('!{ … } in math is text, since ! is a factorial there', async () => {
+    const doc = await parseClean('#{ a !{2} b }');
+    const mi = doc.nodes.find(isMathInline);
+    assertOk(mi, 'Expected MathInline');
+    assertOk(mi.nodes.find(isMathText), 'Expected the !{…} run to be MathText');
+});
+
+await test('the align* body from 00DH.tree parses cleanly', async () => {
+    // The formula that first surfaced this: Forester renders it, the extension
+    // reported "Expecting token of type '}'" at the [[…]] row.
+    await parseClean(String.raw`##{
+    \begin{align*}
+      [\bvec{x}]_\mathcal{C} & = \underset{\mathcal{C} \leftarrow \mathcal{B}}{P} [\bvec{x}]_\mathcal{B} \\
+      & = [[\bvec{b}_1 \quad \bvec{b}_2 \quad \ldots \quad \bvec{b}_3]]
+    \end{align*}
+  }`);
+});
+
+await test('[[…]] outside math is still a wiki link', async () => {
+    const doc = await parseClean('see [[00DJ]] here');
+    assertOk(doc.nodes.find(isWikiLink), 'Expected WikiLink in prose');
+});
+
 await test('braces still group inside math, and still end it', async () => {
     const doc = await parseClean('#{x^{a+b}}');
     const mi = doc.nodes.find(isMathInline);

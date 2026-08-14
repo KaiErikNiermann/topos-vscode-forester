@@ -255,8 +255,17 @@ MathEscape:
 // [a, b) mismatch by design, and \left. \right) leaves one side unpaired.
 // Matching them as groups turned ordinary formulae into parse errors. Braces
 // above stay structural: they group in TeX too, and one has to close the math.
+//
+// WIKI_LINK and RAW_GROUP are text here for the same reason, and they need
+// saying twice because they are lexer terminals: the lexer has no modes, so
+// they match inside math where Forester's would never fire. Forester lexes
+// math with a dedicated rule (`math` in lib/parser/Lexer.mll) that emits no
+// square tokens at all, so `[[…]]` cannot become the nested `Group (Squares,
+// Group (Squares, _))` that Expand.ml turns into a link — a bracket matrix
+// `[[\bvec{b}_1 \quad \bvec{b}_2]]` is just TeX. The same rule omits `!{`,
+// where `!` is a factorial rather than the herald of a raw group.
 MathText:
-    value=(TEXT | BARE_HASH | BARE_BACKTICK | '[' | ']' | '(' | ')');
+    value=(TEXT | BARE_HASH | BARE_BACKTICK | '[' | ']' | '(' | ')' | WIKI_LINK | RAW_GROUP);
 
 // ============================================================================
 // Escaped percent and plain text fragments

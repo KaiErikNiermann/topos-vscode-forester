@@ -1,8 +1,13 @@
 #!/bin/sh
 set -e
 
-# Mirrors the CI workflow's gates, minus the LSP handshake job (which sleeps
-# five seconds for a spawned server — CI's job to wait on, not a hook's).
+# Mirrors the CI workflow's gates, minus two jobs that are CI's to wait on:
+# the LSP handshake (which sleeps five seconds for a spawned server) and the
+# editor auto-closing tests, which drive a real VS Code. Those want a display,
+# and without xvfb installed they would open a window on top of whatever you
+# are doing on every push. CI runs them under xvfb-run; to run them here:
+#
+#   pnpm run test:vscode
 
 echo "▶ pre-push: type-check..."
 pnpm run check-types

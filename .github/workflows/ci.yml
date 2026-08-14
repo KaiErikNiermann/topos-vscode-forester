@@ -70,6 +70,11 @@ jobs:
       - name: TextMate grammar scope tests
         run: pnpm run test:tmgrammar
 
+      # Auto-closing is the editor's behaviour, not the extension's, so these
+      # run a real VS Code — which needs a display even headless.
+      - name: Editor auto-closing tests
+        run: xvfb-run -a pnpm run test:vscode
+
   lsp-standalone:
     name: Language Server Standalone
     runs-on: ubuntu-latest

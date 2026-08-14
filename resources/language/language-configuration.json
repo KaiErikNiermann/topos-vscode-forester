@@ -24,12 +24,8 @@
       "}"
     ]
   ],
-  "autoCloseBefore": ";:.,=}])>'\"\n\t",
+  "autoCloseBefore": ";:.,=}])> \n\t",
   "autoClosingPairs": [
-    {
-      "open": "\\{",
-      "close": "\\}"
-    },
     {
       "open": "{",
       "close": "}"

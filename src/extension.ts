@@ -14,6 +14,7 @@ import { initLanguageToolBridge, checkAllTreeFilesCommand } from "./languageTool
 import { registerSpeedFixCommand } from "./speedfix";
 import { registerSigCompletion, registerSigHover } from "./sig-completion";
 import { registerSigInlayHints } from "./sig-inlay";
+import { EscapeBraceAutoCloseFeature } from "./escape-brace-autoclose";
 import { SubtreeAutoIdFeature } from "./subtree-auto-id";
 import { ForesterLatexHoverService } from "./latex-hover";
 import {
@@ -259,6 +260,7 @@ export async function activate(context: vscode.ExtensionContext) {
    await initLanguageToolBridge(context);
 
    new SubtreeAutoIdFeature().activate(context);
+   new EscapeBraceAutoCloseFeature().activate(context);
 
    // Watch for configuration changes to refresh the ignored commands cache
    context.subscriptions.push(

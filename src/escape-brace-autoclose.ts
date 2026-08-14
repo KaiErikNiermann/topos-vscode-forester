@@ -98,12 +98,17 @@ export class EscapeBraceAutoCloseFeature implements vscode.Disposable {
       // event fires, so it is computed rather than saved and restored.
       const caretOffset = braceOffset + 1;
 
-      const edit = new vscode.WorkspaceEdit();
-      edit.insert(document.uri, document.positionAt(caretOffset), "\\");
-
       this.applyingEdit = true;
       try {
-         if (await vscode.workspace.applyEdit(edit)) {
+         // Both undo stops are suppressed so the backslash joins the keystroke
+         // that provoked it: one undo should take back the whole `\{\}`, not
+         // peel the escape apart into `\{}` first.
+         const applied = await editor.edit(
+            (builder) => builder.insert(document.positionAt(caretOffset), "\\"),
+            { undoStopBefore: false, undoStopAfter: false },
+         );
+
+         if (applied) {
             const caret = document.positionAt(caretOffset);
             editor.selections = [new vscode.Selection(caret, caret)];
          }

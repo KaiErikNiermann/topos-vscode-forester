@@ -23,7 +23,8 @@ export interface ForesterTree {
    taxon: string | null;
    tags: string[];
    route: string;
-   metas: Map<string, string>;
+   /** Plain JSON object — the query output is JSON.parse'd, so this is not a Map. */
+   metas: Record<string, string>;
    sourcePath: string;
    uri: string;
 }

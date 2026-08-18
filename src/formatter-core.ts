@@ -17,8 +17,13 @@ export const TOP_LEVEL_COMMANDS: readonly string[] = [
 // Block-level commands that typically contain multi-line content
 export const BLOCK_COMMANDS: readonly string[] = [
     "p", "ul", "ol", "li", "blockquote", "pre", "subtree", "query", "solution",
-    "texfig", "ltexfig", "scope", "figure"
+    "texfig", "ltexfig", "scope", "figure", "meta"
 ];
+
+// Commands of the shape \cmd{key}{value}: the first argument names the entry and
+// is preserved verbatim (it is part of the tag, not content), the second is an
+// ordinary block body and formats like \p{…}.
+export const KEYED_BLOCK_COMMANDS: readonly string[] = ["meta"];
 
 // Commands whose content should be preserved exactly (like \tex{preamble}{content})
 // \texfig and \ltexfig contain LaTeX/TikZ that must not be reformatted
@@ -565,6 +570,21 @@ export function tokenize(text: string, options: FormatOptions = {}): Token[] {
                     continue;
                 }
 
+                // Keyed block commands (\meta{key}{value}): consume the key
+                // argument here so it rides along with the command name. The
+                // value argument is then the command's only brace group and
+                // formats like any other block body.
+                if (KEYED_BLOCK_COMMANDS.includes(cmdName)) {
+                    tokens.push({ type: "command", value: cmd, commandName: cmdName });
+                    const ws = skipWhitespace(text, i);
+                    if (text[ws.endPos] === "{") {
+                        const key = consumeBalancedBlock(text, ws.endPos, "{", "}");
+                        tokens.push({ type: "ignored_block", value: key.content, commandName: "keyed_command_key" });
+                        i = key.endPos;
+                    }
+                    continue;
+                }
+
                 // Check if this command should be ignored (like \startverb...\stopverb)
                 if (isIgnoredCommand(cmdName, ignoredCommands)) {
                     // Extract all the arguments and preserve them exactly
@@ -796,6 +816,18 @@ export function format(text: string, options: FormatOptions = {}): string {
                 consecutiveNewlines = 0;
                 pendingBlockCommand = null;
             })
+            .with({ type: "ignored_block", commandName: "keyed_command_key" }, (t) => {
+                // The key argument of \meta{key}{value} — part of the tag, so it
+                // stays inline and leaves pendingBlockCommand alone for the value.
+                if (lineStart) {
+                    result += currentIndent();
+                }
+                result += t.value;
+                lineStart = false;
+                lastWasNewline = false;
+                lastWasCommand = false;
+                consecutiveNewlines = 0;
+            })
             .with({ type: "ignored_block" }, (t) => {
                 // Preserve other ignored blocks exactly as-is
                 if (lineStart) {
@@ -836,7 +868,12 @@ export function format(text: string, options: FormatOptions = {}): string {
                 if (!lineStart && !lastWasNewline && lastCommandName !== "def") {
                     const afterOpening = prevToken && ["brace_open", "bracket_open", "paren_open"].includes(prevToken.type);
                     const beforeClosing = nextToken && ["brace_close", "bracket_close", "paren_close"].includes(nextToken.type);
-                    if (!afterOpening && !beforeClosing && !result.endsWith(" ") && !result.endsWith("\n")) {
+                    // \meta{key} {value} — the key and the value it keys are one
+                    // command, so they stay flush the way \meta{key} itself does.
+                    const betweenKeyAndValue = prevToken?.type === "ignored_block"
+                        && prevToken.commandName === "keyed_command_key"
+                        && nextToken?.type === "brace_open";
+                    if (!afterOpening && !beforeClosing && !betweenKeyAndValue && !result.endsWith(" ") && !result.endsWith("\n")) {
                         result += " ";
                     }
                 }

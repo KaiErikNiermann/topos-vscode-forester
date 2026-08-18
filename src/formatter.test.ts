@@ -1231,6 +1231,39 @@ test("User's exact edge case - subtree with title containing link and codeblock"
 });
 
 
+// ============== \meta{key}{value} ==============
+
+test("Meta key stays inline, value formats as a block", () => {
+   const input = `\\meta{author}{Kai Niermann}`;
+   const expected = `\\meta{author}{\n  Kai Niermann\n}\n`;
+   assertEqual(format(input, defaultOptions), expected);
+});
+
+test("Meta value block is indented to the meta command's scope", () => {
+   const input = `\\subtree{\n\\meta{position}{\ncenter}\n}`;
+   const expected = `\\subtree{\n  \\meta{position}{\n    center\n  }\n}\n`;
+   assertEqual(format(input, defaultOptions), expected);
+});
+
+test("Meta with whitespace between arguments closes it up", () => {
+   const input = `\\meta {key} {value}`;
+   assertContains(format(input, defaultOptions), `\\meta{key}{`);
+});
+
+test("Meta without a value argument is left alone", () => {
+   assertEqual(format(`\\meta{key}`, defaultOptions), `\\meta{key}\n`);
+});
+
+test("Meta formatting is idempotent", () => {
+   const once = format(`\\meta{a}{b}\n\\p{text}`, defaultOptions);
+   assertEqual(format(once, defaultOptions), once, "Should be idempotent");
+});
+
+test("Meta key with braces inside is preserved verbatim", () => {
+   const input = `\\meta{a{b}c}{v}`;
+   assertContains(format(input, defaultOptions), `\\meta{a{b}c}{`);
+});
+
 // ============== raw groups \cmd!{…} ==============
 
 test("Multi-line raw group closes in its command's scope", () => {

@@ -23,6 +23,7 @@
 - **Document and range formatter** (Shift+Alt+F or right-click → Format Document).
 - Preserves verbatim blocks (`\startverb`/`\stopverb`), `\tex{...}{...}`, and `\codeblock{...}{...}` exactly.
 - Raw group bodies (`\align!{...}`) are kept byte for byte; only the closing brace is re-indented into the scope of the command that opened it.
+- `\meta{key}{value}` keeps its key inline and formats the value as a block, like `\p{...}`.
 - **`Forester: Scan Macros for Formatter`** — scans the workspace for macro definitions and adds them to the ignored-commands list automatically.
 - **`Forester: Format All Tree Files`** — bulk-format every `.tree` file in the workspace.
 - `forester.formatter.ignoredCommands` — commands whose content is never reformatted.

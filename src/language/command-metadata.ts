@@ -18,12 +18,36 @@ export const DEFAULT_TAXONS: readonly string[] = [
     'Problem', 'Solution', 'Reference', 'Person', 'Institution',
 ];
 
+/**
+ * Meta keys the forester compiler's own renderers treat specially (frontmatter
+ * lines, links, and the three `false`/`lang` switches) — everything else a forest
+ * uses is discovered from the forest itself, since nothing declares meta keys.
+ * Source: lib/frontend/Htmx_frontmatter.ml and bin/forester/theme/{metadata,tree}.xsl.
+ * Ordered by how often they are hand-written rather than machine-generated.
+ */
+export const DEFAULT_META_KEYS: readonly string[] = [
+    'external', 'position', 'institution', 'venue', 'source', 'doi', 'orcid',
+    'slides', 'video', 'bibtex', 'author', 'toc', 'lang',
+];
+
+/**
+ * Commands whose builtin parameter list drives completion and hover but NOT the
+ * parameter-name inlay hints. `\meta{key}{value}` names its own slots, so labelling
+ * them would only add noise to every frontmatter line in a forest. A project
+ * `%! sig` for the same command overrides this and restores the hints.
+ */
+export const INLAY_SUPPRESSED_COMMANDS: ReadonlySet<string> = new Set(['\\meta']);
+
 const treeId = (name: string): readonly Param[] =>
     [{ name, optional: false, kind: { tag: 'dynamic', source: 'tree-id' } }];
 
 /** Builtin command → its parameters (first brace arg first), keyed with backslash. */
 export const BUILTIN_PARAMS: ReadonlyMap<string, readonly Param[]> = new Map<string, readonly Param[]>([
     ['\\taxon', [{ name: 'taxon', optional: false, kind: { tag: 'dynamic', source: 'taxon' } }]],
+    ['\\meta', [
+        { name: 'key', optional: false, kind: { tag: 'dynamic', source: 'meta-key' } },
+        { name: 'value', optional: false, kind: { tag: 'content' } },
+    ]],
     ['\\transclude', treeId('tree-id')],
     ['\\ref', treeId('tree-id')],
     ['\\import', treeId('tree-id')],

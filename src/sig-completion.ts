@@ -5,13 +5,14 @@
  * figure, embed opts) it offers the param's enum / dynamic value set; inside an
  * `opts: flags{…}` arg it offers the mode bareword, flag keys, and flag values.
  *
- * Dynamic value sources (`@language @figure @taxon @tree-id @artifact-ref
- * @bib-ref`) are all resolved from the workspace / current tree.
+ * Dynamic value sources (`@language @figure @taxon @meta-key @tree-id
+ * @artifact-ref @bib-ref`) are all resolved from the workspace / current tree.
  */
 import * as vscode from 'vscode';
 import type { ParamKind, Param } from './language/sig.js';
 import { getProjectSigs } from './sig-registry.js';
 import { BUILTIN_PARAMS, DEFAULT_TAXONS } from './language/command-metadata.js';
+import { collectMetaKeys } from './meta-keys-core.js';
 import { getForest } from './get-forest.js';
 
 // A reasonable code-language set for `@language` (highlight.js common aliases).
@@ -39,8 +40,14 @@ function artifactRefs(doc: vscode.TextDocument): string[] {
     return [...keys];
 }
 
+/**
+ * A value to offer. A bare string takes the param's name as its detail; the object
+ * form overrides it, for sources whose entries aren't all the same kind of thing.
+ */
+type Suggestion = string | { readonly value: string; readonly detail: string };
+
 /** Resolve a dynamic `@source` to its value set (workspace-derived where applicable). */
-async function resolveDynamic(source: string, doc?: vscode.TextDocument): Promise<readonly string[]> {
+async function resolveDynamic(source: string, doc?: vscode.TextDocument): Promise<readonly Suggestion[]> {
     switch (source) {
         case 'language': return LANGUAGES;
         case 'figure': {
@@ -53,6 +60,13 @@ async function resolveDynamic(source: string, doc?: vscode.TextDocument): Promis
         case 'taxon': {
             const forest = await getForest({ fastReturnStale: true });
             return [...new Set([...DEFAULT_TAXONS, ...forest.map(t => t.taxon).filter((t): t is string => !!t)])];
+        }
+        case 'meta-key': {
+            // Nothing declares meta keys, so the forest's own usage is the vocabulary —
+            // plus the buffer's, so a key just typed is offered before the next rebuild.
+            const forest = await getForest({ fastReturnStale: true });
+            return collectMetaKeys(forest.map(t => t.metas), doc?.getText() ?? '')
+                .map(s => (s.namespaced ? { value: s.key, detail: 'prefix' } : s.key));
         }
         case 'tree-id': {
             const forest = await getForest({ fastReturnStale: true });
@@ -70,17 +84,18 @@ async function resolveDynamic(source: string, doc?: vscode.TextDocument): Promis
 }
 
 /** Values to suggest for a param kind (enum literals or a resolved dynamic set). */
-async function valuesFor(kind: ParamKind, doc?: vscode.TextDocument): Promise<readonly string[]> {
+async function valuesFor(kind: ParamKind, doc?: vscode.TextDocument): Promise<readonly Suggestion[]> {
     if (kind.tag === 'enum') { return kind.values; }
     if (kind.tag === 'dynamic') { return resolveDynamic(kind.source, doc); }
     return [];
 }
 
-function items(values: readonly string[], range: vscode.Range, kindLabel: string): vscode.CompletionItem[] {
+function items(values: readonly Suggestion[], range: vscode.Range, kindLabel: string): vscode.CompletionItem[] {
     return values.map((v, i) => {
-        const item = new vscode.CompletionItem(v, vscode.CompletionItemKind.EnumMember);
+        const { value, detail } = typeof v === 'string' ? { value: v, detail: kindLabel } : v;
+        const item = new vscode.CompletionItem(value, vscode.CompletionItemKind.EnumMember);
         item.range = range;
-        item.detail = kindLabel;
+        item.detail = detail;
         item.sortText = String(i).padStart(4, '0');
         return item;
     });

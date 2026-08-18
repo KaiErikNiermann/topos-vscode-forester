@@ -5,6 +5,7 @@
 - **Syntax highlighting** for `.tree` files, including `\startverb%tex` blocks that inherit your installed TeX highlighter.
 - **Tree ID completions** — type a partial title, ID, or taxon to filter trees; Tab inserts the ID.
 - **Go-to-definition / Ctrl+click** on `\transclude{id}`, `\ref{id}`, `[text](id)`, and `[[id]]` links.
+- **`\meta{key}` completions** — the meta keys forester itself renders (`external`, `position`, `doi`, `toc`, …) plus every key your forest already uses, ranked by how often it uses them. Nothing needs declaring: writing a key once is what registers it. Keys that carry a payload (`style:…`, `artifact-file:…`) are offered as the prefix alone. A `%! sig \meta(key: a|b|c, value: content)` in the forest replaces this with a strict allowlist — note that it then warns on any key outside it, prefixed ones included.
 - **Inline title hints** — the title and taxon of a transcluded/imported/exported tree appear beside the link.
 - **LaTeX hover preview** — hover over `#{...}`, `##{...}`, or `\tex{...}{...}` to see a rendered preview.
 - **Tag closure inlay hints** — shows the opening command name after its closing brace (e.g., `} ul`). Configurable allowlist of tags.

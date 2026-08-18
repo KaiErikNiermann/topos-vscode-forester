@@ -8,8 +8,9 @@
  *   %! sig \embed(opts: flags{mode: image|code|raw, width?: number, align?: left|center|right}, target: @artifact-ref, caption?: content)
  *
  * `kind` ∈ a|b|c (enum) · number · content · opaque · @source (dynamic value set,
- * resolved per-environment: @language @figure @taxon @tree-id @artifact-ref
- * @bib-ref) · flags{ k: kind, k2?: kind } (first field is the bareword positional).
+ * resolved per-environment: @language @figure @taxon @meta-key @tree-id
+ * @artifact-ref @bib-ref) · flags{ k: kind, k2?: kind } (first field is the
+ * bareword positional).
  */
 
 export type ParamKind =

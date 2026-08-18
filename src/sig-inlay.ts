@@ -10,7 +10,7 @@
  */
 import * as vscode from 'vscode';
 import { getProjectSigs } from './sig-registry.js';
-import { BUILTIN_PARAMS } from './language/command-metadata.js';
+import { BUILTIN_PARAMS, INLAY_SUPPRESSED_COMMANDS } from './language/command-metadata.js';
 import { collectParamNameHints, type NamedParam } from './sig-inlay-core.js';
 import { onForestChange } from './get-forest.js';
 
@@ -34,9 +34,14 @@ class SigInlayHintsProvider implements vscode.InlayHintsProvider {
         const sigs = await getProjectSigs();
         if (token.isCancellationRequested) { return []; }
 
-        // Project sigs win over builtins of the same name (project may override).
+        // Project sigs win over builtins of the same name (project may override) —
+        // including for a command whose builtin params are suppressed here, so
+        // writing a `%! sig` for it is how you ask for its hints back.
         const params = new Map<string, readonly NamedParam[]>();
-        for (const [command, params_] of BUILTIN_PARAMS) { params.set(command, params_); }
+        for (const [command, params_] of BUILTIN_PARAMS) {
+            if (INLAY_SUPPRESSED_COMMANDS.has(command)) { continue; }
+            params.set(command, params_);
+        }
         for (const [command, sig] of sigs) { params.set(command, sig.params); }
 
         const startOffset = document.offsetAt(range.start);

@@ -1230,6 +1230,61 @@ test("User's exact edge case - subtree with title containing link and codeblock"
    assertEqual(result, twice, "Should be idempotent");
 });
 
+
+// ============== raw groups \cmd!{…} ==============
+
+test("Multi-line raw group closes in its command's scope", () => {
+   const input = [
+      `\\p{`,
+      `  \\align!{`,
+      `      F = (f_1, f_2): && xy^2 - x &= y\\cdot(xy - 1) + (-x + y),\\\\`,
+      `      F = (f_2, f_1): && xy^2 - x &= x\\cdot(y^2 - 1) + 0.}`,
+      `}`
+   ].join("\n");
+   const expected = [
+      `\\p{`,
+      `  \\align!{`,
+      `      F = (f_1, f_2): && xy^2 - x &= y\\cdot(xy - 1) + (-x + y),\\\\`,
+      `      F = (f_2, f_1): && xy^2 - x &= x\\cdot(y^2 - 1) + 0.`,
+      `  }`,
+      `}`,
+      ``
+   ].join("\n");
+   assertEqual(format(input, defaultOptions), expected);
+});
+
+test("Raw group body is preserved byte for byte", () => {
+   const input = `\\p{\n\\foo!{\n    \\{ a \\}\n  b   %not a comment\n}\n}`;
+   const result = format(input, defaultOptions);
+   assertContains(result, `    \\{ a \\}\n  b   %not a comment\n  }`);
+});
+
+test("Already-closed raw group is only re-indented", () => {
+   const input = `\\p{\n  \\align!{\n    a = b\n        }\n}`;
+   const expected = `\\p{\n  \\align!{\n    a = b\n  }\n}\n`;
+   assertEqual(format(input, defaultOptions), expected);
+});
+
+test("Single-line raw group is untouched", () => {
+   const input = `\\p{a \\foo!{x + \\{y\\} } b}`;
+   assertContains(format(input, defaultOptions), `a \\foo!{x + \\{y\\} } b`);
+});
+
+test("Raw group at top level closes at column 0", () => {
+   const input = `\\align!{\n  a\n  b}`;
+   assertEqual(format(input, defaultOptions), `\\align!{\n  a\n  b\n}\n`);
+});
+
+test("Raw group formatting is idempotent", () => {
+   const once = format(`\\p{\n\\align!{\n  a\\\\\n  b}\n}`, defaultOptions);
+   assertEqual(format(once, defaultOptions), once, "Should be idempotent");
+});
+
+test("Raw group keeps a blank line before its closing brace", () => {
+   const result = format(`\\p{\n  \\align!{\n    a\n\n}\n}`, defaultOptions);
+   assertContains(result, `    a\n\n  }`);
+});
+
 // Summary
 console.log("\\n=== Test Results ===");
 console.log(`Passed: ${testsPassed}`);

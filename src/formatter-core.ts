@@ -260,6 +260,26 @@ export function normalizeCodeBlock(codeBlock: string, baseIndent: string, indent
 }
 
 /**
+ * Re-indent the brace that closes a multi-line raw group `!{ … }`.
+ *
+ * The body is foreign syntax and stays byte for byte — only the closing brace
+ * moves onto its own line at `baseIndent`, so the group ends in the scope of
+ * the command that opened it. Single-line groups are left exactly as written.
+ */
+export function normalizeRawGroupClosing(rawGroup: string, baseIndent: string): string {
+    if (!rawGroup.startsWith("!{") || !rawGroup.endsWith("}") || !rawGroup.includes("\n")) {
+        return rawGroup;
+    }
+    const body = rawGroup
+        .slice(2, -1)
+        // Drop the blank tail the closing brace already sat on, if any, so a
+        // group that is already laid out this way is merely re-indented.
+        .replace(/\r?\n[ \t]*$/, "")
+        .replace(/[ \t]+$/, "");
+    return `!{${body}\n${baseIndent}}`;
+}
+
+/**
  * Normalize multi-line math indentation.
  * Handles ##{...} format.
  */
@@ -758,6 +778,20 @@ export function format(text: string, options: FormatOptions = {}): string {
                 result += normalizedCode;
                 lineStart = false;
                 lastWasNewline = t.value.endsWith("\n");
+                lastWasCommand = false;
+                consecutiveNewlines = 0;
+                pendingBlockCommand = null;
+            })
+            .with({ type: "ignored_block", commandName: "raw_group" }, (t) => {
+                // Raw group bodies are foreign syntax and stay untouched, but the
+                // group still closes in its command's scope, not wherever the
+                // author's last body line happened to end.
+                if (lineStart) {
+                    result += currentIndent();
+                }
+                result += normalizeRawGroupClosing(t.value, getLastLineIndent());
+                lineStart = false;
+                lastWasNewline = false;
                 lastWasCommand = false;
                 consecutiveNewlines = 0;
                 pendingBlockCommand = null;

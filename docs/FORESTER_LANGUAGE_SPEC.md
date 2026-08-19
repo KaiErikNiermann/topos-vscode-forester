@@ -476,9 +476,47 @@ Commands consume arguments from a "tape" (stream of nodes):
 
 Functions:
 
-- `pop_arg()` - Get next braced group
+- `pop_arg()` - Get next argument
 - `pop_content_arg()` - Get and evaluate to content
 - `pop_text_arg()` - Get and convert to string
+
+Because application is resolved here rather than in the grammar, arity is not a
+parse-time question: `\foo{a}{b}` parses as the flat sibling list
+`[Ident ["foo"]; Group (Braces, ...); Group (Braces, ...)]`.
+
+#### Brace-less single arguments
+
+Following LaTeX's `\frac 12` == `\frac{1}{2}`, an argument may be written
+without braces.
+
+- **Who.** User-defined macros (`\def`, `\let`, `\fun`) and the content
+  primitives `\p \em \strong \code \li \ol \ul \blockquote \pre \figure
+  \figcaption`. Every other builtin still requires braces, so `\title My Great
+  Note` remains an error rather than silently becoming the title `My`.
+- **Text mode.** The whole next `TEXT` token, punctuation included:
+  `\em word, rest` == `\em{word,} rest`. A `TEXT` token is exactly one word,
+  since the lexer splits on whitespace.
+- **Math mode.** The leading alphanumeric run, because the lexer hands back
+  `x^2` as a single token: `#{\norm x^2}` == `\norm{x}^2`, as TeX reads it.
+  With no leading alphanumeric run there is no bare argument, and the usual
+  missing-argument error is reported.
+- **Control sequences.** A control sequence is a complete token and stands in
+  for a braced group: `#{\vec\alpha}` == `\vec{\alpha}`.
+- **Leading whitespace** is skipped before *any* argument, braced or bare.
+- **Paragraph breaks stop scanning**, mirroring LaTeX's `\par` rule: a dangling
+  `\foo` cannot reach across a blank line to take the next paragraph's word.
+
+Bare `TEXT` is not a `head_node`, so this reaches `{...}` bodies, group bodies
+and math -- everywhere prose lives -- but not the top level, where a bare word
+is a parse error regardless.
+
+> **Editor note.** This is an *evaluator* rule. The Langium grammar in
+> `src/language/forester.langium` deliberately does NOT model it: a macro's
+> arity is unknowable at parse time, so a bare-argument production would apply
+> to every command. `\foo bar` parses as a command followed by a sibling text
+> node, which mirrors the compiler's flat tape. `src/latex-hover-core.ts`
+> resolves the form because it derives arity from `\def`. See the pinning tests
+> in `src/langium-grammar.test.mts`.
 
 ### 5.5 Values
 

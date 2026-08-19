@@ -77,6 +77,28 @@ There is no Jest/Mocha setup. Test files (`*.test.ts`) are standalone scripts ru
 ### Key Formatting Concepts
 The formatter in `formatter-core.ts` uses a tokenizer that recognizes: commands (`\name`), brace/bracket/paren delimiters, verbatim blocks (`\startverb`/`\stopverb`), math (`#{}`, `##{}`) and ignored/preserved blocks. `TOP_LEVEL_COMMANDS`, `BLOCK_COMMANDS`, and user-configured `ignoredCommands` control how content is reformatted vs. preserved.
 
+### Brace-less macro application
+
+Forester resolves `\foo bar` == `\foo{bar}` when it pops arguments off its
+evaluation tape, **not** when it parses. Consequences for this repo:
+
+- `src/language/forester.langium` deliberately does not model it, and must not
+  start to: a macro's arity is unknowable at parse time (macros are user-defined
+  and arrive via `\import`), so a bare-argument production would make every
+  command swallow the next word — breaking `\def` binding sites, go-to-definition
+  and datalog term colouring. `src/langium-grammar.test.mts` pins the flat
+  sibling shape.
+- `src/latex-hover-core.ts` *does* implement it, because it derives arity from
+  `\def`. It is the only place that can.
+- The space in `\em word` is load-bearing. Anything in `formatter-core.ts` that
+  consumes whitespace after a command must probe for `{` **first** and leave the
+  cursor alone otherwise — this is what `CODE_CONTENT_COMMANDS` got wrong,
+  rewriting `\pre foo` as `\prefoo`. A blank line is load-bearing too (it ends
+  argument scanning), which is why `extractContentTokens` emits a `¶` sentinel.
+- The tier matters: only user macros and the 11 content primitives take bare
+  arguments. `\title`, `\ref`, `\transclude`, `\link`, `\meta`, `\tex` and the
+  rest still require braces, so `BUILTIN_ARITY` needs no changes.
+
 ## Model selection
 
 **Use `claude-haiku-4-5-20251001` for mechanical, deterministic tasks:**

@@ -58,3 +58,14 @@ When adding syntax to either grammar:
 1. Add a `.tree` file to this directory exercising the new construct.
 2. Ensure both Langium and tree-sitter tests pass against it.
 3. Update the terminal regex table above if terminals changed.
+
+## Evaluator-level constructs
+
+Some Forester surface forms are resolved by the **evaluator**, not the grammar,
+and must not appear as grammar structure in Langium or tree-sitter — otherwise
+the two parsers stop producing structurally equivalent trees on these fixtures.
+
+The current one is brace-less single-argument application (`\foo bar` ==
+`\foo{bar}`, fixture `003-brace-less-application.tree`). A macro's arity is
+unknowable at parse time, so both parsers keep the bare argument as a sibling
+text node. No terminal changes for it; the table above is unaffected.

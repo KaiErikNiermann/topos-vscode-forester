@@ -1318,6 +1318,19 @@ test("Raw group keeps a blank line before its closing brace", () => {
    assertContains(result, `    a\n\n  }`);
 });
 
+test("Code-content command keeps the space before a brace-less argument", () => {
+   // \pre is a content primitive, so \pre foo is legal. This branch used to
+   // consume the whitespace before testing for "{" and never re-emit it,
+   // silently rewriting the line as \prefoo.
+   assertEqual(format("\\pre foo", defaultOptions), "\\pre foo\n");
+   assertEqual(format("\\p{\\pre word rest}", defaultOptions), "\\p{\n  \\pre word rest\n}\n");
+   assertEqual(format("\\codeblock foo", defaultOptions), "\\codeblock foo\n");
+});
+
+test("Braced code-content commands are unaffected", () => {
+   assertEqual(format("\\pre{sh}{ls}", defaultOptions), "\\pre{\n  sh\n}{\n  ls\n}\n");
+});
+
 // Summary
 console.log("\\n=== Test Results ===");
 console.log(`Passed: ${testsPassed}`);

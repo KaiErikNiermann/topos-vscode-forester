@@ -516,7 +516,15 @@ export function tokenize(text: string, options: FormatOptions = {}): Token[] {
                 }
 
                 // Check if this is a code content command (like \codeblock{lang}{content})
-                if (CODE_CONTENT_COMMANDS.includes(cmdName)) {
+                //
+                // Only take this path when a brace actually follows. \pre is a
+                // content primitive and so accepts a brace-less argument
+                // (\pre foo), and this branch consumes the whitespace before
+                // testing for "{" - without the lookahead it fell through with
+                // the space eaten and never re-emitted, rewriting \pre foo as
+                // \prefoo. The keyed-block branch below probes the same way.
+                if (CODE_CONTENT_COMMANDS.includes(cmdName)
+                    && text[skipWhitespace(text, i).endPos] === "{") {
                     // Emit the command token
                     tokens.push({ type: "command", value: cmd, commandName: cmdName });
 

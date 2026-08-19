@@ -1555,6 +1555,73 @@ await test('bracket mismatch: Chevrotain generic bracket errors are suppressed w
     }
 });
 
+// ── Brace-less application is an evaluator rule, not grammar structure ───────
+//
+// The compiler resolves \foo bar == \foo{bar} when it pops arguments off its
+// tape, NOT when it parses. Langium must not model it, because it cannot: a
+// macro's arity is unknowable at parse time (macros are user-defined and reach
+// this document through \import). A BareArg production would apply to EVERY
+// command, so \transclude{x} and more prose would swallow the paragraph, \def
+// would swallow the name it binds -- breaking go-to-definition, the
+// declaration semantic token and the sig definition-site exemption -- and
+// \rel/has-taxon ?X would swallow its datalog term.
+//
+// These tests pin the flat sibling shape so that decision is enforced rather
+// than remembered. If you are here because you just added a BareArg rule:
+// don't. See docs/FORESTER_LANGUAGE_SPEC.md §5.4.
+
+await test('a brace-less argument stays a sibling, not an argument', async () => {
+    const doc = await parseClean('\\def\\foo[x]{hi}\n\\p{\\foo bar}');
+    const p = firstCommand(doc, '\\p');
+    assertEqual(p.args.length, 1);
+    const body = p.args[0];
+    assertIs(isBraceArg(body));
+    const call = body.nodes.find(n => isCommand(n) && (n as Command).name === '\\foo') as Command;
+    assertOk(call, 'expected the \\foo call');
+    assertEqual(call.args.length, 0, 'the bare word must NOT be parsed as an argument');
+    assertOk(body.nodes.find(isTextFragment), 'expected "bar" as a sibling TextFragment');
+});
+
+await test('a brace-less argument parses cleanly at top level too', async () => {
+    const doc = await parseClean('\\def\\foo[x]{hi}\n\\foo bar');
+    const calls = doc.nodes.filter(n => isCommand(n) && (n as Command).name === '\\foo') as Command[];
+    assertEqual(calls[calls.length - 1].args.length, 0);
+});
+
+// Whitespace before a braced argument already binds here, because WS and NL are
+// hidden terminals -- Langium was ahead of the compiler on this one.
+await test('whitespace before a braced argument still binds', async () => {
+    for (const source of ['\\foo {bar}', '\\p{\\foo {bar}}']) {
+        const doc = await parseClean(source);
+        const cmd = source.startsWith('\\p')
+            ? ((firstCommand(doc, '\\p').args[0] as never as { nodes: unknown[] }).nodes
+                .find(n => isCommand(n as never)) as Command)
+            : firstCommand(doc, '\\foo');
+        assertEqual(cmd.args.length, 1, `expected one BraceArg for ${source}`);
+        assertIs(isBraceArg(cmd.args[0]));
+    }
+});
+
+// x^2 is a single MathText token, which is exactly why the "stop at the first
+// non-alphanumeric" rule cannot live in the grammar -- it needs raw text.
+await test('math keeps a brace-less argument as one text token', async () => {
+    const doc = await parseClean('#{\\norm x^2}');
+    const math = doc.nodes.find(isMathInline);
+    assertOk(math);
+    assertOk(math.nodes.find(n => isCommand(n) && (n as Command).name === '\\norm'));
+    const text = math.nodes.find(isMathText);
+    assertOk(text);
+});
+
+await test('a bare control sequence in math is its own sibling command', async () => {
+    const doc = await parseClean('#{\\vec\\alpha}');
+    const math = doc.nodes.find(isMathInline);
+    assertOk(math);
+    const commands = math.nodes.filter(n => isCommand(n)) as Command[];
+    assertEqual(commands.length, 2);
+    assertEqual(commands[0].args.length, 0);
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

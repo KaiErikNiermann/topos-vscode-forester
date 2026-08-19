@@ -1,0 +1,39 @@
+% Corpus fixture: brace-less single-argument application, \foo bar == \foo{bar}.
+% This is an EVALUATOR rule in the compiler, not grammar structure — every form
+% below already parsed before the feature existed, as a command followed by
+% sibling text. The fixture exists to keep it that way in both parsers: nothing
+% here may become a new AST node.
+\import{base-macros}
+\title{Brace-less application}
+
+\def\norm[x]{#{\lVert\x\rVert}}
+\def\pair[x][y]{(\x, \y)}
+
+% Text mode: the whole next TEXT token, punctuation included.
+\p{\em word, and the rest stays outside}
+\p{\strong one two}
+\p{\code foo bar}
+\p{\norm v}
+
+% Each parameter takes its own bare word; bare and braced mix freely.
+\p{\pair a b}
+\p{\pair a{b}}
+
+% Whitespace before an argument is skipped, braced or not.
+\p{\norm {v}}
+
+% Math: the capture stops at the first non-alphanumeric character, so this is
+% \norm{x}^2 and \norm{v}_1 — what TeX would read.
+\p{#{\norm x^2}}
+\p{#{\norm v_1}}
+
+% A control sequence is a complete token and stands in for a braced group.
+\p{#{\norm\alpha}}
+
+% A paragraph break ends argument scanning (LaTeX's \par rule), so a command
+% cannot reach across a blank line for its argument. Here \em takes "word" on
+% its own line and the next paragraph is untouched — writing \em with nothing
+% but a blank line after it is a missing-argument error, by design.
+\p{\em word
+
+a new paragraph}

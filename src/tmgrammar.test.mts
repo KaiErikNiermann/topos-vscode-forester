@@ -231,6 +231,49 @@ test('a command is still a command', () => {
     assertScope('\\p{x}', '\\p', 'constant.language.forester');
 });
 
+// ── Brace-less single arguments ──────────────────────────────────────────────
+//
+// \em word == \em{word}. The argument must carry the SAME scope as the braced
+// form, so the two look identical to a theme and the author can see that the
+// bare form did something.
+
+test('\\em word is italic without braces', () => {
+    assertScope('\\em hello world', 'hello', 'markup.italic.forester');
+});
+
+test('\\strong word is bold without braces', () => {
+    assertScope('\\strong hello, world', 'hello,', 'markup.bold.forester');
+});
+
+test('\\code word is raw without braces', () => {
+    assertScope('\\code foo bar', 'foo', 'markup.inline.raw.forester');
+});
+
+test('a brace-less argument is styled inside a group too', () => {
+    assertScope('\\p{\\em hello there}', 'hello', 'markup.italic.forester');
+});
+
+test('the brace-less rule stops at the first word', () => {
+    assertNotScope('\\em hello world', 'world', 'markup.italic.forester');
+});
+
+// Whitespace before a braced argument now binds in the compiler, so it has to
+// keep its scope here as well.
+test('\\em {x} still italicises through the space', () => {
+    assertScope('\\em {x}', 'x', 'markup.italic.forester');
+});
+
+// \emph is a different command; the [ \t]+ guard keeps the rule off it.
+test('the brace-less rule does not fire on a longer command name', () => {
+    assertNotScope('\\emph foo', 'foo', 'markup.italic.forester');
+});
+
+// Builtins outside the brace-less tier must NOT be styled bare -- writing them
+// that way is still a compile error, and highlighting it would suggest it works.
+test('\\title takes no brace-less argument', () => {
+    assertNotScope('\\title A primer', 'A', 'markup.heading.forester');
+});
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

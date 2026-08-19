@@ -27,7 +27,7 @@
           "include": "#link"
         },
         {
-          "begin": "(\\\\transclude|\\\\import|\\\\export|\\\\ref)\\{",
+          "begin": "(\\\\transclude|\\\\import|\\\\export|\\\\ref)[ \\t]*\\{",
           "end": "\\}",
           "patterns": [
             {
@@ -42,7 +42,7 @@
           }
         },
         {
-          "begin": "(\\\\em)\\{",
+          "begin": "(\\\\em)[ \\t]*\\{",
           "end": "\\}",
           "patterns": [
             {
@@ -57,7 +57,18 @@
           }
         },
         {
-          "begin": "(\\\\strong)\\{",
+          "match": "(\\\\em)[ \\t]+([^\\s\\\\{}\\[\\]()%#`]+)",
+          "captures": {
+            "1": {
+              "name": "constant.language.forester"
+            },
+            "2": {
+              "name": "markup.italic.forester"
+            }
+          }
+        },
+        {
+          "begin": "(\\\\strong)[ \\t]*\\{",
           "end": "\\}",
           "patterns": [
             {
@@ -72,7 +83,18 @@
           }
         },
         {
-          "begin": "(\\\\title)\\{",
+          "match": "(\\\\strong)[ \\t]+([^\\s\\\\{}\\[\\]()%#`]+)",
+          "captures": {
+            "1": {
+              "name": "constant.language.forester"
+            },
+            "2": {
+              "name": "markup.bold.forester"
+            }
+          }
+        },
+        {
+          "begin": "(\\\\title)[ \\t]*\\{",
           "end": "\\}",
           "patterns": [
             {
@@ -87,7 +109,7 @@
           }
         },
         {
-          "begin": "(\\\\code)\\{",
+          "begin": "(\\\\code)[ \\t]*\\{",
           "end": "\\}",
           "patterns": [
             {
@@ -98,6 +120,17 @@
           "beginCaptures": {
             "1": {
               "name": "constant.language.forester"
+            }
+          }
+        },
+        {
+          "match": "(\\\\code)[ \\t]+([^\\s\\\\{}\\[\\]()%#`]+)",
+          "captures": {
+            "1": {
+              "name": "constant.language.forester"
+            },
+            "2": {
+              "name": "markup.inline.raw.forester"
             }
           }
         },

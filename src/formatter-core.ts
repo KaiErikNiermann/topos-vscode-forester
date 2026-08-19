@@ -1089,6 +1089,16 @@ export function extractContentTokens(text: string): string[] {
         tokens.push(match[0]);
     }
 
+    // A blank line is content, not layout: brace-less application stops at a
+    // paragraph break (LaTeX's \par rule), so "\em word" and "\em\n\nword"
+    // mean different things. Everything above is whitespace-blind, which would
+    // let a reflow add or drop a break unnoticed. Ordinary re-indentation adds
+    // newlines but no blank lines, so this only fires on a real change.
+    const paragraphBreakRegex = /\n[ \t]*\n/g;
+    while ((match = paragraphBreakRegex.exec(text)) !== null) {
+        tokens.push("\u00b6");
+    }
+
     return tokens;
 }
 

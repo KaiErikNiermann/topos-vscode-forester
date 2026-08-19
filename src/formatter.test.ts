@@ -1318,10 +1318,17 @@ test("Raw group keeps a blank line before its closing brace", () => {
    assertContains(result, `    a\n\n  }`);
 });
 
+// ── Brace-less single arguments ──────────────────────────────────────────────
+//
+// \em word == \em{word}. The space between a command and its brace-less
+// argument is now load-bearing: delete it and \em word becomes the undefined
+// command \emword; insert a blank line and the argument detaches (LaTeX's \par
+// rule). Neither may ever happen during formatting.
+
 test("Code-content command keeps the space before a brace-less argument", () => {
-   // \pre is a content primitive, so \pre foo is legal. This branch used to
-   // consume the whitespace before testing for "{" and never re-emit it,
-   // silently rewriting the line as \prefoo.
+   // \pre is a content primitive, so \pre foo is legal. The code-content branch
+   // used to consume the whitespace before testing for "{" and never re-emit
+   // it, silently rewriting this as \prefoo.
    assertEqual(format("\\pre foo", defaultOptions), "\\pre foo\n");
    assertEqual(format("\\p{\\pre word rest}", defaultOptions), "\\p{\n  \\pre word rest\n}\n");
    assertEqual(format("\\codeblock foo", defaultOptions), "\\codeblock foo\n");
@@ -1329,6 +1336,45 @@ test("Code-content command keeps the space before a brace-less argument", () => 
 
 test("Braced code-content commands are unaffected", () => {
    assertEqual(format("\\pre{sh}{ls}", defaultOptions), "\\pre{\n  sh\n}{\n  ls\n}\n");
+});
+
+test("Brace-less argument keeps its space for every content primitive", () => {
+   for (const prim of ["p", "em", "strong", "code", "li", "ol", "ul", "blockquote", "figure", "figcaption"]) {
+      const source = `\\p{\\${prim} word rest}`;
+      const result = format(source, defaultOptions);
+      assertContains(result, `\\${prim} word rest`);
+      assertEqual(format(result, defaultOptions), result, `\\${prim} should format idempotently`);
+   }
+});
+
+test("Brace-less argument is never moved onto a new line", () => {
+   const result = format("\\subtree{\\p{\\strong word and more prose here}}", defaultOptions);
+   assertContains(result, "\\strong word");
+});
+
+test("A paragraph break after a command is preserved", () => {
+   assertEqual(format("\\foo\n\nbar", defaultOptions), "\\foo\n\nbar\n");
+   assertContains(format("\\p{\\foo bar\n\nbaz}", defaultOptions), "bar\n\n");
+});
+
+test("Brace-less argument survives an ignored macro", () => {
+   // autoScanMacros defaults on, so a \def'd macro lands in ignoredCommands --
+   // the path most brace-less calls actually take.
+   const options = { ...defaultOptions, ignoredCommands: new Set(["foo"]) };
+   assertContains(format("\\p{\\foo bar}", options), "\\foo bar");
+});
+
+test("Whitespace before a braced argument is preserved", () => {
+   assertEqual(format("\\foo {bar}", defaultOptions), "\\foo {bar}\n");
+});
+
+test("checkContentPreservation notices a paragraph break appearing or vanishing", () => {
+   // Everything else in the checker is whitespace-blind, so without a sentinel
+   // a reflow could silently detach a brace-less argument.
+   assertEqual(String(checkContentPreservation("\\foo bar", "\\foo\n\nbar").preserved), "false");
+   assertEqual(String(checkContentPreservation("\\foo\n\nbar", "\\foo bar").preserved), "false");
+   // ...while ordinary re-indentation still passes.
+   assertEqual(String(checkContentPreservation("\\p{x}", "\\p{\n  x\n}").preserved), "true");
 });
 
 // Summary

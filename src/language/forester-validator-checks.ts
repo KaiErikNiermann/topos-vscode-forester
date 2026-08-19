@@ -104,7 +104,7 @@ const ALL_BUILTIN_COMMANDS: ReadonlySet<string> = new Set([
     '\\transclude', '\\import', '\\export', '\\ref', '\\link',
     // Block-level layout
     '\\p', '\\ul', '\\ol', '\\li', '\\blockquote', '\\subtree', '\\scope',
-    '\\figure', '\\query',
+    '\\figure', '\\figcaption', '\\query',
     // Inline
     '\\em', '\\strong', '\\code',
     // Code / verbatim

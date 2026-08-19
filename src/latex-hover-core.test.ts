@@ -292,6 +292,96 @@ test("returns outermost macro when cursor is outside nested macro arguments", ()
    assert.equal(call.name, "solution");
 });
 
+// ── Brace-less single arguments ──────────────────────────────────────────────
+//
+// \norm v == \norm{v}. This module is the only place in the extension that has
+// both a hand-rolled parser and real arity (from \def), so it is the only one
+// that can resolve the brace-less form -- everywhere else it stays a sibling
+// text node. Without this the LaTeX preview silently vanishes on every bare
+// call.
+
+const braceLessDefs = new Map(
+   parseForesterMacroDefinitions([
+      "\\def\\norm[x]{\\tex{}{\\lVert \\x \\rVert}}",
+      "\\def\\vecd[x]{\\tex{}{\\vec{\\x}}}",
+      "\\def\\pair[a][b]{\\tex{}{(\\a,\\b)}}",
+   ].join("\n")).map(def => [def.name, def]),
+);
+
+function callAt(source: string, needle: string) {
+   return findForesterMacroCallAtOffset(source, source.indexOf(needle), braceLessDefs);
+}
+
+test("a bare word is the argument", () => {
+   const call = callAt("\\norm v", "v");
+   assert.ok(call);
+   assert.equal(call.args.get("x"), "v");
+});
+
+test("a bare argument works mid-prose", () => {
+   const call = callAt("text \\norm v more", "\\norm");
+   assert.ok(call);
+   assert.equal(call.args.get("x"), "v");
+});
+
+// The argument is the whole TEXT token, so trailing punctuation rides along --
+// matching what the compiler captures.
+test("a bare argument keeps trailing punctuation", () => {
+   const call = callAt("\\norm word, rest", "\\norm");
+   assert.ok(call);
+   assert.equal(call.args.get("x"), "word,");
+});
+
+// In math the lexer produces x^2 as one token, so the whole-word rule would
+// read \norm{x^2}. Stopping at the first non-alphanumeric gives TeX's answer.
+test("a bare argument in math stops at a superscript", () => {
+   const source = "#{\\norm x^2}";
+   const call = findForesterMacroCallAtOffset(source, source.indexOf("\\norm"), braceLessDefs);
+   assert.ok(call);
+   assert.equal(call.args.get("x"), "x");
+   assert.equal(source[call.range.end], "^", "the call must end before the superscript");
+});
+
+test("a bare control sequence in math is an argument", () => {
+   const source = "#{\\vecd\\alpha}";
+   const call = findForesterMacroCallAtOffset(source, source.indexOf("\\vecd"), braceLessDefs);
+   assert.ok(call);
+   assert.equal(call.args.get("x"), "\\alpha");
+});
+
+test("math with no leading alphanumeric run takes no bare argument", () => {
+   const source = "#{\\norm ^2}";
+   assert.equal(findForesterMacroCallAtOffset(source, source.indexOf("\\norm"), braceLessDefs), undefined);
+});
+
+test("bare and braced arguments mix", () => {
+   const call = callAt("\\pair a{b}", "\\pair");
+   assert.ok(call);
+   assert.equal(call.args.get("a"), "a");
+   assert.equal(call.args.get("b"), "b");
+});
+
+test("whitespace and a single newline before a brace still bind", () => {
+   for (const source of ["\\norm {v}", "\\norm\n{v}"]) {
+      const call = findForesterMacroCallAtOffset(source, 1, braceLessDefs);
+      assert.ok(call, `expected a call for ${JSON.stringify(source)}`);
+      assert.equal(call.args.get("x"), "v");
+   }
+});
+
+// LaTeX's \par rule: a blank line ends argument scanning. This one CHANGES
+// existing behaviour -- the call used to bind across the break.
+test("a paragraph break stops argument scanning", () => {
+   assert.equal(findForesterMacroCallAtOffset("\\norm\n\n{v}", 1, braceLessDefs), undefined);
+});
+
+// A definition site is not a call: '[' is outside the bare-argument class, so
+// it fails to parse exactly as it did before.
+test("a definition site is still not a macro call", () => {
+   const source = "\\def\\norm[x]{\\tex{}{\\lVert \\x \\rVert}}";
+   assert.equal(findForesterMacroCallAtOffset(source, source.indexOf("[x]"), braceLessDefs), undefined);
+});
+
 console.log(`\\nTests passed: ${testsPassed}`);
 console.log(`Tests failed: ${testsFailed}`);
 

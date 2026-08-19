@@ -255,6 +255,73 @@ export function parseForesterImports(text: string): string[] {
    return imports;
 }
 
+// A brace-less argument in text mode is the whole next TEXT token -- this class
+// is the TEXT terminal from forester.langium, so hover and the parser agree on
+// where a word ends. Punctuation rides along: \em word, rest binds "word,".
+const bareTextArgument = /^[^\s\\{}[\]()%#`]+/;
+
+// In math the lexer hands back x^2 as ONE token, so the whole-word rule would
+// read \norm x^2 as \norm{x^2}. Stopping at the first non-alphanumeric
+// character reproduces TeX: \norm{x}^2.
+const bareMathArgument = /^[A-Za-z0-9]+/;
+
+// The #{...} and ##{...} spans of a document, so an argument can be read with
+// the right rule. Collected once per call rather than re-derived per argument.
+function mathSpans(text: string): TextRange[] {
+   const spans: TextRange[] = [];
+   let i = 0;
+   while (i < text.length) {
+      if (text.startsWith("##{", i)) {
+         const parsed = parseBalancedBraces(text, i + 2);
+         if (parsed) {
+            spans.push({ start: i, end: parsed.end });
+            i = parsed.end;
+            continue;
+         }
+      }
+      if (text.startsWith("#{", i)) {
+         const parsed = parseBalancedBraces(text, i + 1);
+         if (parsed) {
+            spans.push({ start: i, end: parsed.end });
+            i = parsed.end;
+            continue;
+         }
+      }
+      i++;
+   }
+   return spans;
+}
+
+// Whitespace before an argument is skipped, but a paragraph break ends the
+// scan -- LaTeX's \par rule for ordinary macros, so a dangling command cannot
+// reach across a blank line to take the next paragraph's first word.
+function skipArgWhitespace(text: string, start: number): number | null {
+   let i = start;
+   let newlines = 0;
+   while (i < text.length && /\s/.test(text[i])) {
+      if (text[i] === "\n") {
+         newlines++;
+      }
+      i++;
+   }
+   return newlines >= 2 ? null : i;
+}
+
+function readBareArgument(
+   text: string,
+   start: number,
+   inMath: boolean,
+): { content: string; end: number } | null {
+   // A control sequence is a complete token and stands in for a braced group:
+   // #{\vec\alpha} is \vec{\alpha}.
+   if (inMath && text[start] === "\\") {
+      const cs = readCommandName(text, start + 1);
+      return cs.name ? { content: "\\" + cs.name, end: cs.end } : null;
+   }
+   const match = (inMath ? bareMathArgument : bareTextArgument).exec(text.slice(start));
+   return match ? { content: match[0], end: start + match[0].length } : null;
+}
+
 export function findForesterMacroCallAtOffset(
    text: string,
    offset: number,
@@ -262,6 +329,9 @@ export function findForesterMacroCallAtOffset(
 ): ForesterMacroCall | undefined {
    let result: ForesterMacroCall | undefined;
    let i = 0;
+   const spans = mathSpans(text);
+   const inMath = (at: number): boolean =>
+      spans.some((span) => at >= span.start && at < span.end);
 
    while (i < text.length) {
       if (text[i] !== "\\") {
@@ -281,13 +351,21 @@ export function findForesterMacroCallAtOffset(
          continue;
       }
 
-      let cursor = skipWhitespace(text, command.end);
+      let cursor = skipArgWhitespace(text, command.end);
       const args = new Map<string, string>();
       let callEnd = command.end;
       let parseFailed = false;
 
       for (const argName of definition.args) {
-         const argument = parseBalancedBraces(text, cursor);
+         if (cursor === null) {
+            parseFailed = true;
+            break;
+         }
+
+         // Braces first, then a brace-less token -- the same order the
+         // compiler's tape pops in.
+         const braced = parseBalancedBraces(text, cursor);
+         const argument = braced ?? readBareArgument(text, cursor, inMath(cursor));
          if (!argument) {
             parseFailed = true;
             break;
@@ -295,7 +373,7 @@ export function findForesterMacroCallAtOffset(
 
          args.set(argName, argument.content);
          callEnd = argument.end;
-         cursor = skipWhitespace(text, argument.end);
+         cursor = skipArgWhitespace(text, argument.end);
       }
 
       if (!parseFailed) {

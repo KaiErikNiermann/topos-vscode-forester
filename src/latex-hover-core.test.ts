@@ -453,6 +453,44 @@ test("colours the body for the active theme", () => {
 });
 
 
+
+// ── Structural TeX primitives ─────────────────────────────────────────────────
+
+test("refuses to redefine a structural TeX primitive", () => {
+   // \span is what \halign uses to read an alignment preamble. A forest defining it
+   // as the linear-algebra operator must not break every table in the document.
+   const [span] = parseForesterMacroDefinitions("\\def\\span{\\operatorname{span}}");
+   assert.equal(convertForesterMacroToLatexCommand(span), undefined);
+});
+
+test("still redefines symbol-like kernel names", () => {
+   // \Im is amsmath's, but overriding it costs one symbol, not the document.
+   const [im] = parseForesterMacroDefinitions("\\def\\Im{\\operatorname{im}}");
+   assert.ok(convertForesterMacroToLatexCommand(im)?.includes("csname Im"));
+});
+
+test("a structural primitive is dropped from the assembled preamble", () => {
+   const definitions = parseForesterMacroDefinitions(
+      "\\def\\span{\\operatorname{span}}\n\\def\\Set{\\mathbf{Set}}",
+   );
+   const preamble = buildLatexMacroPreamble(definitions);
+   assert.ok(!preamble.includes("csname span"));
+   assert.ok(preamble.includes("csname Set"));
+});
+
+test("shims KaTeX's \\htmlData so \\notation-wrapped symbols render", () => {
+   const source = buildLatexDocument({
+      documentClass: "standalone",
+      documentClassOptions: [],
+      macroPreamble: "",
+      snippetPreamble: "",
+      body: "\\(\\htmlData{notation=009A}{\\mathbb{N}}\\)",
+      foregroundColor: "black",
+   });
+
+   assert.ok(source.includes("\\providecommand{\\htmlData}[2]{#2}"));
+});
+
 console.log(`\\nTests passed: ${testsPassed}`);
 console.log(`Tests failed: ${testsFailed}`);
 

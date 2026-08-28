@@ -618,8 +618,40 @@ export function extractLatexDefinedCommandNames(text: string): Set<string> {
    return names;
 }
 
+// ── Macro conversion ────────────────────────────────────────────────────────
+
+/**
+ * Names the typesetter itself uses to build a document, which a forest macro must
+ * never be allowed to take over.
+ *
+ * A forest defines its macros for KaTeX, where these names mean nothing special —
+ * `\span` is free for the linear-algebra operator. TeX is not so lucky: `\span` is
+ * the primitive `\halign` uses when it reads an alignment preamble, so redefining it
+ * breaks every `align`, `array` and `tabular` in the document with a baffling
+ * "Missing # inserted in alignment preamble", nowhere near the macro at fault — and
+ * in a forest that defines one, it breaks them in *every* preview, since the macro
+ * preamble is assembled from the whole import closure regardless of what the span
+ * being rendered actually uses.
+ *
+ * Restricted to primitives that are load-bearing for document structure. Symbol-like
+ * kernel names (`\Im`, `\ker`, `\deg`) are deliberately absent: overriding those is
+ * exactly what a forest means to do, and the blast radius is the one symbol.
+ */
+export const structuralTexPrimitives: ReadonlySet<string> = new Set([
+   // \halign / \valign — alignment construction.
+   "span", "cr", "crcr", "noalign", "omit", "halign", "valign", "tabskip",
+   // Grouping, expansion and definition.
+   "def", "edef", "gdef", "xdef", "let", "futurelet", "expandafter", "noexpand",
+   "csname", "endcsname", "begingroup", "endgroup", "relax", "the", "string",
+   "catcode", "meaning", "afterassignment", "aftergroup",
+   // Boxes and paragraph structure.
+   "hbox", "vbox", "vtop", "vcenter", "par", "hskip", "vskip", "kern", "unskip",
+   // Math construction that is syntax rather than a symbol.
+   "over", "atop", "above", "left", "right", "mathchoice", "discretionary",
+]);
+
 export function convertForesterMacroToLatexCommand(definition: ForesterMacroDefinition): string | undefined {
-   if (!isTexCommandName(definition.name)) {
+   if (!isTexCommandName(definition.name) || structuralTexPrimitives.has(definition.name)) {
       return undefined;
    }
 
@@ -854,6 +886,11 @@ const compatibilityShims: readonly string[] = [
    "\\providecommand{\\lBrack}{\\langle}",
    "\\providecommand{\\rBrack}{\\rangle}",
    "\\providecommand{\\exist}{\\exists}",
+   // KaTeX's own extension, used by the `\notation` idiom to hang a hover annotation
+   // on a symbol. LaTeX has never heard of it, so a forest that documents its symbols
+   // that way would otherwise fail to preview every one of them. Keep the body, drop
+   // the annotation — exactly what a forest's own LaTeX-side shim does.
+   "\\providecommand{\\htmlData}[2]{#2}",
 ];
 
 /**
@@ -906,4 +943,43 @@ export function buildLatexDocument(options: LatexDocumentOptions): string {
       "\\end{document}",
       "",
    ].join("\n");
+}
+
+// ── TeX search path ──────────────────────────────────────────────────────────
+
+/**
+ * Compose a `TEXINPUTS` value from the forest's own style directories.
+ *
+ * The hover compiles in a scratch directory, so a `.sty` sitting in the repo — the
+ * forest's `tex/` or `theme/` — is invisible to `\usepackage`, and the span fails with
+ * "File `polydiv.sty' not found" no matter how faithfully the preamble was
+ * reconstructed. (Forester itself compiles figures in a temp dir for the same reason,
+ * which is why a forest may have worked around it by inlining a package verbatim into
+ * its preamble tree.)
+ *
+ * `//` after each directory makes kpathsea recurse into it, and the trailing empty
+ * entry — TEXINPUTS' own convention — appends the system tree rather than replacing
+ * it, so ordinary packages keep resolving.
+ *
+ * Returns undefined when there is nothing to add, so the caller can leave the child's
+ * environment untouched rather than setting an empty override.
+ */
+export function composeTexInputs(
+   directories: readonly string[],
+   inherited?: string,
+): string | undefined {
+   const seen = new Set<string>();
+   const entries: string[] = [];
+   for (const dir of directories) {
+      const trimmed = dir.trim();
+      if (trimmed.length === 0 || seen.has(trimmed)) { continue; }
+      seen.add(trimmed);
+      entries.push(`${trimmed}//`);
+   }
+   if (entries.length === 0) { return undefined; }
+
+   // An inherited TEXINPUTS already ends in the separator that re-appends the system
+   // tree; keep it whole and simply take precedence over it.
+   const tail = inherited && inherited.trim().length > 0 ? inherited : "";
+   return `${entries.join(":")}:${tail}`;
 }

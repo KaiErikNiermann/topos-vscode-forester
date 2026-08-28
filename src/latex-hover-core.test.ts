@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import {
    buildLatexDocument,
+   aliasStructuralPrimitiveCalls,
+   collectDefinedStructuralPrimitives,
    composeTexInputs,
    buildLatexMacroPreamble,
    buildRenderableLatexBody,
@@ -460,11 +462,47 @@ test("colours the body for the active theme", () => {
 
 // ── Structural TeX primitives ─────────────────────────────────────────────────
 
-test("refuses to redefine a structural TeX primitive", () => {
-   // \span is what \halign uses to read an alignment preamble. A forest defining it
-   // as the linear-algebra operator must not break every table in the document.
+test("defines a structural TeX primitive under a private alias", () => {
+   // \span is what \halign uses to read an alignment preamble, so the forest's
+   // definition must not take the name — but it must not be lost either.
    const [span] = parseForesterMacroDefinitions("\\def\\span{\\operatorname{span}}");
-   assert.equal(convertForesterMacroToLatexCommand(span), undefined);
+   const converted = convertForesterMacroToLatexCommand(span);
+   assert.ok(converted?.includes("csname foresterprimspan"));
+   assert.ok(!converted?.includes("csname span"));
+});
+
+test("rewrites a redefined primitive's math call sites to the alias", () => {
+   const defined = collectDefinedStructuralPrimitives(
+      parseForesterMacroDefinitions("\\def\\span{\\operatorname{span}}"),
+   );
+   assert.deepEqual([...defined], ["span"]);
+
+   const body = buildRenderableLatexBody(
+      { kind: "math-inline", range: { start: 0, end: 0 }, body: "\\span(v_1, v_2)" },
+      defined,
+   );
+   assert.equal(body, "\\(\\foresterprimspan(v_1, v_2)\\)");
+});
+
+test("a tex body keeps the primitive — a raw group expands nothing", () => {
+   const defined = collectDefinedStructuralPrimitives(
+      parseForesterMacroDefinitions("\\def\\span{\\operatorname{span}}"),
+   );
+   const body = buildRenderableLatexBody(
+      { kind: "tex", range: { start: 0, end: 0 }, preamble: "", body: "a &\\span b" },
+      defined,
+   );
+   assert.ok(body.includes("\\span"));
+   assert.ok(!body.includes("foresterprimspan"));
+});
+
+test("aliasing matches whole command names only", () => {
+   const defined = new Set(["span"]);
+   assert.equal(aliasStructuralPrimitiveCalls("\\spanning \\span", defined), "\\spanning \\foresterprimspan");
+});
+
+test("a primitive the forest does not define is left alone", () => {
+   assert.equal(aliasStructuralPrimitiveCalls("\\span x", new Set()), "\\span x");
 });
 
 test("still redefines symbol-like kernel names", () => {
@@ -473,12 +511,13 @@ test("still redefines symbol-like kernel names", () => {
    assert.ok(convertForesterMacroToLatexCommand(im)?.includes("csname Im"));
 });
 
-test("a structural primitive is dropped from the assembled preamble", () => {
+test("the assembled preamble never takes the primitive's own name", () => {
    const definitions = parseForesterMacroDefinitions(
       "\\def\\span{\\operatorname{span}}\n\\def\\Set{\\mathbf{Set}}",
    );
    const preamble = buildLatexMacroPreamble(definitions);
-   assert.ok(!preamble.includes("csname span"));
+   assert.ok(!preamble.includes("csname span\\endcsname"));
+   assert.ok(preamble.includes("csname foresterprimspan"));
    assert.ok(preamble.includes("csname Set"));
 });
 

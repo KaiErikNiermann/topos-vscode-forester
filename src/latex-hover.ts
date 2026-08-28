@@ -18,6 +18,7 @@ import {
    composeTexInputs,
    buildLatexMacroPreamble,
    buildRenderableLatexBody,
+   collectDefinedStructuralPrimitives,
    extractLatexDefinedCommandNames,
    filterTopLevelPutAssignments,
    findFirstTexCommand,
@@ -246,7 +247,10 @@ export class ForesterLatexHoverService implements vscode.Disposable {
          const macroPreamble = buildLatexMacroPreamble(contextData.macros.values(), snippetDefinedNames);
 
          const themeForeground = this.getThemeForegroundColor();
-         const latexBody = buildRenderableLatexBody(snippet);
+         const latexBody = buildRenderableLatexBody(
+            snippet,
+            collectDefinedStructuralPrimitives(contextData.macros.values()),
+         );
          const latexSource = this.buildLatexSource({
             latexConfig,
             macroPreamble,

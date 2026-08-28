@@ -650,8 +650,24 @@ export const structuralTexPrimitives: ReadonlySet<string> = new Set([
    "over", "atop", "above", "left", "right", "mathchoice", "discretionary",
 ]);
 
+/**
+ * The name a forest's definition of a structural primitive is given instead.
+ *
+ * Refusing to define `\span` at all keeps alignments working but loses the forest's
+ * meaning, and a forest that defines it means the operator every time. So define it
+ * under a private name and rewrite the call sites — in math bodies only, which is
+ * exactly where forester would have expanded the macro itself. An alignment preamble
+ * is never math, so the primitive it needs is still the primitive.
+ *
+ * Letters only, so `\csname` accepts it and it cannot collide with a forest macro
+ * (a forester macro name reaching LaTeX has already passed {@link isTexCommandName}).
+ */
+export function structuralPrimitiveAlias(name: string): string {
+   return `foresterprim${name}`;
+}
+
 export function convertForesterMacroToLatexCommand(definition: ForesterMacroDefinition): string | undefined {
-   if (!isTexCommandName(definition.name) || structuralTexPrimitives.has(definition.name)) {
+   if (!isTexCommandName(definition.name)) {
       return undefined;
    }
 
@@ -672,7 +688,10 @@ export function convertForesterMacroToLatexCommand(definition: ForesterMacroDefi
 
    // Use \csname-based definitions to avoid "already defined" errors from \newcommand
    // while still allowing one-letter and project-specific command names.
-   return `\\expandafter\\def\\csname ${definition.name}\\endcsname${parameters}{${replacedBody}}`;
+   const target = structuralTexPrimitives.has(definition.name)
+      ? structuralPrimitiveAlias(definition.name)
+      : definition.name;
+   return `\\expandafter\\def\\csname ${target}\\endcsname${parameters}{${replacedBody}}`;
 }
 
 export function buildLatexMacroPreamble(
@@ -831,17 +850,23 @@ function stripBlankLines(input: string): string {
       .join("\n");
 }
 
-export function buildRenderableLatexBody(snippet: HoverTexSnippet): string {
+export function buildRenderableLatexBody(
+   snippet: HoverTexSnippet,
+   /** Structural primitives the forest redefines; their math call sites are aliased. */
+   definedPrimitives: ReadonlySet<string> = new Set<string>(),
+): string {
    const displayMathEnvironmentPattern =
       /^\s*\\begin\{(equation\*?|align\*?|aligned|alignat\*?|flalign\*?|gather\*?|multline\*?|mathpar)\}[\s\S]*\\end\{\1\}\s*$/;
 
    return match(snippet)
       .with({ kind: "math-inline" }, ({ body }) => {
-         const normalized = stripBlankLines(unwrapForesterVerbatimBlocks(body));
+         const normalized = aliasStructuralPrimitiveCalls(
+            stripBlankLines(unwrapForesterVerbatimBlocks(body)), definedPrimitives);
          return `\\(${normalized}\\)`;
       })
       .with({ kind: "math-display" }, ({ body }) => {
-         const normalized = stripBlankLines(unwrapForesterVerbatimBlocks(body));
+         const normalized = aliasStructuralPrimitiveCalls(
+            stripBlankLines(unwrapForesterVerbatimBlocks(body)), definedPrimitives);
          if (displayMathEnvironmentPattern.test(normalized)) {
             return normalized;
          }
@@ -984,6 +1009,40 @@ export function composeTexInputs(
    return `${entries.join(":")}:${tail}`;
 }
 
+/**
+ * Point a math body's uses of a structural primitive at the forest's definition.
+ *
+ * `\span(v_1, v_2)` in a math span means the forest's operator, not `\halign`'s
+ * primitive — forester would have expanded the macro before LaTeX ever saw it. Only
+ * whole command names are rewritten, so `\spanning` is left alone, and only the
+ * primitives the forest actually defines are touched.
+ *
+ * Math bodies only. Inside a raw `!{…}` group forester expands nothing, so a `\span`
+ * there is the author writing real LaTeX and must stay the primitive.
+ */
+export function aliasStructuralPrimitiveCalls(
+   body: string,
+   definedPrimitives: ReadonlySet<string>,
+): string {
+   if (definedPrimitives.size === 0) { return body; }
+   return body.replace(/\\([A-Za-z]+)/g, (whole, name: string) =>
+      definedPrimitives.has(name) ? `\\${structuralPrimitiveAlias(name)}` : whole,
+   );
+}
+
+/** The structural primitives a forest redefines — the ones worth rewriting call sites for. */
+export function collectDefinedStructuralPrimitives(
+   definitions: Iterable<ForesterMacroDefinition>,
+): Set<string> {
+   const found = new Set<string>();
+   for (const definition of definitions) {
+      if (structuralTexPrimitives.has(definition.name) && convertForesterMacroToLatexCommand(definition)) {
+         found.add(definition.name);
+      }
+   }
+   return found;
+}
+
 // ── Project preamble discovery ───────────────────────────────────────────────
 
 /** Preamble-shaped: it configures the document rather than typesetting anything. */
@@ -1053,4 +1112,103 @@ export function resolveProjectPreamble(
 ): string {
    const macro = selectProjectPreambleMacro(definitions, preferred);
    return macro ? resolveForesterPreamble(macro.body, puts, definitions) : "";
+}
+
+// ── Failure diagnosis ────────────────────────────────────────────────────────
+
+/**
+ * Why a preview did not render, in terms the author can act on.
+ *
+ * `unknown` is the honest default: the LaTeX log is not a structured format, and a
+ * message that guesses wrong is worse than one that admits it and points at the
+ * issue tracker.
+ */
+export type LatexFailureKind =
+   | "missing-package"
+   | "undefined-command"
+   | "structural-primitive"
+   | "undefined-environment"
+   | "missing-tool"
+   | "unknown";
+
+export interface LatexFailure {
+   kind: LatexFailureKind
+   /** One line, no trailing period — rendered as the hover's heading. */
+   summary: string
+   /** What to do about it. Empty when there is nothing honest to suggest. */
+   hint: string
+   /** The package, command or environment at fault, when one was identified. */
+   subject?: string
+}
+
+const missingPackagePattern = /! LaTeX Error: File `([^']+)' not found/;
+const undefinedEnvironmentPattern = /! LaTeX Error: Environment ([^ ]+) undefined/;
+const undefinedCommandPattern = /! Undefined control sequence\.?[\s\S]{0,600}?(\\[A-Za-z@]+)\s*$/m;
+const missingToolPattern = /\bENOENT\b|not found/i;
+
+/**
+ * Read a LaTeX log (or a spawn error) and say what went wrong.
+ *
+ * The three cases worth naming are the three a forest actually hits: a `.sty` the
+ * preview cannot see, a command the preview's environment never defined, and a
+ * missing `latex`/`dvisvgm`. Everything else is reported as unknown rather than
+ * dressed up — the log excerpt goes to the output channel, and the author gets a link.
+ */
+export function classifyLatexFailure(log: string, toolName?: string): LatexFailure {
+   if (toolName && missingToolPattern.test(log)) {
+      return {
+         kind: "missing-tool",
+         subject: toolName,
+         summary: `Could not run \`${toolName}\``,
+         hint: `Install it, or point \`[forest.latex]\` in forest.toml at a command that exists.`,
+      };
+   }
+
+   const missingPackage = missingPackagePattern.exec(log);
+   if (missingPackage) {
+      const file = missingPackage[1];
+      return {
+         kind: "missing-package",
+         subject: file,
+         summary: `Preview needs \`${file}\`, which is not on TeX's search path`,
+         hint: `If it lives in this forest, add its directory to \`forester.hover.latex.texInputs\`; otherwise install the package.`,
+      };
+   }
+
+   const undefinedEnvironment = undefinedEnvironmentPattern.exec(log);
+   if (undefinedEnvironment) {
+      const name = undefinedEnvironment[1];
+      return {
+         kind: "undefined-environment",
+         subject: name,
+         summary: `The \`${name}\` environment is not defined in the preview`,
+         hint: `Load the package that provides it from the forest's preamble macro (\`forester.hover.latex.preambleMacro\`).`,
+      };
+   }
+
+   const undefinedCommand = undefinedCommandPattern.exec(log);
+   if (undefinedCommand) {
+      const command = undefinedCommand[1];
+      const bare = command.slice(1);
+      if (structuralTexPrimitives.has(bare)) {
+         return {
+            kind: "structural-primitive",
+            subject: command,
+            summary: `\`${command}\` is a TeX primitive, so the forest's definition is not applied here`,
+            hint: `Redefining it would break every table and alignment in the preview. The forest's meaning still renders in KaTeX; only this preview differs.`,
+         };
+      }
+      return {
+         kind: "undefined-command",
+         subject: command,
+         summary: `\`${command}\` is not defined in the preview's LaTeX environment`,
+         hint: `If the forest defines it, check that the defining tree is reachable by \`\\import\` and that the forest's preamble macro was found (\`forester.hover.latex.preambleMacro\`).`,
+      };
+   }
+
+   return {
+      kind: "unknown",
+      summary: "LaTeX could not render this span",
+      hint: "",
+   };
 }

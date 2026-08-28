@@ -16,7 +16,7 @@
  */
 
 import type { AstNode, LangiumCoreServices, LangiumParser, ParseResult } from 'langium';
-import { CstUtils, EmptyFileSystem, inject } from 'langium';
+import { AstUtils, CstUtils, EmptyFileSystem, inject } from 'langium';
 import { createDefaultCoreModule, createDefaultSharedCoreModule } from 'langium';
 import { isBraceArg, isCommand, isMathDisplay, isMathInline, type Document } from './generated/ast.js';
 import { ForesterGeneratedModule, ForesterGeneratedSharedModule } from './generated/module.js';
@@ -144,4 +144,29 @@ export async function findHoverSnippetAtOffset(
     if (!leafNode) {return undefined;}
 
     return snippetFromAncestors(text, leafNode.astNode);
+}
+
+/**
+ * Every hoverable snippet in `text`, in source order.
+ *
+ * One parse for the whole document, where {@link findHoverSnippetAtOffset} costs one
+ * per cursor position. The editor only ever needs the span under the cursor; a corpus
+ * run over a whole forest needs all of them, and doing that through the offset API
+ * means re-parsing each file once per `#{`.
+ *
+ * Only `\tex`-backed and math spans, exactly as the offset API reports them — a macro
+ * call like `\texfig!{…}` is not visible here, because resolving one needs the
+ * forest's `\def` table, which lives on the caller's side.
+ */
+export function collectHoverSnippets(text: string): LangiumHoverSnippet[] {
+    const parseResult: ParseResult<Document> = getParser().parse(text);
+    const root = parseResult.value;
+    if (!root.$cstNode) {return [];}
+
+    const out: LangiumHoverSnippet[] = [];
+    for (const node of AstUtils.streamAllContents(root)) {
+        const snippet = asMathInline(text, node) ?? asMathDisplay(text, node) ?? asTexCommand(text, node);
+        if (snippet) {out.push(snippet);}
+    }
+    return out.sort((a, b) => a.start - b.start);
 }

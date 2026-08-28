@@ -12,8 +12,9 @@ import type { DefaultSharedModuleContext, LangiumServices, LangiumSharedServices
 import { createDefaultModule, createDefaultSharedModule } from 'langium/lsp';
 import { ForesterGeneratedModule, ForesterGeneratedSharedModule } from './generated/module.js';
 import { ForesterDocumentValidator } from './forester-validator.js';
-import { registerForesterValidationChecks, setProjectSigs } from './forester-validator-checks.js';
+import { registerForesterValidationChecks, setProjectMacroIndex, setProjectSigs } from './forester-validator-checks.js';
 import { parseMacroSigs, type Sig } from './sig.js';
+import { buildInverseIndexFromSource } from './macro-index.js';
 import { ForesterSemanticTokenProvider } from './forester-semantic-tokens.js';
 import { ForesterDefinitionProvider } from './forester-definition-provider.js';
 import { ForesterCodeLensProvider } from './forester-codelens-provider.js';
@@ -86,6 +87,27 @@ export function createForesterServices(context: DefaultSharedModuleContext): {
             for (const [cmd, sig] of parseMacroSigs(text)) { sigs.set(cmd, sig); }
         }
         setProjectSigs(sigs);
+
+        // Same pass, same reason: invert the workspace's \def table so
+        // checkHandrolledMacro can ask "is this the expansion of a macro?". Built from
+        // every indexed document rather than one file, so a forest that splits its
+        // macros across trees still gets a complete index.
+        //
+        // KNOWN LIMIT: this is workspace-global, not import-scoped. A macro defined in
+        // a tree the checked document does not \import is still suggested, and the
+        // quick-fix would then produce an unresolved command. Tolerable because a
+        // forest keeps its macros in one imported-everywhere file (base-macros.tree),
+        // and because the diagnostic is advisory — but the honest fix is to intersect
+        // with the document's transitive import closure, the way
+        // ForesterLatexHoverService.buildMacroContext already does for hover.
+        setProjectMacroIndex(
+            buildInverseIndexFromSource(
+                [...shared.workspace.LangiumDocuments.all]
+                    .map((doc) => doc.textDocument.getText())
+                    .filter((text) => text.includes('\\def\\'))
+                    .join('\n'),
+            ),
+        );
     });
 
     return { shared, Forester };

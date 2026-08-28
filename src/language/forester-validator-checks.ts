@@ -23,6 +23,7 @@
 import type { AstNode, ValidationAcceptor, ValidationChecks, LangiumDocuments } from 'langium';
 import { AstUtils } from 'langium';
 import type { ForesterAstType, Command, Document, TextFragment } from './generated/ast.js';
+import { findHandrolls, type MacroIndex } from './macro-index.js';
 import {
     isBraceArg,
     isBracketGroup,
@@ -40,6 +41,15 @@ import { validateFlags, type Sig } from './sig.js';
 // headless grammar tests run with an empty map and produce no sig diagnostics.
 let projectSigs: ReadonlyMap<string, Sig> = new Map();
 export function setProjectSigs(sigs: ReadonlyMap<string, Sig>): void { projectSigs = sigs; }
+
+/**
+ * The workspace's macro table, inverted: expansion -> the macro that stands for it.
+ * Populated from the indexed documents by forester-module's IndexedContent hook, the
+ * same way projectSigs is — the validator runs in the language-server bundle and has
+ * no `vscode` API to discover files with.
+ */
+let projectMacroIndex: MacroIndex = new Map();
+export function setProjectMacroIndex(index: MacroIndex): void { projectMacroIndex = index; }
 
 // ── Arity table ──────────────────────────────────────────────────────────────
 // Maps command name (with leading backslash) → expected brace-arg count +
@@ -462,6 +472,51 @@ export class ForesterChecks {
         }
     }
 
+    /**
+     * Warn when a math span spells out a macro's expansion instead of using the macro.
+     *
+     * `\def\N{\notation{009A}{\mathbb{N}}}` means `#{\mathbb{N}}` renders a
+     * pixel-identical glyph — with no hover popover. The page looks right, so nothing
+     * else in the toolchain can catch it.
+     *
+     * Document-level rather than Command-level: the detector works on offsets over the
+     * raw text (it has to, since a `% macro-check: allow …` pragma lives in a COMMENT,
+     * which the grammar hides from the AST), and one pass per document beats one per
+     * node. Registered `fast` — Langium's default build options validate only
+     * 'built-in' and 'fast', so a 'slow' check would never run in the editor.
+     *
+     * Severity mirrors the notes build's two tiers: a documented symbol (one carrying
+     * `\notation`) loses a real feature, so it warns; a cosmetic duplicate hints.
+     */
+    checkHandrolledMacro(node: Document, accept: ValidationAcceptor): void {
+        if (projectMacroIndex.size === 0) { return; }
+        const doc = AstUtils.getDocument(node);
+        const text = doc.textDocument.getText();
+
+        for (const hit of findHandrolls(text, projectMacroIndex)) {
+            const alts = hit.alternatives.length > 0
+                ? ` (or ${hit.alternatives.map((a) => `\\${a}`).join(', ')})`
+                : '';
+            const why = hit.notation === null
+                ? ''
+                : ' — the handrolled form loses its hover annotation';
+            accept(
+                hit.notation === null ? 'hint' : 'warning',
+                `${hit.expansion} is the expansion of \\${hit.macro}${alts}; use the macro${why}.`,
+                {
+                    node,
+                    range: {
+                        start: doc.textDocument.positionAt(hit.startOffset),
+                        end: doc.textDocument.positionAt(hit.endOffset),
+                    },
+                    code: 'handrolled-macro',
+                    // Only offer an automatic rewrite when the inverse is unambiguous.
+                    data: { replacement: hit.alternatives.length === 0 ? `\\${hit.macro}` : null },
+                },
+            );
+        }
+    }
+
     // ── Slow checks ─────────────────────────────────────────────────────────
 
     /**
@@ -807,6 +862,7 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
         ],
         Document: [
             checker.checkDuplicateImports,
+            checker.checkHandrolledMacro,
         ],
     };
 

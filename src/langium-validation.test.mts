@@ -180,6 +180,61 @@ await test('an unterminated raw group is a parse error', async () => {
     }
 });
 
+// ── Handrolled-macro detection ───────────────────────────────────────────────
+//
+// End-to-end: the IndexedContent hook must invert the document's own \def table and
+// checkHandrolledMacro must then fire on the expansion. Both halves are exercised
+// here because the fixture and the usage live in one document.
+
+const HANDROLL_DOC = String.raw`\def\N{\notation{009A}{\mathbb{N}}}
+\p{prose about #{\mathbb{N}} here}
+`;
+
+await test('a handrolled documented symbol is reported', async () => {
+    const messages = await diagnosticsFor(HANDROLL_DOC);
+    if (!messages.some((m) => m.includes('expansion of \\N'))) {
+        throw new Error(`Expected a handrolled-macro diagnostic, got:\n  ${messages.join('\n  ') || '(none)'}`);
+    }
+});
+
+await test('the diagnostic carries the code and replacement a quick-fix needs', async () => {
+    const doc = await parse(HANDROLL_DOC, { validation: true });
+    const hit = (doc.diagnostics ?? []).find((d) => d.code === 'handrolled-macro');
+    if (!hit) { throw new Error('no diagnostic with code handrolled-macro'); }
+    const data = hit.data as { replacement?: string | null } | undefined;
+    if (data?.replacement !== '\\N') {
+        throw new Error(`Expected replacement \\N, got ${JSON.stringify(data)}`);
+    }
+});
+
+await test('using the macro itself is clean', async () => {
+    const messages = await diagnosticsFor(String.raw`\def\N{\notation{009A}{\mathbb{N}}}
+\p{prose about #{\N} here}
+`);
+    if (messages.some((m) => m.includes('expansion of'))) {
+        throw new Error(`Expected no handrolled-macro diagnostic, got:\n  ${messages.join('\n  ')}`);
+    }
+});
+
+await test('a raw group is never flagged — forester expands nothing there', async () => {
+    const messages = await diagnosticsFor(String.raw`\def\N{\notation{009A}{\mathbb{N}}}
+\texfig!{ $\mathbb{N}$ }
+`);
+    if (messages.some((m) => m.includes('expansion of'))) {
+        throw new Error(`Expected no diagnostic inside a raw group, got:\n  ${messages.join('\n  ')}`);
+    }
+});
+
+await test('a file-scoped pragma silences the report', async () => {
+    const messages = await diagnosticsFor(String.raw`\def\N{\notation{009A}{\mathbb{N}}}
+% macro-check: allow \mathbb{N}
+\p{prose about #{\mathbb{N}} here}
+`);
+    if (messages.some((m) => m.includes('expansion of'))) {
+        throw new Error(`Expected the pragma to silence it, got:\n  ${messages.join('\n  ')}`);
+    }
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

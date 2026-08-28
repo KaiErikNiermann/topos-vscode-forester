@@ -14,6 +14,7 @@ import {
    ForesterMacroDefinition,
    ForesterPutAssignment,
    HoverTexSnippet,
+   buildLatexDocument,
    buildLatexMacroPreamble,
    buildRenderableLatexBody,
    extractLatexDefinedCommandNames,
@@ -644,55 +645,12 @@ export class ForesterLatexHoverService implements vscode.Disposable {
       body: string
       foregroundColor: "black" | "white"
    }): string {
-      const { latexConfig, macroPreamble, snippetPreamble, body, foregroundColor } = params;
-      const quiverProbeText = [macroPreamble, snippetPreamble, body].join("\n");
-      const needsQuiverPreamble = /\\(?:begin\{tikzcd\}|ltexfig\b|texfig\b|arrow\b|tikzcdset\b)/.test(quiverProbeText);
-
-      const classOptions = latexConfig.documentClassOptions.join(",");
-      const classDecl = classOptions.length > 0
-         ? `\\documentclass[${classOptions}]{${latexConfig.documentClass}}`
-         : `\\documentclass{${latexConfig.documentClass}}`;
-
-      const userPreambleSections = [macroPreamble, snippetPreamble].filter(section => section.trim().length > 0);
-
-      return [
-         classDecl,
-         "",
-         "\\usepackage{iftex}",
-         "\\ifPDFTeX",
-         "  \\usepackage[T1]{fontenc}",
-         "  \\usepackage[utf8]{inputenc}",
-         "\\else",
-         "  \\usepackage{fontspec}",
-         "\\fi",
-         "",
-         "\\usepackage{xcolor}",
-         "\\usepackage{amsmath,amssymb,mathtools}",
-         "",
-         ...userPreambleSections,
-         ...(needsQuiverPreamble
-            ? [
-               "\\makeatletter",
-               "\\@ifpackageloaded{quiver}{}{\\IfFileExists{quiver.sty}{\\usepackage{quiver}}{}}",
-               "\\makeatother",
-               "",
-            ]
-            : []),
-         "",
-         // Compatibility shims for common symbols/shorthands used in Forester notes.
-         // Declared after user preamble so user-defined commands win.
-         "\\providecommand{\\llbracket}{\\mathopen{[\\![}}",
-         "\\providecommand{\\rrbracket}{\\mathclose{]\\!]}}",
-         "\\providecommand{\\lBrack}{\\langle}",
-         "\\providecommand{\\rBrack}{\\rangle}",
-         "\\providecommand{\\exist}{\\exists}",
-         "",
-         "\\begin{document}",
-         `\\color{${foregroundColor}}`,
-         body,
-         "\\end{document}",
-         "",
-      ].join("\n");
+      const { latexConfig, ...rest } = params;
+      return buildLatexDocument({
+         documentClass: latexConfig.documentClass,
+         documentClassOptions: latexConfig.documentClassOptions,
+         ...rest,
+      });
    }
 
    private computeCacheKey(

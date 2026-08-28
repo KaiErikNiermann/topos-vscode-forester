@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+   buildLatexDocument,
    buildLatexMacroPreamble,
    buildRenderableLatexBody,
    convertForesterMacroToLatexCommand,
@@ -381,6 +382,76 @@ test("a definition site is still not a macro call", () => {
    const source = "\\def\\norm[x]{\\tex{}{\\lVert \\x \\rVert}}";
    assert.equal(findForesterMacroCallAtOffset(source, source.indexOf("[x]"), braceLessDefs), undefined);
 });
+
+// ── buildLatexDocument ────────────────────────────────────────────────────────
+
+test("emits the class options as a comma list", () => {
+   const source = buildLatexDocument({
+      documentClass: "standalone",
+      documentClassOptions: ["preview", "border=2pt"],
+      macroPreamble: "",
+      snippetPreamble: "",
+      body: "\\(x\\)",
+      foregroundColor: "black",
+   });
+
+   assert.ok(source.startsWith("\\documentclass[preview,border=2pt]{standalone}"));
+});
+
+test("omits the bracket group when there are no class options", () => {
+   const source = buildLatexDocument({
+      documentClass: "article",
+      documentClassOptions: [],
+      macroPreamble: "",
+      snippetPreamble: "",
+      body: "\\(x\\)",
+      foregroundColor: "black",
+   });
+
+   assert.ok(source.startsWith("\\documentclass{article}"));
+});
+
+test("orders the user preamble before the compatibility shims", () => {
+   const source = buildLatexDocument({
+      documentClass: "standalone",
+      documentClassOptions: [],
+      macroPreamble: "\\newcommand{\\N}{\\mathbb{N}}",
+      snippetPreamble: "\\usepackage{stmaryrd}",
+      body: "\\(\\N\\)",
+      foregroundColor: "black",
+   });
+
+   // stmaryrd owns \llbracket; the shim must not pre-empt it.
+   assert.ok(source.indexOf("\\usepackage{stmaryrd}") < source.indexOf("\\providecommand{\\llbracket}"));
+   assert.ok(source.indexOf("\\newcommand{\\N}") < source.indexOf("\\begin{document}"));
+});
+
+test("loads quiver only for diagram bodies", () => {
+   const base = {
+      documentClass: "standalone",
+      documentClassOptions: [],
+      macroPreamble: "",
+      snippetPreamble: "",
+      foregroundColor: "black" as const,
+   };
+
+   assert.ok(!buildLatexDocument({ ...base, body: "\\(x\\)" }).includes("quiver.sty"));
+   assert.ok(buildLatexDocument({ ...base, body: "\\begin{tikzcd} A \\end{tikzcd}" }).includes("quiver.sty"));
+});
+
+test("colours the body for the active theme", () => {
+   const dark = buildLatexDocument({
+      documentClass: "standalone",
+      documentClassOptions: [],
+      macroPreamble: "",
+      snippetPreamble: "",
+      body: "\\(x\\)",
+      foregroundColor: "white",
+   });
+
+   assert.ok(dark.includes("\\color{white}"));
+});
+
 
 console.log(`\\nTests passed: ${testsPassed}`);
 console.log(`Tests failed: ${testsFailed}`);

@@ -818,3 +818,92 @@ export function buildRenderableLatexBody(snippet: HoverTexSnippet): string {
       .with({ kind: "tex" }, ({ body }) => unwrapForesterVerbatimBlocks(body))
       .exhaustive();
 }
+
+// ── Standalone document assembly ─────────────────────────────────────────────
+
+export interface LatexDocumentOptions {
+   /** `\documentclass{…}` name, from `[forest.latex] document_class`. */
+   documentClass: string
+   /** Class options, joined with commas. Empty means a bare `\documentclass`. */
+   documentClassOptions: readonly string[]
+   /** Commands the forest's `\def` table contributed, already converted to LaTeX. */
+   macroPreamble: string
+   /** Preamble the snippet itself carries — a `\tex{…}{…}` first argument. */
+   snippetPreamble: string
+   /** The math or text body, already wrapped by {@link buildRenderableLatexBody}. */
+   body: string
+   /** Follows the editor theme, so the glyphs are legible against the popover. */
+   foregroundColor: "black" | "white"
+}
+
+/**
+ * quiver's `\usepackage` is expensive and only relevant to diagram bodies, so it is
+ * loaded on demand — and guarded twice over, since the user preamble may have loaded
+ * it already and the .sty may not be installed at all.
+ */
+const quiverProbePattern = /\\(?:begin\{tikzcd\}|ltexfig\b|texfig\b|arrow\b|tikzcdset\b)/;
+
+/**
+ * Compatibility shims for symbols Forester notes reach for that plain
+ * amsmath+amssymb does not define. `\providecommand`, and emitted *after* the user
+ * preamble, so a real package (stmaryrd owns `\llbracket`) always wins.
+ */
+const compatibilityShims: readonly string[] = [
+   "\\providecommand{\\llbracket}{\\mathopen{[\\![}}",
+   "\\providecommand{\\rrbracket}{\\mathclose{]\\!]}}",
+   "\\providecommand{\\lBrack}{\\langle}",
+   "\\providecommand{\\rBrack}{\\rangle}",
+   "\\providecommand{\\exist}{\\exists}",
+];
+
+/**
+ * Assemble the standalone .tex file whose DVI becomes the hover image.
+ *
+ * Pure, and deliberately so: this is the single point where "what the forest
+ * declares" turns into "what LaTeX is asked to compile", which makes it the thing a
+ * parity test has to be able to call without a running editor.
+ */
+export function buildLatexDocument(options: LatexDocumentOptions): string {
+   const { documentClass, documentClassOptions, macroPreamble, snippetPreamble, body, foregroundColor } = options;
+
+   const needsQuiverPreamble = quiverProbePattern.test([macroPreamble, snippetPreamble, body].join("\n"));
+   const classOptions = documentClassOptions.join(",");
+   const classDecl = classOptions.length > 0
+      ? `\\documentclass[${classOptions}]{${documentClass}}`
+      : `\\documentclass{${documentClass}}`;
+
+   const userPreambleSections = [macroPreamble, snippetPreamble].filter(section => section.trim().length > 0);
+
+   return [
+      classDecl,
+      "",
+      "\\usepackage{iftex}",
+      "\\ifPDFTeX",
+      "  \\usepackage[T1]{fontenc}",
+      "  \\usepackage[utf8]{inputenc}",
+      "\\else",
+      "  \\usepackage{fontspec}",
+      "\\fi",
+      "",
+      "\\usepackage{xcolor}",
+      "\\usepackage{amsmath,amssymb,mathtools}",
+      "",
+      ...userPreambleSections,
+      ...(needsQuiverPreamble
+         ? [
+            "\\makeatletter",
+            "\\@ifpackageloaded{quiver}{}{\\IfFileExists{quiver.sty}{\\usepackage{quiver}}{}}",
+            "\\makeatother",
+            "",
+         ]
+         : []),
+      "",
+      ...compatibilityShims,
+      "",
+      "\\begin{document}",
+      `\\color{${foregroundColor}}`,
+      body,
+      "\\end{document}",
+      "",
+   ].join("\n");
+}

@@ -14,7 +14,9 @@ import {
    ForesterMacroDefinition,
    ForesterPutAssignment,
    HoverTexSnippet,
+   LatexFailure,
    buildLatexDocument,
+   classifyLatexFailure,
    composeTexInputs,
    buildLatexMacroPreamble,
    buildRenderableLatexBody,
@@ -115,6 +117,7 @@ const defaultLatexRenderConfig: LatexRenderConfig = {
 const maxImportDepth = 16;
 const latexConfigCacheTtlMs = 2000;
 const renderFailureBackoffMs = 15000;
+const issuesUrl = "https://github.com/KaiErikNiermann/topos-vscode-forester/issues";
 
 function getErrorMessage(error: unknown): string {
    if (error instanceof Error) {
@@ -172,6 +175,9 @@ export class ForesterLatexHoverService implements vscode.Disposable {
 
    private readonly warnedMissingCommands = new Set<string>();
    private readonly failedRenderCooldownUntil = new Map<string, number>();
+   private readonly rememberedFailures = new Map<string, LatexFailure>();
+   /** The command whose spawn last failed, so ENOENT can be attributed to it. */
+   private lastFailedCommand: string | undefined;
    private readonly disposables: vscode.Disposable[] = [];
 
    constructor(private readonly context: vscode.ExtensionContext) {
@@ -230,6 +236,9 @@ export class ForesterLatexHoverService implements vscode.Disposable {
 
       let cacheKey: string | undefined;
       let snippetKind: HoverTexSnippet["kind"] | undefined;
+      // Kept outside the try so the catch can anchor a diagnostic hover to the span
+      // the author is actually pointing at.
+      let snippetRange: vscode.Range | undefined;
 
       try {
          const contextData = await this.buildMacroContext(document, text);
@@ -240,6 +249,10 @@ export class ForesterLatexHoverService implements vscode.Disposable {
 
          const { snippet, puts } = snippetResolution;
          snippetKind = snippet.kind;
+         snippetRange = new vscode.Range(
+            document.positionAt(snippet.range.start),
+            document.positionAt(snippet.range.end),
+         );
          const latexConfig = await this.getLatexConfig();
 
          const snippetPreamble = this.buildSnippetPreamble(snippet, puts, contextData.macros);
@@ -260,8 +273,9 @@ export class ForesterLatexHoverService implements vscode.Disposable {
          });
 
          cacheKey = this.computeCacheKey(snippet, latexSource, latexConfig, themeForeground);
-         if (this.isInFailureCooldown(cacheKey)) {
-            return undefined;
+         const remembered = this.rememberedFailure(cacheKey);
+         if (remembered) {
+            return new vscode.Hover(this.buildFailureMarkdown(remembered), snippetRange);
          }
 
          const dataUri = await this.getOrRenderSvgDataUri(cacheKey, latexSource, latexConfig, token);
@@ -274,27 +288,30 @@ export class ForesterLatexHoverService implements vscode.Disposable {
          markdown.supportHtml = true;
          markdown.appendMarkdown(`<img src="${dataUri}" alt="LaTeX preview"/>`);
 
-         const range = new vscode.Range(
-            document.positionAt(snippet.range.start),
-            document.positionAt(snippet.range.end),
-         );
-
-         return new vscode.Hover(markdown, range);
+         return new vscode.Hover(markdown, snippetRange);
       } catch (error) {
          const message = getErrorMessage(error);
          if (token.isCancellationRequested || message.startsWith("Command cancelled:")) {
             return undefined;
          }
 
-         if (cacheKey) {
-            this.failedRenderCooldownUntil.set(cacheKey, Date.now() + renderFailureBackoffMs);
-         }
          this.logger.error("hover_render_failed", {
             message,
             file: document.fileName,
             snippetKind,
          });
-         return undefined;
+
+         // A span that will not compile is the case worth explaining: the author sees
+         // a preview everywhere else, so silence here reads as "hover is broken"
+         // rather than "this span needs something the preview cannot see".
+         const failure = classifyLatexFailure(message, this.lastFailedCommand);
+         if (cacheKey) {
+            this.failedRenderCooldownUntil.set(cacheKey, Date.now() + renderFailureBackoffMs);
+            this.rememberedFailures.set(cacheKey, failure);
+         }
+         return snippetRange
+            ? new vscode.Hover(this.buildFailureMarkdown(failure), snippetRange)
+            : undefined;
       }
    }
 
@@ -382,18 +399,52 @@ export class ForesterLatexHoverService implements vscode.Disposable {
       return resolveProjectPreamble(macros, puts, preferred.length > 0 ? preferred : undefined);
    }
 
-   private isInFailureCooldown(cacheKey: string): boolean {
+   /**
+    * The diagnosis for a span still inside its retry backoff, if there is one.
+    *
+    * The backoff exists so a span that cannot compile is not recompiled on every
+    * mouse-over. Re-showing the diagnosis costs nothing and keeps the explanation on
+    * screen for as long as the failure is real.
+    */
+   private rememberedFailure(cacheKey: string): LatexFailure | undefined {
       const blockedUntil = this.failedRenderCooldownUntil.get(cacheKey);
       if (!blockedUntil) {
-         return false;
+         return undefined;
       }
 
       if (blockedUntil <= Date.now()) {
          this.failedRenderCooldownUntil.delete(cacheKey);
-         return false;
+         this.rememberedFailures.delete(cacheKey);
+         return undefined;
       }
 
-      return true;
+      return this.rememberedFailures.get(cacheKey);
+   }
+
+   /**
+    * The hover shown in place of a preview that did not render.
+    *
+    * Says what went wrong, what to do about it, and — only when there is nothing
+    * actionable to say — points at the issue tracker. Offering the tracker for a
+    * missing package the author can install would just be noise.
+    */
+   private buildFailureMarkdown(failure: LatexFailure): vscode.MarkdownString {
+      const markdown = new vscode.MarkdownString();
+      markdown.isTrusted = true;
+      markdown.appendMarkdown(`$(warning) ${failure.summary}.`);
+
+      if (failure.hint.length > 0) {
+         markdown.appendMarkdown(`\n\n${failure.hint}`);
+      }
+
+      if (failure.kind === "unknown") {
+         markdown.appendMarkdown(
+            `\n\nThe LaTeX log is in the **Forester LaTeX Hover** output channel.` +
+            ` If the span looks like it should render, please [report it](${issuesUrl}).`,
+         );
+      }
+
+      return markdown;
    }
 
    private handleUriChanged(uri: vscode.Uri): void {
@@ -982,6 +1033,7 @@ export class ForesterLatexHoverService implements vscode.Disposable {
 
          child.on("error", (error) => {
             cancellation?.dispose();
+            this.lastFailedCommand = command;
             this.maybeWarnMissingCommand(command, error);
             reject(error);
          });

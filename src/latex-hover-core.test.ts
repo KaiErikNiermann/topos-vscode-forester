@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
    buildLatexDocument,
+   classifyLatexFailure,
    aliasStructuralPrimitiveCalls,
    collectDefinedStructuralPrimitives,
    composeTexInputs,
@@ -613,6 +614,50 @@ test("leaves the environment alone when there is nothing to add", () => {
 
 test("does not repeat a directory listed twice", () => {
    assert.equal(composeTexInputs(["/forest/tex", "/forest/tex"]), "/forest/tex//:");
+});
+
+
+// ── Failure diagnosis ─────────────────────────────────────────────────────────
+
+test("names the .sty a preview cannot see", () => {
+   const failure = classifyLatexFailure(
+      "! LaTeX Error: File `polydiv.sty' not found.\n\nType X to quit",
+   );
+   assert.equal(failure.kind, "missing-package");
+   assert.equal(failure.subject, "polydiv.sty");
+   assert.ok(failure.hint.includes("texInputs"));
+});
+
+test("names an undefined command", () => {
+   const failure = classifyLatexFailure(
+      "! Undefined control sequence.\nl.42 \\(\\htmlData",
+   );
+   assert.equal(failure.kind, "undefined-command");
+   assert.equal(failure.subject, "\\htmlData");
+});
+
+test("explains a structural primitive rather than calling it undefined", () => {
+   const failure = classifyLatexFailure("! Undefined control sequence.\nl.7 x \\noalign");
+   assert.equal(failure.kind, "structural-primitive");
+   assert.ok(failure.summary.includes("TeX primitive"));
+});
+
+test("names an undefined environment", () => {
+   const failure = classifyLatexFailure("! LaTeX Error: Environment polydivision undefined.");
+   assert.equal(failure.kind, "undefined-environment");
+   assert.equal(failure.subject, "polydivision");
+});
+
+test("attributes a missing binary to the command that failed", () => {
+   const failure = classifyLatexFailure("spawn dvisvgm ENOENT", "dvisvgm");
+   assert.equal(failure.kind, "missing-tool");
+   assert.equal(failure.subject, "dvisvgm");
+});
+
+test("a log it cannot read stays unknown rather than guessing", () => {
+   const failure = classifyLatexFailure("! Emergency stop.\n! ==> Fatal error occurred");
+   assert.equal(failure.kind, "unknown");
+   assert.equal(failure.hint, "");
 });
 
 console.log(`\\nTests passed: ${testsPassed}`);

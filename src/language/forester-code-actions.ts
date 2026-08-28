@@ -4,6 +4,7 @@
  * Quick fixes (triggered by Langium validation diagnostics):
  *
  *   • 'missing-import'  (hint)    → "Add \import{treeId}"
+ *   • 'handrolled-macro'          → "Replace \mathbb{N} with \N"
  *   • 'unknown-command' (warning) → "Create definition for \foo"
  *   • 'unknown-command' (warning) → "Qualify as \prefix/foo"
  *
@@ -65,6 +66,30 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
                                     range: { start: insertPos, end: insertPos },
                                     newText: `\\import{${treeId}}\n`,
                                 },
+                            ],
+                        },
+                    },
+                });
+            }
+
+            // ── "Replace \mathbb{N} with \N" ───────────────────────────────
+            // The diagnostic's own range is the matched expansion, so the fix is a
+            // straight substitution. `replacement` is null when the expansion maps to
+            // more than one macro — report it, but never guess which was meant.
+            if (diagnostic.code === 'handrolled-macro') {
+                const data = diagnostic.data as { replacement?: string | null } | undefined;
+                if (!data?.replacement) {continue;}
+
+                const { replacement } = data;
+                result.push({
+                    title: `Replace with ${replacement}`,
+                    kind: 'quickfix',
+                    diagnostics: [diagnostic],
+                    isPreferred: true,
+                    edit: {
+                        changes: {
+                            [document.uri.toString()]: [
+                                { range: diagnostic.range, newText: replacement },
                             ],
                         },
                     },

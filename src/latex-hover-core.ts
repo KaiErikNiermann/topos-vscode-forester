@@ -983,3 +983,74 @@ export function composeTexInputs(
    const tail = inherited && inherited.trim().length > 0 ? inherited : "";
    return `${entries.join(":")}:${tail}`;
 }
+
+// ── Project preamble discovery ───────────────────────────────────────────────
+
+/** Preamble-shaped: it configures the document rather than typesetting anything. */
+const preambleShapedBody = /\\(?:usepackage|RequirePackage|providecommand|newcommand|renewcommand|DeclareMathOperator|tikzset|usetikzlibrary|definecolor|makeatletter)\b/;
+
+/** Forester's convention for a preamble macro: `\latex-preamble`, `\preamble`, `\tex-preamble`. */
+const preambleMacroName = /(?:^|\/)(?:[a-z]+-)?preamble$/i;
+
+/**
+ * The macro a forest means as "the preamble", if it has one.
+ *
+ * A `\tex{…}{…}` snippet names its own preamble, so it renders with whatever the
+ * forest declared. A `#{…}` math span names nothing — and forester never compiles one
+ * through LaTeX at all, it hands them to KaTeX in the browser, so there is no existing
+ * answer to inherit. That is why math previews fail on exactly the spans that need the
+ * forest most: a symbol from a `.sty`, a `\usepackage`d package, a `\providecommand`
+ * shim. Rendering one through LaTeX means picking the preamble forester never had to.
+ *
+ * Chosen by name, because that is the only signal a forest actually gives:
+ *
+ *   1. `preferred`, when the user named a macro in settings — always wins.
+ *   2. A preamble-shaped, zero-argument macro whose name reads as a preamble.
+ *      Fewest path segments first, so the base `\latex-preamble` beats the
+ *      `\latex-preamble/mathpar` variant, then longest body, which prefers the
+ *      variant that declares the most over a near-empty placeholder.
+ *
+ * Zero-argument only: a preamble that takes arguments is a template for one
+ * construct, not the forest's ambient environment.
+ *
+ * Returns undefined when nothing qualifies — a forest with no preamble macro is
+ * normal, and the built-in amsmath/amssymb/mathtools base still renders most spans.
+ */
+export function selectProjectPreambleMacro(
+   definitions: ReadonlyMap<string, ForesterMacroDefinition>,
+   preferred?: string,
+): ForesterMacroDefinition | undefined {
+   if (preferred) {
+      const explicit = definitions.get(preferred.replace(/^\\/, ""));
+      if (explicit) { return explicit; }
+   }
+
+   const candidates = [...definitions.values()].filter(
+      (definition) =>
+         definition.args.length === 0 &&
+         preambleMacroName.test(definition.name) &&
+         preambleShapedBody.test(definition.body),
+   );
+   if (candidates.length === 0) { return undefined; }
+
+   return candidates.sort((a, b) => {
+      const depth = a.name.split("/").length - b.name.split("/").length;
+      return depth !== 0 ? depth : b.body.length - a.body.length;
+   })[0];
+}
+
+/**
+ * Resolve the forest's preamble macro into LaTeX ready to sit in a document.
+ *
+ * Reuses {@link resolveForesterPreamble}, so a preamble assembled from other macros
+ * (`\latex-preamble{ \latex-preamble/shims … }`, the usual shape) is expanded the same
+ * way a `\tex` snippet's own preamble is.
+ */
+export function resolveProjectPreamble(
+   definitions: ReadonlyMap<string, ForesterMacroDefinition>,
+   puts: ReadonlyMap<string, string>,
+   preferred?: string,
+): string {
+   const macro = selectProjectPreambleMacro(definitions, preferred);
+   return macro ? resolveForesterPreamble(macro.body, puts, definitions) : "";
+}

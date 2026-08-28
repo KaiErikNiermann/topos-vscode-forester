@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
    buildLatexDocument,
+   composeTexInputs,
    buildLatexMacroPreamble,
    buildRenderableLatexBody,
    convertForesterMacroToLatexCommand,
@@ -13,7 +14,10 @@ import {
    parseForesterMacroDefinitions,
    parseForesterPutAssignments,
    resolveForesterPreamble,
+   resolveProjectPreamble,
+   selectProjectPreambleMacro,
    substituteForesterMacroArgs,
+   type ForesterMacroDefinition,
 } from "./latex-hover-core";
 
 let testsPassed = 0;
@@ -489,6 +493,87 @@ test("shims KaTeX's \\htmlData so \\notation-wrapped symbols render", () => {
    });
 
    assert.ok(source.includes("\\providecommand{\\htmlData}[2]{#2}"));
+});
+
+
+// ── Project preamble discovery ────────────────────────────────────────────────
+
+function macroMap(source: string): Map<string, ForesterMacroDefinition> {
+   return new Map(parseForesterMacroDefinitions(source).map(d => [d.name, d]));
+}
+
+test("discovers the forest's preamble macro by name and shape", () => {
+   const macros = macroMap(
+      "\\def\\latex-preamble{\\startverb\\usepackage{stmaryrd}\\stopverb}\n" +
+      "\\def\\N{\\mathbb{N}}",
+   );
+   assert.equal(selectProjectPreambleMacro(macros)?.name, "latex-preamble");
+});
+
+test("prefers the base preamble over a variant", () => {
+   const macros = macroMap(
+      "\\def\\latex-preamble/mathpar{\\startverb\\usepackage{mathpartir}\\stopverb}\n" +
+      "\\def\\latex-preamble{\\startverb\\usepackage{stmaryrd}\\stopverb}",
+   );
+   assert.equal(selectProjectPreambleMacro(macros)?.name, "latex-preamble");
+});
+
+test("an explicitly named macro always wins", () => {
+   const macros = macroMap(
+      "\\def\\latex-preamble{\\startverb\\usepackage{stmaryrd}\\stopverb}\n" +
+      "\\def\\latex-preamble/bnf{\\startverb\\usepackage{simplebnf}\\stopverb}",
+   );
+   assert.equal(selectProjectPreambleMacro(macros, "latex-preamble/bnf")?.name, "latex-preamble/bnf");
+   // A leading backslash is how a user would write it in settings.
+   assert.equal(selectProjectPreambleMacro(macros, "\\latex-preamble/bnf")?.name, "latex-preamble/bnf");
+});
+
+test("a macro that only typesets is not a preamble", () => {
+   // Named like one, but declares nothing — a placeholder, not the environment.
+   const macros = macroMap("\\def\\my-preamble{\\mathbb{N}}");
+   assert.equal(selectProjectPreambleMacro(macros), undefined);
+});
+
+test("a preamble taking arguments is a template, not the environment", () => {
+   const macros = macroMap("\\def\\preamble[opts]{\\startverb\\usepackage{\\opts}\\stopverb}");
+   assert.equal(selectProjectPreambleMacro(macros), undefined);
+});
+
+test("a forest with no preamble macro resolves to nothing", () => {
+   assert.equal(resolveProjectPreamble(macroMap("\\def\\N{\\mathbb{N}}"), new Map()), "");
+});
+
+test("resolves a preamble assembled from other macros", () => {
+   const macros = macroMap(
+      "\\def\\latex-preamble/shims{\\startverb\\providecommand{\\htmlData}[2]{#2}\\stopverb}\n" +
+      "\\def\\latex-preamble{\\latex-preamble/shims\\startverb\\usepackage{stmaryrd}\\stopverb}",
+   );
+   const resolved = resolveProjectPreamble(macros, new Map());
+   assert.ok(resolved.includes("\\usepackage{stmaryrd}"));
+   assert.ok(resolved.includes("\\providecommand{\\htmlData}"));
+});
+
+// ── TEXINPUTS ─────────────────────────────────────────────────────────────────
+
+test("composes a recursive, system-preserving TEXINPUTS", () => {
+   const value = composeTexInputs(["/forest/tex", "/forest/theme"]);
+   // `//` recurses; the trailing separator appends the system tree rather than
+   // replacing it, so ordinary packages keep resolving.
+   assert.equal(value, "/forest/tex//:/forest/theme//:");
+});
+
+test("keeps an inherited TEXINPUTS after the forest's own directories", () => {
+   const value = composeTexInputs(["/forest/tex"], "/opt/texmf//:");
+   assert.equal(value, "/forest/tex//:/opt/texmf//:");
+});
+
+test("leaves the environment alone when there is nothing to add", () => {
+   assert.equal(composeTexInputs([]), undefined);
+   assert.equal(composeTexInputs(["", "  "]), undefined);
+});
+
+test("does not repeat a directory listed twice", () => {
+   assert.equal(composeTexInputs(["/forest/tex", "/forest/tex"]), "/forest/tex//:");
 });
 
 console.log(`\\nTests passed: ${testsPassed}`);

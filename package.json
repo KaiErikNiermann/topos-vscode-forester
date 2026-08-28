@@ -272,6 +272,22 @@
           "default": true,
           "description": "Render LaTeX previews on hover for #{...}, ##{...}, and \\tex{...}{...}."
         },
+        "forester.hover.latex.useProjectPreamble": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render #{...} and ##{...} previews against the forest's own preamble macro, so a math span sees the same packages and \\providecommand shims the forest declares. Forester itself renders inline math with KaTeX and never builds a LaTeX document for it, so without this a math preview only gets amsmath, amssymb and mathtools."
+        },
+        "forester.hover.latex.preambleMacro": {
+          "type": "string",
+          "default": "",
+          "description": "Name of the macro to use as the forest's preamble, e.g. 'latex-preamble'. Leave empty to discover it: a zero-argument macro whose name reads as a preamble and whose body declares packages or commands."
+        },
+        "forester.hover.latex.texInputs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Extra directories to put on TEXINPUTS when compiling a preview, absolute or relative to the workspace root. Previews compile in a scratch directory, so a .sty kept in the forest is otherwise invisible to \\usepackage. Directories in the workspace root that contain a .sty or .cls are added automatically."
+        },
         "forester.inlayHints.tagClosures.enabled": {
           "type": "boolean",
           "default": true,

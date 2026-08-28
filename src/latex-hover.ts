@@ -15,6 +15,7 @@ import {
    ForesterPutAssignment,
    HoverTexSnippet,
    buildLatexDocument,
+   composeTexInputs,
    buildLatexMacroPreamble,
    buildRenderableLatexBody,
    extractLatexDefinedCommandNames,
@@ -25,6 +26,7 @@ import {
    parseForesterMacroDefinitions,
    parseForesterPutAssignments,
    resolveForesterPreamble,
+   resolveProjectPreamble,
    substituteForesterMacroArgs,
 } from "./latex-hover-core";
 // ── Langium hover integration (tasks 4–7) ─────────────────────────────────────
@@ -90,6 +92,8 @@ interface ExecProcessOptions {
    cwd: string
    input?: Uint8Array
    token?: vscode.CancellationToken
+   /** Prepended to the child's environment; carries TEXINPUTS for `latex`. */
+   env?: NodeJS.ProcessEnv
 }
 
 const defaultLatexRenderConfig: LatexRenderConfig = {
@@ -162,6 +166,8 @@ export class ForesterLatexHoverService implements vscode.Disposable {
    private treeIndexDirty = true;
 
    private latexConfigCache: { loadedAt: number; config: LatexRenderConfig } | null = null;
+
+   private texInputsCache: { loadedAt: number; value: string | undefined } | null = null;
 
    private readonly warnedMissingCommands = new Set<string>();
    private readonly failedRenderCooldownUntil = new Map<string, number>();
@@ -339,6 +345,16 @@ export class ForesterLatexHoverService implements vscode.Disposable {
       };
    }
 
+   /**
+    * The preamble a snippet renders against.
+    *
+    * A `\tex{…}{…}` carries its own — that is its first argument, and the forest
+    * already decided what belongs there. A math span carries nothing, because forester
+    * hands `#{…}` to KaTeX in the browser and never builds a LaTeX document for it, so
+    * previewing one here means supplying the preamble that never existed. Falling back
+    * to the forest's own declared preamble is what keeps a math preview in parity with
+    * the packages, `.sty` shims and `\providecommand`s the forest set up.
+    */
    private buildSnippetPreamble(
       snippet: HoverTexSnippet,
       puts: ReadonlyMap<string, string>,
@@ -346,7 +362,20 @@ export class ForesterLatexHoverService implements vscode.Disposable {
    ): string {
       return match(snippet)
          .with({ kind: "tex" }, ({ preamble }) => resolveForesterPreamble(preamble, puts, macros))
-         .otherwise(() => "");
+         .otherwise(() => this.buildProjectPreamble(puts, macros));
+   }
+
+   private buildProjectPreamble(
+      puts: ReadonlyMap<string, string>,
+      macros: ReadonlyMap<string, ForesterMacroDefinition>,
+   ): string {
+      const config = vscode.workspace.getConfiguration("forester");
+      if (!config.get<boolean>("hover.latex.useProjectPreamble", true)) {
+         return "";
+      }
+
+      const preferred = config.get<string>("hover.latex.preambleMacro", "").trim();
+      return resolveProjectPreamble(macros, puts, preferred.length > 0 ? preferred : undefined);
    }
 
    private isInFailureCooldown(cacheKey: string): boolean {
@@ -374,6 +403,11 @@ export class ForesterLatexHoverService implements vscode.Disposable {
 
       if (basename(uri.fsPath).endsWith(".toml")) {
          this.latexConfigCache = null;
+      }
+
+      // A newly added or removed .sty changes the search path, not the config.
+      if (/\.(sty|cls)$/.test(uri.fsPath)) {
+         this.texInputsCache = null;
       }
    }
 
@@ -632,6 +666,80 @@ export class ForesterLatexHoverService implements vscode.Disposable {
       return [...fallback];
    }
 
+   /**
+    * Directories to put on the TeX search path, in precedence order: whatever the user
+    * configured, then any directory in the forest that actually holds a `.sty` or
+    * `.cls`.
+    *
+    * Discovery is shallow on purpose — one level of the workspace root, which is where
+    * forests keep `tex/` and `theme/` — because kpathsea recurses into each entry
+    * anyway, and a deep walk of a forest with a `build/` tree of thousands of
+    * generated files would cost more than the render it is trying to enable.
+    */
+   private async resolveTexInputs(): Promise<string | undefined> {
+      const now = Date.now();
+      if (this.texInputsCache && now - this.texInputsCache.loadedAt <= latexConfigCacheTtlMs) {
+         return this.texInputsCache.value;
+      }
+
+      const directories: string[] = [];
+      try {
+         const root = getRoot();
+         const configured = vscode.workspace
+            .getConfiguration("forester")
+            .get<string[]>("hover.latex.texInputs", []);
+
+         for (const entry of configured) {
+            if (typeof entry !== "string" || entry.trim().length === 0) { continue; }
+            directories.push(
+               path.isAbsolute(entry) ? entry : join(root.fsPath, entry),
+            );
+         }
+
+         for (const dir of await this.discoverStyleDirectories(root)) {
+            directories.push(dir);
+         }
+      } catch {
+         // No workspace folder — nothing to add, and the fallback is the system path.
+      }
+
+      const value = composeTexInputs(directories, process.env.TEXINPUTS);
+      this.texInputsCache = { loadedAt: now, value };
+      if (value) {
+         this.logger.info("texinputs_resolved", { value });
+      }
+      return value;
+   }
+
+   private async discoverStyleDirectories(root: vscode.Uri): Promise<string[]> {
+      const skipped = new Set(["node_modules", ".git", "build", "output", "_tmp", "out", "dist"]);
+      const found: string[] = [];
+
+      let entries: [string, vscode.FileType][];
+      try {
+         entries = await vscode.workspace.fs.readDirectory(root);
+      } catch {
+         return found;
+      }
+
+      for (const [name, type] of entries) {
+         if (type !== vscode.FileType.Directory || skipped.has(name) || name.startsWith(".")) {
+            continue;
+         }
+         const child = vscode.Uri.joinPath(root, name);
+         try {
+            const contents = await vscode.workspace.fs.readDirectory(child);
+            if (contents.some(([file]) => file.endsWith(".sty") || file.endsWith(".cls"))) {
+               found.push(child.fsPath);
+            }
+         } catch {
+            // Unreadable directory — skip it rather than failing the whole render.
+         }
+      }
+
+      return found;
+   }
+
    private getThemeForegroundColor(): "black" | "white" {
       return match(vscode.window.activeColorTheme.kind)
          .with(vscode.ColorThemeKind.Dark, vscode.ColorThemeKind.HighContrast, () => "white" as const)
@@ -766,8 +874,14 @@ export class ForesterLatexHoverService implements vscode.Disposable {
       const hasInputFile = rawArgs.some(arg => arg.endsWith(".tex"));
       const args = hasInputFile ? rawArgs : [...rawArgs, "job.tex"];
 
+      const texInputs = await this.resolveTexInputs();
+
       try {
-         await this.executeProcess(command, args, { cwd: workDir, token });
+         await this.executeProcess(command, args, {
+            cwd: workDir,
+            token,
+            ...(texInputs ? { env: { TEXINPUTS: texInputs } } : {}),
+         });
       } catch (error) {
          const logPath = join(workDir, "job.log");
          let logTail = "";
@@ -842,6 +956,7 @@ export class ForesterLatexHoverService implements vscode.Disposable {
          const child = spawn(command, args, {
             cwd: options.cwd,
             stdio: "pipe",
+            env: options.env ? { ...process.env, ...options.env } : undefined,
          });
 
          const stdoutChunks: Buffer[] = [];

@@ -70,6 +70,15 @@ jobs:
       - name: TextMate grammar scope tests
         run: pnpm run test:tmgrammar
 
+      # Cross-repo contract: these two must agree with the notes-repo detector's
+      # golden fixture, and the validation suite is what proves the diagnostic
+      # actually fires through Langium rather than merely compiling.
+      - name: Macro-index cross-repo contract tests
+        run: pnpm run test:macro-index
+
+      - name: Langium validation tests
+        run: pnpm run test:langium-validation
+
       # Auto-closing is the editor's behaviour, not the extension's, so these
       # run a real VS Code — which needs a display even headless.
       - name: Editor auto-closing tests

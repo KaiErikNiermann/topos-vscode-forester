@@ -122,3 +122,38 @@ pnpm run lint              # show remaining issues
 ```
 
 The post-edit Claude hook (`.claude/hooks/post-edit.sh`) runs `eslint --fix` automatically after every file edit and prints any remaining issues with a haiku invocation hint.
+
+### LaTeX hover: parity with the forest's TeX environment
+
+`#{…}` and `##{…}` never reach LaTeX in a real forest — forester hands inline
+math to KaTeX in the browser. The hover *does* compile them, so it has to
+supply an environment forester never had to, and that is where previews break:
+
+- **Structural TeX primitives.** A forest writes macros for KaTeX, where `\span`
+  is a free name (the linear-algebra operator). In TeX it is what `\halign` uses
+  to read an alignment preamble, so defining it broke every `align`, `array` and
+  `tabular` preview in the forest — reported at the `\end{align*}`, nowhere near
+  the macro at fault. `structuralTexPrimitives` in `latex-hover-core.ts` lists
+  the names that must not be taken; they are defined under a `\foresterprim…`
+  alias and their **math** call sites rewritten, since math is exactly where
+  forester would have expanded the macro. A raw `!{…}` group keeps the
+  primitive — forester expands nothing there.
+- **The project preamble.** A `\tex{…}{…}` names its own preamble; a math span
+  names nothing, so it used to compile against amsmath/amssymb/mathtools alone.
+  `selectProjectPreambleMacro` finds the forest's preamble macro by name and
+  shape (`forester.hover.latex.preambleMacro` overrides).
+- **TEXINPUTS.** Previews compile in a scratch directory, so a `.sty` kept in
+  the forest is invisible to `\usepackage`. Workspace-root directories holding
+  a `.sty`/`.cls` are added automatically; `forester.hover.latex.texInputs`
+  extends that. (Forester itself has the same constraint, which is why a forest
+  may have inlined a package into its preamble tree as a workaround.)
+- **Failures are shown, not swallowed.** `classifyLatexFailure` turns a LaTeX
+  log into an actionable hover; only the unclassifiable case offers the issue
+  tracker.
+
+Anything touching the assembled document should be checked against a real
+forest, not just the unit tests — neither bug above is visible in a single span:
+
+```bash
+FOREST=~/notes pnpm run test:hover-corpus
+```

@@ -6,6 +6,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { parseTaxonAndTitle, getPrefix, getRootTreeDirectory, getAvailableTemplates } from "./utils";
 import { command, getTree } from "./get-forest";
+import { checkCreateTarget, checkPathClaimsTree, checkOnlyEditableLinesChanged } from "./safe-tree-write-core";
 
 /**
  * Open and focus a newly created tree file based on configuration
@@ -328,12 +329,9 @@ async function createNewTree(options: CreateNewTreeOptions = {}): Promise<{ tree
       // forest index, and a stale index hands back an address that is already
       // spent — so make sure the path it returned really is new. Overwriting a
       // tree that predates this command would destroy it with no undo.
-      if (preExistingTrees.has(uri.fsPath)) {
-         vscode.window.showErrorMessage(
-            `Refusing to create tree "${treeId}": ${newTreeFilePath} already existed before ` +
-            `this command ran. forester allocated an address that is already in use; ` +
-            `the existing tree has been left untouched.`
-         );
+      const createVerdict = checkCreateTarget(uri.fsPath, preExistingTrees);
+      if (!createVerdict.ok) {
+         vscode.window.showErrorMessage(createVerdict.reason);
          return undefined;
       }
 
@@ -606,6 +604,23 @@ export async function renameTreeById(treeId: string): Promise<void> {
 
    // Write the updated content back using WorkspaceEdit to trigger file events
    const updatedContent = lines.join('\n');
+
+   // `overwrite: true` replaces the whole file with no editor undo, so both
+   // invariants are checked immediately before the write rather than trusting
+   // how resolvedPath was derived: the file must be the one that claims this
+   // address, and the rewrite must have touched nothing but \title/\taxon.
+   // Together these make "one tree's content lands on another file" — the
+   // 977eefb / 700c5b5 / 2026-09-06 failure — structurally impossible.
+   for (const verdict of [
+      checkPathClaimsTree(resolvedPath, treeId),
+      checkOnlyEditableLinesChanged(text, updatedContent),
+   ]) {
+      if (!verdict.ok) {
+         vscode.window.showErrorMessage(`Cannot rename "${treeId}": ${verdict.reason}`);
+         return;
+      }
+   }
+
    const edit = new vscode.WorkspaceEdit();
    edit.createFile(vscode.Uri.file(resolvedPath), { overwrite: true, contents: new Uint8Array(Buffer.from(updatedContent, 'utf-8')) });
    await vscode.workspace.applyEdit(edit);

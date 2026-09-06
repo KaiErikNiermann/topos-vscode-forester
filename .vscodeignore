@@ -26,3 +26,20 @@ forester-graph/dist/**
 # that `forester.exportGraphView` can copy its files into a user-chosen
 # folder without requiring the source repo or pnpm.
 !dist/graph-view/**
+
+# Repo/dev cruft that has no business in a published .vsix. The marketplace
+# README pulls its screenshots from raw.githubusercontent.com absolute URLs,
+# so demo/ ships nothing the listing needs.
+.remember/**
+.claude/**
+.husky/**
+.github/**
+.languagecheck.db
+CLAUDE.md
+Justfile
+esbuild.js
+langium-config.json
+pnpm-lock.yaml
+scripts/**
+test/**
+demo/**

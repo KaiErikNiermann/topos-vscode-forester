@@ -34,6 +34,7 @@ import { BacklinksTreeProvider } from "./backlinks-view";
 import { ContributorsTreeProvider } from "./contributors-view";
 import { evalDatalogQuery } from "./datalog-query-runner";
 import { initForesterDiagnostics } from "./forester-diagnostics";
+import { findSubtreeDeclaration, mayContainSubtree } from "./subtree-location-core";
 
 const textDecoder = new TextDecoder("utf-8");
 
@@ -145,6 +146,65 @@ async function findMacroDefinitionLocations(macroName: string, originRange?: vsc
    }
 
    return locationLinks;
+}
+
+/**
+ * Resolve a tree address that has no `<id>.tree` file of its own by locating the
+ * inline `\subtree[id]{…}` that declares it.
+ *
+ * `sourcePath` is the forest's own answer for which file holds the tree (for an
+ * inline subtree forester reports the *parent* file), so it is tried first; the
+ * workspace scan is the fallback for when the forest cache is stale or absent.
+ */
+async function findInlineSubtreeLocation(
+   treeId: string,
+   sourcePath?: string,
+): Promise<vscode.Location | undefined> {
+   const locate = async (file: vscode.Uri): Promise<vscode.Location | undefined> => {
+      let content: string;
+      try {
+         content = textDecoder.decode(await vscode.workspace.fs.readFile(file));
+      } catch {
+         return undefined;
+      }
+      if (!mayContainSubtree(content, treeId)) {
+         return undefined;
+      }
+      const declaration = findSubtreeDeclaration(content, treeId);
+      if (!declaration) {
+         return undefined;
+      }
+      return new vscode.Location(
+         file,
+         new vscode.Range(
+            new vscode.Position(declaration.start.line, declaration.start.character),
+            new vscode.Position(declaration.end.line, declaration.end.character),
+         ),
+      );
+   };
+
+   if (sourcePath) {
+      const absolute = path.isAbsolute(sourcePath)
+         ? sourcePath
+         : path.join(getRoot().fsPath, sourcePath);
+      const hit = await locate(vscode.Uri.file(absolute));
+      if (hit) {
+         return hit;
+      }
+   }
+
+   const treeFiles = await vscode.workspace.findFiles("**/*.tree", "**/node_modules/**");
+   const BATCH = 32;
+   for (let start = 0; start < treeFiles.length; start += BATCH) {
+      const batch = treeFiles.slice(start, start + BATCH);
+      const hits = await Promise.all(batch.map(locate));
+      const hit = hits.find((location) => location !== undefined);
+      if (hit) {
+         return hit;
+      }
+   }
+
+   return undefined;
 }
 
 // Find the end of a macro definition by tracking brace depth
@@ -598,13 +658,10 @@ export async function activate(context: vscode.ExtensionContext) {
                return;
             }
 
-            // Get the forest
-            let tree = await getTree(treeId);
-            if (!tree) {
-               // Tree not found
-               vscode.window.showInformationMessage(`Tree '${treeId}' not found`);
-               return;
-            }
+            // Get the forest. A missing entry is not fatal: an inline subtree
+            // added since the last successful build is still navigable from its
+            // \subtree[id]{…} declaration, so fall through to that scan.
+            const tree = await getTree(treeId);
 
             // Find the actual file path
             // Trees can be in subdirectories, so we need to search for them
@@ -619,8 +676,18 @@ export async function activate(context: vscode.ExtensionContext) {
                const files = await vscode.workspace.findFiles(pattern, null, 1);
 
                if (files.length === 0) {
+                  // No file of its own — an inline \subtree[id]{…} inside some
+                  // parent file is a tree just as much as a .tree file is, and
+                  // forester's own sourcePath points at that parent.
+                  const subtree = await findInlineSubtreeLocation(treeId, tree?.sourcePath);
+                  if (subtree) {
+                     return subtree;
+                  }
+
                   vscode.window.showInformationMessage(
-                     `File for tree '${treeId}' not found`,
+                     tree
+                        ? `Tree '${treeId}' has no .tree file and no \\subtree[${treeId}] declaration`
+                        : `Tree '${treeId}' not found`,
                   );
                   return;
                }

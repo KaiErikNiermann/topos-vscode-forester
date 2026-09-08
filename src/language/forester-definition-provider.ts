@@ -10,6 +10,8 @@
  *   • \import{tree-id}     → jump to the target .tree file
  *   • \export{tree-id}     → jump to the target .tree file
  *   • \ref{tree-id}        → jump to the target .tree file
+ *   • any of the above whose target is an inline \subtree[tree-id]{…}
+ *     rather than a file → jump to that declaration in its parent file
  *   • Cursor on \macro call → navigate to its \def\macro or \let\macro definition
  */
 import type { DefinitionParams } from 'vscode-languageserver';
@@ -17,6 +19,7 @@ import type { CancellationToken, AstNode, LangiumDocuments, LangiumDocument } fr
 import { CstUtils, AstUtils } from 'langium';
 import type { LangiumServices, DefinitionProvider } from 'langium/lsp';
 import { LocationLink } from 'vscode-languageserver';
+import { findSubtreeDeclaration, mayContainSubtree } from '../subtree-location-core.js';
 import {
     isCommand,
     isBraceArg,
@@ -120,6 +123,39 @@ export class ForesterDefinitionProvider implements DefinitionProvider {
                 const { targetRange, selectionRange } = this.computePeekRange(doc);
                 return [LocationLink.create(doc.uri.toString(), targetRange, selectionRange, sourceRange)];
             }
+        }
+        return this.resolveInlineSubtree(treeId, sourceRange);
+    }
+
+    /**
+     * A tree with no `<id>.tree` file of its own is an inline `\subtree[id]{…}`
+     * living in some parent file; navigate to that declaration.
+     *
+     * The peek range spans the declaration line so the panel shows the subtree's
+     * own header rather than the parent's, and the selection range is the
+     * `\subtree[id]` command itself.
+     */
+    private resolveInlineSubtree(treeId: string, sourceRange: SimpleRange): LocationLink[] | undefined {
+        for (const doc of this.documents.all) {
+            const text = doc.textDocument.getText();
+            if (!mayContainSubtree(text, treeId)) {
+                continue;
+            }
+            const declaration = findSubtreeDeclaration(text, treeId);
+            if (!declaration) {
+                continue;
+            }
+
+            const PEEK_LINES = 12;
+            const selectionRange: SimpleRange = { start: declaration.start, end: declaration.end };
+            const targetRange: SimpleRange = {
+                start: { line: declaration.start.line, character: 0 },
+                end: {
+                    line: Math.min(declaration.start.line + PEEK_LINES, doc.textDocument.lineCount - 1),
+                    character: 0,
+                },
+            };
+            return [LocationLink.create(doc.uri.toString(), targetRange, selectionRange, sourceRange)];
         }
         return undefined;
     }

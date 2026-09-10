@@ -35,8 +35,11 @@ const PATH_ARG_COMMANDS: ReadonlySet<string> = new Set([
     'transclude', 'import', 'export', 'ref',
 ]);
 
-// Definition-introducing keywords whose immediately following Command is the name being bound
-const BINDING_COMMANDS: ReadonlySet<string> = new Set(['\\def', '\\let']);
+// Definition-introducing keywords whose immediately following Command is the name
+// being bound. `\alloc` binds a fresh address rather than a body, but the shape is
+// the same and its name is navigated to the same way — it is the binding site for
+// every `\put`/`\get` that names it.
+const BINDING_COMMANDS: ReadonlySet<string> = new Set(['\\def', '\\let', '\\alloc']);
 
 type SimpleRange = { start: { line: number; character: number }; end: { line: number; character: number } };
 

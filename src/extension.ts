@@ -17,6 +17,7 @@ import { registerSigInlayHints } from "./sig-inlay";
 import { EscapeBraceAutoCloseFeature } from "./escape-brace-autoclose";
 import { SubtreeAutoIdFeature } from "./subtree-auto-id";
 import { ForesterLatexHoverService } from "./latex-hover";
+import { findVerbatimSpans, isInSpans } from "./raw-group";
 import {
    initLinkAliasConfig,
    buildAutocompleteRegex,
@@ -609,6 +610,13 @@ export async function activate(context: vscode.ExtensionContext) {
       { scheme: "file", language: "forester" },
       {
          async provideDefinition(document, position) {
+            // Inside a raw group or a verbatim block nothing is forester — the
+            // body is TeX (or code) the compiler passes through — so neither a
+            // macro call nor a `\ref{…}` in there is a reference to resolve.
+            if (isInSpans(findVerbatimSpans(document.getText()), document.offsetAt(position))) {
+               return;
+            }
+
             // Get the line text
             const line = document.lineAt(position.line).text;
 

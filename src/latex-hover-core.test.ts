@@ -142,6 +142,19 @@ test("converts simple Forester macro definitions into TeX command definitions", 
    assert.equal(latexCommand, "\\expandafter\\def\\csname cf\\endcsname#1{\\texttt{#1}}");
 });
 
+test("a \\def inside a raw group or verbatim block is TeX's, not a forester macro", () => {
+   const content = [
+      "\\def\\st{#{\\ \\textrm{such that}\\ }}",
+      "\\texfig!{\\ifnum\\i=3\\relax\\def\\st{pick}\\else\\def\\st{skip}\\fi}",
+      "\\startverb \\def\\verbatimOnly{x} \\stopverb",
+   ].join("\n");
+
+   const definitions = parseForesterMacroDefinitions(content);
+
+   assert.deepEqual(definitions.map((d) => d.name), ["st"]);
+   assert.equal(definitions[0].body, "#{\\ \\textrm{such that}\\ }");
+});
+
 test("builds TeX macro preamble from mixed Forester definitions", () => {
    const content = [
       "\\def\\cf[arg1]{#{\\texttt{\\arg1}}}",

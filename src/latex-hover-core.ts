@@ -1,5 +1,5 @@
 import { match } from "ts-pattern";
-import { rawGroupEnd } from "./raw-group.js";
+import { findVerbatimSpans, rawGroupEnd } from "./raw-group.js";
 
 export interface TextRange {
    start: number
@@ -403,9 +403,23 @@ export function findForesterMacroCallAtOffset(
 
 export function parseForesterMacroDefinitions(text: string): ForesterMacroDefinition[] {
    const definitions: ForesterMacroDefinition[] = [];
+   // A `\def` inside `!{…}` or a verbatim block is TeX's own, bound in TeX's
+   // namespace — forester expands nothing there, so neither does the preview.
+   // `i` only ever moves forward, so one cursor into the spans suffices.
+   const verbatim = findVerbatimSpans(text);
+   let nextSpan = 0;
 
    let i = 0;
    while (i < text.length) {
+      while (nextSpan < verbatim.length && verbatim[nextSpan]!.endOffset <= i) {
+         nextSpan++;
+      }
+      const span = verbatim[nextSpan];
+      if (span && i >= span.startOffset) {
+         i = span.endOffset;
+         continue;
+      }
+
       if (!text.startsWith("\\def\\", i)) {
          i++;
          continue;

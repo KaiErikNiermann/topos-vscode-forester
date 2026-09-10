@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { hasForestConfig } from "./utils";
+import { findVerbatimSpans, isInSpans } from "./raw-group";
 
 /**
  * Scans workspace for Forester macro definitions and manages the formatter configuration.
@@ -266,11 +267,15 @@ function extractMacrosFromContent(content: string): MacroScanResult {
    // The macro name follows \def\ and consists of alphanumeric characters, hyphens, etc.
    // Pattern: \def\name where name can contain letters, numbers, hyphens
    const defRegex = /\\def\\([A-Za-z][A-Za-z0-9\-]*)/g;
-   
+
+   // A `\def` in a `!{…}` body or a verbatim block is TeX's, and defines no
+   // forester command — so it must not become one the formatter leaves alone.
+   const verbatim = findVerbatimSpans(content);
+
    let match;
    while ((match = defRegex.exec(content)) !== null) {
       const macroName = match[1];
-      if (macroName) {
+      if (macroName && !isInSpans(verbatim, match.index)) {
          macros.add(macroName);
          // Attempt to extract the macro body to detect subtree aliases
          const bodyInfo = extractMacroBody(content, match.index + match[0].length);

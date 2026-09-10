@@ -65,3 +65,59 @@ export function findRawGroupSpans(text: string): RawGroupSpan[] {
 export function isInSpans(spans: readonly RawGroupSpan[], offset: number): boolean {
     return spans.some((s) => offset >= s.startOffset && offset < s.endOffset);
 }
+
+const VERBATIM_HERALD = '\\startverb';
+const VERBATIM_TERMINATOR = '\\stopverb';
+const VERBATIM_FENCE = '```';
+
+/**
+ * Every span forester lexes verbatim: `!{ … }` raw groups, `\startverb … \stopverb`
+ * heralds, and ``` fences.
+ *
+ * Nothing inside one is forester syntax. `\texfig!{ … }` takes a TeX body, so a
+ * `\def\st{pick}` in there is TeX's `\def`, bound in TeX's namespace and passed
+ * through by the compiler untouched — it defines no forester macro. Any scanner
+ * that registers macros by walking raw text has to exclude these spans or it
+ * indexes the wrong language: go-to-definition on a forest's own `\st` was
+ * offering six TikZ-internal bindings from a figure alongside the real one.
+ *
+ * Highlighting is unaffected — this is about what the spans *mean*, not how they
+ * look. The Langium side already gets this right for free, since RAW_GROUP and
+ * VERBATIM_SPAN are single opaque terminals; this is for the regex scanners that
+ * do not go through the parser.
+ *
+ * Spans are returned in source order and never overlap: an unterminated herald
+ * or fence runs to end-of-input, which is what forester's own lexer does with it.
+ */
+export function findVerbatimSpans(text: string): RawGroupSpan[] {
+    const spans: RawGroupSpan[] = [];
+    for (let i = 0; i < text.length; i++) {
+        const end = verbatimSpanEnd(text, i);
+        if (end === null) { continue; }
+        spans.push({ startOffset: i, endOffset: end });
+        i = end - 1;
+    }
+    return spans;
+}
+
+/** Offset just past the verbatim span opening at `offset`, or null for none. */
+function verbatimSpanEnd(text: string, offset: number): number | null {
+    switch (text[offset]) {
+        case '!': {
+            return rawGroupEnd(text, offset);
+        }
+        case '\\': {
+            if (!text.startsWith(VERBATIM_HERALD, offset)) { return null; }
+            const stop = text.indexOf(VERBATIM_TERMINATOR, offset + VERBATIM_HERALD.length);
+            return stop === -1 ? text.length : stop + VERBATIM_TERMINATOR.length;
+        }
+        case '`': {
+            if (!text.startsWith(VERBATIM_FENCE, offset)) { return null; }
+            const close = text.indexOf(VERBATIM_FENCE, offset + VERBATIM_FENCE.length);
+            return close === -1 ? text.length : close + VERBATIM_FENCE.length;
+        }
+        default: {
+            return null;
+        }
+    }
+}

@@ -64,99 +64,6 @@ function suggest(trees: Forest, range: vscode.Range) {
    return results;
 }
 
-function getMacroNameAtPosition(line: string, position: vscode.Position): string | undefined {
-   const match = getMacroMatchAtPosition(line, position);
-   return match?.name;
-}
-
-interface MacroMatch {
-   name: string;
-   start: number;
-   end: number;
-}
-
-function getMacroMatchAtPosition(line: string, position: vscode.Position): MacroMatch | undefined {
-   const macroPattern = /\\([A-Za-z][A-Za-z0-9\-]*)/g;
-   let match: RegExpExecArray | null;
-   while ((match = macroPattern.exec(line)) !== null) {
-      const start = match.index;
-      const end = start + match[0].length;
-      if (position.character >= start && position.character <= end) {
-         return { name: match[1], start, end };
-      }
-   }
-   return undefined;
-}
-
-interface MacroDefinitionInfo {
-   uri: vscode.Uri;
-   definitionRange: vscode.Range;  // Full range of the definition (for highlighting in peek)
-   targetRange: vscode.Range;      // Where to position cursor
-}
-
-async function findMacroDefinitionLocations(macroName: string, originRange?: vscode.Range): Promise<vscode.LocationLink[]> {
-   const workspaceFolders = vscode.workspace.workspaceFolders;
-   if (!workspaceFolders || workspaceFolders.length === 0) {
-      return [];
-   }
-
-   // Match \def\macroName or \alloc\macroName patterns
-   const defRegex = new RegExp(`\\\\(def|alloc)\\\\${macroName}(?![A-Za-z0-9-])`, 'g');
-   const treeFiles = await vscode.workspace.findFiles("**/*.tree", "**/node_modules/**");
-   const locationLinks: vscode.LocationLink[] = [];
-
-   for (const file of treeFiles) {
-      try {
-         const raw = await vscode.workspace.fs.readFile(file);
-         const content = textDecoder.decode(raw);
-         const lines = content.split(/\r?\n/);
-         
-         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            let match;
-            defRegex.lastIndex = 0;
-            
-            while ((match = defRegex.exec(line)) !== null) {
-               const matchStart = match.index;
-               const matchEnd = matchStart + match[0].length;
-               
-               // Find the extent of the full definition (scan for matching braces)
-               const definitionEndLine = findDefinitionEnd(lines, i, matchEnd);
-               
-               const targetRange = new vscode.Range(
-                  new vscode.Position(i, matchStart),
-                  new vscode.Position(i, matchEnd)
-               );
-               
-               const definitionRange = new vscode.Range(
-                  new vscode.Position(i, matchStart),
-                  new vscode.Position(definitionEndLine.line, definitionEndLine.char)
-               );
-               
-               locationLinks.push({
-                  originSelectionRange: originRange,
-                  targetUri: file,
-                  targetRange: definitionRange,      // This is what gets shown in peek
-                  targetSelectionRange: targetRange  // This is what gets highlighted
-               });
-            }
-         }
-      } catch (error) {
-         console.error(`Failed to read ${file.fsPath}:`, error);
-      }
-   }
-
-   return locationLinks;
-}
-
-/**
- * Resolve a tree address that has no `<id>.tree` file of its own by locating the
- * inline `\subtree[id]{…}` that declares it.
- *
- * `sourcePath` is the forest's own answer for which file holds the tree (for an
- * inline subtree forester reports the *parent* file), so it is tried first; the
- * workspace scan is the fallback for when the forest cache is stale or absent.
- */
 async function findInlineSubtreeLocation(
    treeId: string,
    sourcePath?: string,
@@ -208,32 +115,16 @@ async function findInlineSubtreeLocation(
    return undefined;
 }
 
-// Find the end of a macro definition by tracking brace depth
-function findDefinitionEnd(lines: string[], startLine: number, startChar: number): { line: number; char: number } {
-   let depth = 0;
-   let inDefinition = false;
-   
-   for (let lineNum = startLine; lineNum < lines.length && lineNum < startLine + 100; lineNum++) {
-      const line = lines[lineNum];
-      const startCol = lineNum === startLine ? startChar : 0;
-      
-      for (let col = startCol; col < line.length; col++) {
-         const char = line[col];
-         if (char === '{') {
-            depth++;
-            inDefinition = true;
-         } else if (char === '}') {
-            depth--;
-            if (inDefinition && depth === 0) {
-               return { line: lineNum, char: col + 1 };
-            }
-         }
-      }
-   }
-   
-   // Fallback: return end of start line if we can't find matching braces
-   return { line: startLine, char: lines[startLine].length };
-}
+/**
+ * Macro go-to-definition lives in the Langium server (forester-definition-provider),
+ * not here. It resolves `\def` / `\let` / `\alloc` binding sites from the parsed
+ * AST over every indexed workspace document, which means it gets for free what a
+ * regex scan over raw text has to be told: `RAW_GROUP` and `VERBATIM_SPAN` are
+ * opaque terminals, so a `\def\st{pick}` inside a `\texfig!{…}` is TeX and never
+ * becomes a binding. It also reads a slash-bearing name like `\base/tex-preamble`
+ * as one command rather than stopping at the slash. The scan that used to live
+ * here duplicated every real hit it found.
+ */
 
 export async function activate(context: vscode.ExtensionContext) {
    // Set context for conditional visibility - extension only activates when Forester files exist
@@ -619,19 +510,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
             // Get the line text
             const line = document.lineAt(position.line).text;
-
-            // Macro definition lookup
-            const macroMatch = getMacroMatchAtPosition(line, position);
-            if (macroMatch) {
-               const originRange = new vscode.Range(
-                  new vscode.Position(position.line, macroMatch.start),
-                  new vscode.Position(position.line, macroMatch.end)
-               );
-               const macroDefs = await findMacroDefinitionLocations(macroMatch.name, originRange);
-               if (macroDefs.length > 0) {
-                  return macroDefs;
-               }
-            }
 
             // Check for link patterns that contain the cursor position
             // Use configurable patterns from link-aliases-config

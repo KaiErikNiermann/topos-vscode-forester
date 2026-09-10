@@ -483,6 +483,7 @@
     "test:langium-formatter": "pnpm dlx esbuild src/langium-formatter.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-formatter-test.mjs && node out/langium-formatter-test.mjs",
     "test:langium-hover": "pnpm dlx esbuild src/langium-hover.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-hover-test.mjs && node out/langium-hover-test.mjs",
     "test:langium-grammar": "pnpm dlx esbuild src/langium-grammar.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-grammar-test.mjs && node out/langium-grammar-test.mjs",
+    "test:langium-definition": "pnpm run compile && pnpm dlx esbuild src/langium-definition.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-definition-test.mjs && node out/langium-definition-test.mjs",
     "test:langium-validation": "pnpm dlx esbuild src/langium-validation.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/langium-validation-test.mjs && node out/langium-validation-test.mjs",
     "test:hover-corpus": "pnpm dlx esbuild tests/latex-hover-corpus.mts --bundle --format=esm --platform=node --packages=external --outfile=out/latex-hover-corpus.mjs && node out/latex-hover-corpus.mjs",
     "test:corpus": "pnpm dlx esbuild tests/corpus-langium.test.mts --bundle --format=esm --platform=node --packages=external --outfile=out/corpus-langium-test.mjs && node out/corpus-langium-test.mjs",

@@ -70,6 +70,15 @@ jobs:
       - name: TextMate grammar scope tests
         run: pnpm run test:tmgrammar
 
+      - name: Verbatim-span scanner tests
+        run: pnpm run test:raw-group
+
+      # Drives the built server over stdio, so it needs the bundles above. It is
+      # the only cover for macro go-to-definition now that the regex scan in
+      # extension.ts is gone.
+      - name: Go-to-definition tests
+        run: pnpm run test:langium-definition
+
       # Cross-repo contract: these two must agree with the notes-repo detector's
       # golden fixture, and the validation suite is what proves the diagnostic
       # actually fires through Langium rather than merely compiling.

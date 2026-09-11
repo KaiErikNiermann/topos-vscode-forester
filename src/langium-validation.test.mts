@@ -235,6 +235,78 @@ await test('a file-scoped pragma silences the report', async () => {
     }
 });
 
+// ── Forester markup inside math ───────────────────────────────────────────────
+//
+// \em and friends still resolve as Forester inside #{…} — TeX mode only shadows
+// the names in MATH_SHADOWED_COMMANDS — so they build a content node that has no
+// TeX rendering, and the compiler hard-errors (non_tex_content_in_math). The
+// editor must say so before the build does.
+
+async function assertMathMarkupError(source: string, cmd: string): Promise<void> {
+    const messages = await diagnosticsFor(source);
+    if (!messages.some((m) => m.startsWith(`${cmd} cannot appear inside math`))) {
+        throw new Error(
+            `Expected a markup-in-math error for ${cmd}, got:\n  ${messages.join('\n  ') || '(none)'}`,
+        );
+    }
+}
+
+async function assertNoMathMarkupError(source: string): Promise<void> {
+    const offending = (await diagnosticsFor(source))
+        .filter((m) => m.includes('cannot appear inside math'));
+    if (offending.length > 0) {
+        throw new Error(`Expected none, got:\n  ${offending.join('\n  ')}`);
+    }
+}
+
+await test('\\em inside display math errors', async () => {
+    await assertMathMarkupError(
+        '\\title{x}\n##{ \\textrm{for \\em{every}} A \\subseteq \\Omega }\n', '\\em',
+    );
+});
+
+await test('\\strong inside inline math errors', async () => {
+    await assertMathMarkupError('\\title{x}\n\\p{see #{\\strong{a} + b}}\n', '\\strong');
+});
+
+await test('the error names the TeX spelling to use instead', async () => {
+    const messages = await diagnosticsFor('\\title{x}\n##{ \\em{a} }\n');
+    if (!messages.some((m) => m.includes('\\textit{…}'))) {
+        throw new Error(`Expected \\textit suggested, got:\n  ${messages.join('\n  ') || '(none)'}`);
+    }
+});
+
+await test('\\ref inside math errors, with no TeX spelling to offer', async () => {
+    const messages = await diagnosticsFor('\\title{x}\n##{ x = \\ref{0001} }\n');
+    if (!messages.some((m) => m.startsWith('\\ref cannot appear inside math'))) {
+        throw new Error(`Expected a \\ref error, got:\n  ${messages.join('\n  ') || '(none)'}`);
+    }
+    if (!messages.some((m) => m.includes('Move it outside the math.'))) {
+        throw new Error('Expected the "move it outside" advice for \\ref');
+    }
+});
+
+// A brace group inside math is still math (isInTexMode walks through it).
+await test('\\em inside a TeX brace group in math still errors', async () => {
+    await assertMathMarkupError('\\title{x}\n##{ \\frac{\\em{a}}{b} }\n', '\\em');
+});
+
+await test('the same markup outside math is fine', async () => {
+    await assertNoMathMarkupError('\\title{x}\n\\p{ordinary \\em{emphasis} and \\strong{bold}}\n');
+});
+
+await test('the TeX spelling inside math is fine', async () => {
+    await assertNoMathMarkupError('\\title{x}\n##{ \\textrm{for } \\textit{every} A }\n');
+});
+
+await test('a raw TikZ body is not scanned for markup-in-math', async () => {
+    await assertNoMathMarkupError(TIKZ_BODY);
+});
+
+await test('\\def\\em… is a binding site, not a use', async () => {
+    await assertNoMathMarkupError('\\title{x}\n\\def\\em[y]{\\textit{\\y}}\n');
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);

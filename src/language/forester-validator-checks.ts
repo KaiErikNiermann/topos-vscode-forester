@@ -8,6 +8,8 @@
  *   • checkBuiltinArity    — brace-arg counts for known built-in commands (Task 4)
  *   • checkDateFormat      — \date{…} must be ISO 8601 YYYY-MM-DD (Task 5)
  *   • checkDuplicateImports — detect \import{id} repeated in same document (Task 3)
+ *   • checkMarkupInMath    — Forester markup (\em, \strong, \ref, …) inside #{…},
+ *                            which the compiler rejects (non_tex_content_in_math)
  *
  * Slow checks (run on save / explicit trigger):
  *   • checkImportExportTarget — \import/\export/\transclude{id} must reference a
@@ -102,6 +104,40 @@ const MATH_SHADOWED_COMMANDS: ReadonlySet<string> = new Set(['\\tag']);
 // usable inside math (and harmless outside it).
 const FORESTER_ESCAPE_HATCHES: readonly string[] =
     [...MATH_SHADOWED_COMMANDS].map((name) => `\\forester/${name.slice(1)}`);
+
+// Forester commands that build a content node which cannot be flattened into a
+// TeX string. Math reaches KaTeX and LaTeX as one flat string, so a command that
+// has to become markup has nowhere to go inside #{…}/##{…} or a \tex/\texfig
+// body, and the compiler rejects it (error[non_tex_content_in_math]).
+//
+// The value is the TeX command to suggest instead, or null when there is no
+// sensible equivalent and the markup simply has to move out of the math.
+//
+// Keep in sync with `renderable_as_tex` in the compiler's Types.ml: everything
+// that is not Text/CDATA/KaTeX/Footnote belongs here. \footnote is deliberately
+// absent — TeX_like renders its body. \number is too: it is already covered by
+// checkStructuralCommandContext, and two diagnostics on one node is noise.
+const NON_TEX_IN_MATH_COMMANDS: ReadonlyMap<string, string | null> = new Map([
+    // Inline markup with a direct TeX equivalent
+    ['\\em', '\\textit'],
+    ['\\strong', '\\textbf'],
+    ['\\code', '\\texttt'],
+    ['\\pre', '\\texttt'],
+    // Block structure — nothing inside a formula corresponds to these
+    ['\\p', null],
+    ['\\ul', null],
+    ['\\ol', null],
+    ['\\li', null],
+    ['\\blockquote', null],
+    ['\\figure', null],
+    ['\\figcaption', null],
+    ['\\subtree', null],
+    ['\\query', null],
+    // Nodes carrying a URI or a graph edge
+    ['\\ref', null],
+    ['\\link', null],
+    ['\\transclude', null],
+]);
 
 // Complete set of Forester built-in commands (full name, including leading backslash).
 // Commands matching this set are never "unresolved".
@@ -224,6 +260,26 @@ function isInTexMode(node: AstNode): boolean {
  */
 function isShadowedByTexMode(node: Command): boolean {
     return MATH_SHADOWED_COMMANDS.has(node.name) && isInTexMode(node);
+}
+
+/**
+ * A range covering only the command's name token, not its arguments.
+ *
+ * A Command's CST starts at the backslash and `node.name` includes it, so the
+ * name ends exactly `name.length` bytes in. Used to squiggle `\em` rather than
+ * all of `\em{a long argument}`, which also makes the range a drop-in target
+ * for a rename quick-fix.
+ */
+function commandNameRange(node: Command) {
+    const cst = node.$cstNode;
+    if (!cst) return {};
+    const doc = AstUtils.getDocument(node);
+    return {
+        range: {
+            start: doc.textDocument.positionAt(cst.offset),
+            end: doc.textDocument.positionAt(cst.offset + node.name.length),
+        },
+    };
 }
 
 /**
@@ -439,6 +495,41 @@ export class ForesterChecks {
             + 'surrounding \\p{…}/\\code{…}/argument, or use \\startverb…\\stopverb to '
             + 'show it literally.',
             { node },
+        );
+    }
+
+    /**
+     * Flag Forester markup used inside math (#{…}, ##{…}, a \tex/\texfig body).
+     *
+     * \em, \strong, \p, \ref and friends still resolve as Forester inside math
+     * — TeX mode only shadows the names in MATH_SHADOWED_COMMANDS — so they build
+     * a content node there. But math is emitted as one flat TeX string, so a node
+     * that has to become markup has nowhere to go, and the compiler hard-errors
+     * (non_tex_content_in_math). Reported as 'error' to keep editor and build in
+     * agreement, with the name-only range doubling as the quick-fix target.
+     */
+    checkMarkupInMath(node: Command, accept: ValidationAcceptor): void {
+        const replacement = NON_TEX_IN_MATH_COMMANDS.get(node.name);
+        if (replacement === undefined) return;
+        if (isOnCommentLine(node)) return;
+        if (isBindingSite(node)) return; // \def\em… redefines, not a use site
+        if (!isInTexMode(node)) return;
+
+        const advice = replacement === null
+            ? 'Move it outside the math.'
+            : `Use the TeX spelling ${replacement}{…} instead.`;
+
+        accept(
+            'error',
+            `${node.name} cannot appear inside math. Math is emitted as one flat `
+            + 'TeX string, so a command that has to become markup has nowhere to go '
+            + `(the compiler rejects this: non_tex_content_in_math). ${advice}`,
+            {
+                node,
+                ...commandNameRange(node),
+                code: 'non-tex-in-math',
+                data: { replacement },
+            },
         );
     }
 
@@ -859,6 +950,7 @@ export function registerForesterValidationChecks(services: ForesterServices): vo
             checker.checkDateFormat,
             checker.checkDatalogSyntax,
             checker.checkStructuralCommandContext,
+            checker.checkMarkupInMath,
         ],
         Document: [
             checker.checkDuplicateImports,

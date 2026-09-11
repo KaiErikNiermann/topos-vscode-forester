@@ -5,6 +5,7 @@
  *
  *   • 'missing-import'  (hint)    → "Add \import{treeId}"
  *   • 'handrolled-macro'          → "Replace \mathbb{N} with \N"
+ *   • 'non-tex-in-math' (error)   → "Replace with \textit"
  *   • 'unknown-command' (warning) → "Create definition for \foo"
  *   • 'unknown-command' (warning) → "Qualify as \prefix/foo"
  *
@@ -76,7 +77,9 @@ export class ForesterCodeActionProvider implements CodeActionProvider {
             // The diagnostic's own range is the matched expansion, so the fix is a
             // straight substitution. `replacement` is null when the expansion maps to
             // more than one macro — report it, but never guess which was meant.
-            if (diagnostic.code === 'handrolled-macro') {
+            // Both carry { replacement } and a range that is exactly the text to
+            // swap, so one branch serves them.
+            if (diagnostic.code === 'handrolled-macro' || diagnostic.code === 'non-tex-in-math') {
                 const data = diagnostic.data as { replacement?: string | null } | undefined;
                 if (!data?.replacement) {continue;}
 

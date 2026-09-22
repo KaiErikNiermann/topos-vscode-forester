@@ -153,6 +153,14 @@ suite('auto-closing', () => {
         assertTyping(await type('#{ | }', '('), '#{ (|) }', 'Typing ( inside inline math should auto-close');
     });
 
+    test('( inside an escaped brace closes before \\}', async () => {
+        assertTyping(
+            await type('\\{|\\}', '('),
+            '\\{(|)\\}',
+            'Typing ( inside an escaped brace should close with ) before \\}',
+        );
+    });
+
     // ── The plain brace pair still behaves ───────────────────────────────────
 
     test('a bare { still closes with }', async () => {
